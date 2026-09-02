@@ -126,6 +126,8 @@ export class R2StorageGateway implements StorageGateway {
 
 export class InMemoryStorageGateway implements StorageGateway {
   private readonly objects = new Map<string, Buffer>();
+  /** Opaque download tokens mapped to storage keys (mirrors the R2 contract). */
+  private readonly downloadTokens = new Map<string, string>();
 
   async createUploadIntent(
     key: string,
@@ -168,6 +170,10 @@ export class InMemoryStorageGateway implements StorageGateway {
 
   async createDownloadUrl(key: string, expiresInSeconds: number): Promise<string> {
     void expiresInSeconds;
-    return `http://storage.test/download/${key}?sig=test`;
+    // Mirrors the R2 contract: the presigned URL never carries credentials or
+    // storage-key metadata — the signature itself grants time-boxed access.
+    const token = randomBytes(16).toString('hex');
+    this.downloadTokens.set(token, key);
+    return `http://storage.test/download/${token}?sig=test`;
   }
 }

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### M3 Follow-up — Authorized media download endpoint
+
+- Implemented the documented GET /v1/media/:id/url: authenticated, READY-avatar-only, avatar-visibility rule enforced (self or >=1 shared active Circle with the avatar owner) BEFORE the short-TTL presigned GET is issued; generic 404 on every failure (existence not leaked); Cache-Control no-store; storage keys/credentials never in responses. Deleted Circles lose access. In-memory gateway download URLs are opaque tokens (mirroring R2). 12 integration tests.
+
 ### M3 — Profiles
 
 - Server (docs/API.md contract): PATCH /v1/users/me (displayName/bio, explicit update schema, username immutable), POST /v1/users/me/avatar (own READY avatar media only), GET /v1/users/:username (minimal profile: display name + avatar; viewer rule = self or ≥1 shared active Circle, existence hidden), GET /v1/users/me/avatar-url (short-TTL presigned GET for the caller's avatar).

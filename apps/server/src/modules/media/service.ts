@@ -112,3 +112,31 @@ export async function findReadyAvatarById(db: Database, mediaId: string) {
     .limit(1);
   return rows[0];
 }
+
+/**
+ * Caller-specific authorization for viewing an avatar media object
+ * (docs/API.md "Avatar access", docs/SECURITY.md §7).
+ *
+ * The M3 profile-visibility rule: the requester may view an avatar only when
+ * they are the avatar owner themself, or they share at least one active
+ * Circle with the avatar owner (the same rule as the minimal profile).
+ * Knowing the media UUID alone never grants access. `sharesActiveCircle`
+ * is injected to keep this module free of profile-module imports.
+ */
+export async function canViewAvatarMedia(
+  db: Database,
+  input: {
+    mediaId: string;
+    requesterId: string;
+    sharesActiveCircle: (userA: string, userB: string) => Promise<boolean>;
+  },
+): Promise<boolean> {
+  const row = await findReadyAvatarById(db, input.mediaId);
+  if (!row) {
+    return false;
+  }
+  if (row.ownerId === input.requesterId) {
+    return true;
+  }
+  return input.sharesActiveCircle(input.requesterId, row.ownerId);
+}

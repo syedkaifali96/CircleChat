@@ -53,7 +53,7 @@ PATCH /v1/conversations/:id/notification-pref {enabled?, muted?, mentions?, prev
 
 POST /v1/media/upload-intent            {kind, mimeType, sizeBytes, context} → {mediaId, uploadUrl}
 POST /v1/media/:id/confirm              server verifies object → status ready
-GET  /v1/media/:id/url                  authorized owner/participant/member check → short-TTL presigned GET (M3: avatar media; M5 adds chat media)
+GET  /v1/media/:id/url                  auth → READY avatar media only (M3); viewer rule = avatar owner or >=1 shared active Circle; generic 404 on every failure; short-TTL presigned GET, no-store (M5 adds chat-media checks)
 GET  /v1/users/me/avatar-url            auth → short-TTL presigned GET for the caller's own avatar (404 when none set)
 
 POST /v1/conversations/:id/polls        circle conversations only {question, options[2–6], closesAt?}
