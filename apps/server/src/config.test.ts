@@ -24,4 +24,22 @@ describe('loadConfig', () => {
     );
     expect(() => loadConfig({ NODE_ENV: 'staging' })).toThrow(/Invalid environment configuration/);
   });
+
+  it('does not read DATABASE_URL or any secret in M0 (database arrives in M1)', () => {
+    const cfg = loadConfig({ DATABASE_URL: 'postgres://user:pass@db.internal:5432/circlechat' });
+
+    expect(Object.keys(cfg).sort()).toEqual(['logLevel', 'nodeEnv', 'port']);
+    expect(JSON.stringify(cfg)).not.toContain('postgres://');
+    expect(JSON.stringify(cfg)).not.toContain('pass');
+  });
+
+  it('never includes raw values in validation failure messages', () => {
+    try {
+      loadConfig({ PORT: 'not-a-port' });
+      expect.unreachable('loadConfig should have thrown');
+    } catch (err) {
+      expect(err instanceof Error).toBe(true);
+      expect((err as Error).message).not.toContain('not-a-port');
+    }
+  });
 });
