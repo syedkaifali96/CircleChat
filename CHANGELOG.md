@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### M1 — Database Foundation
+
+- Drizzle schema for all 15 documented tables (users, sessions, media, circles, circle_members, circle_settings, conversations, conversation_participants, messages, message_reactions, polls, poll_votes, pinboard_items, notifications, conversation_notification_prefs).
+- Migrations `0000_m1_schema` (tables/FKs/checks/indexes) and `0001_m1_invariants` (avatar FKs breaking the users/circles↔media cycle; 5-member capacity trigger with `CIRCLE_FULL`; members_count sync; direct-conversation two-participant guard; polls-on-Circle-conversations guard; poll-vote option bound).
+- PostgreSQL-level enforcement: username format + case-insensitive uniqueness, one-owner partial unique index, idempotent sends via `(conversation_id, sender_id, client_message_id)`, hashed-only invite storage, keyset pagination indexes, partial unread index.
+- Database client foundation (`createDatabase`) — intentionally not wired into the app runtime until M2.
+- PostgreSQL integration tests (35) running against a real database: constraint/trigger behavior, cascades, rollback patterns, index presence; hermetic local runs via embedded PostgreSQL (UTF-8), CI via the PostgreSQL 16 service container.
+
 ### M0 — Foundation / Scaffold
 
 - npm-workspaces monorepo (`packages/shared`, `apps/server`, `apps/mobile`) with root scripts: `dev:server`, `dev:mobile`, `typecheck`, `lint`, `test`, `build`, `db:generate`, `db:migrate`.

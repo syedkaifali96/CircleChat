@@ -117,7 +117,8 @@ CircleChat should collect the minimum information necessary to provide the servi
 | Product specification, design system, build plan | ✅ Done |
 | Architecture, database, security, API, deployment docs | ✅ Done (audit-approved) |
 | M0 — Foundation / scaffold (monorepo, server, mobile, CI) | ✅ Done |
-| M1 — Database schema & migrations | ⛔ Awaiting explicit approval |
+| M1 — Database schema, migrations, invariants, integration tests | ✅ Done |
+| M2 — Authentication | ⛔ Awaiting explicit approval |
 
 ## Getting Started (M0 scaffold)
 
@@ -133,6 +134,7 @@ npm run test         # server + shared + mobile tests
 npm run build        # build all workspaces (shared dist, server dist, mobile export)
 ```
 
-`apps/server/src/db/schema.ts` is intentionally empty in M0; `npm run db:generate` /
-`npm run db:migrate` become meaningful in M1 (see docs/DATABASE.md). Copy `.env.example`
-to `.env` for local configuration — never commit real values.
+`apps/server/src/db/schema.ts` implements the approved schema (docs/DATABASE.md);
+migrations live in `apps/server/drizzle/` and are applied to a fresh database by
+the integration tests. `npm run db:generate` / `npm run db:migrate` manage them.
+Copy `.env.example` to `.env` for local configuration — never commit real values.
