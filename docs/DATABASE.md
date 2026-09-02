@@ -1,8 +1,8 @@
 # CircleChat — Database Design
 
-> Status: **Proposed — awaiting approval.** PostgreSQL 16, accessed via Drizzle ORM.
-> This document is conceptual-but-concrete: names, types, constraints and indexes are the
-> intended implementation. Physical tuning happens during implementation.
+> Status: **Proposed — aligned with the approved documentation gate.** PostgreSQL 16, accessed via Drizzle ORM.
+> This document is conceptual-but-concrete: names, types, constraints and indexes are the intended
+> implementation. Physical tuning happens during implementation.
 
 Conventions: UUID primary keys (`gen_random_uuid()`), `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`,
 snake_case names, soft deletes only where specified. All timestamps are UTC.
@@ -14,21 +14,19 @@ snake_case names, soft deletes only where specified. All timestamps are UTC.
 ```text
 users ──< sessions/devices
 users ──< circle_members >── circles ─── circle_settings (1:1)
-                              circles ─── pinboard_items
-users ──< conversations (as participants) >── conversations
+users ──< conversation_participants >── conversations
 conversations ──< messages ──< message_reactions
+conversations ──< conversation_notification_prefs
 conversations ──< polls ──< poll_votes
 messages/media ─── media
 users ──< notifications
+circles ──< pinboard_items
 ```
 
-**Design decision (needs approval):** a `conversations` table is introduced on top of the
-tables listed in the spec. Reason: the product has **two conversation types** (Circle group chat
-and private 1-to-1 chat) and both need messages, reactions, read states and typing. Modeling
-both as `conversations` (type `circle` or `direct`) keeps `messages`, reactions and read-state
-logic unified, while `conversations.type` and the absence of Circle features for `direct`
-conversations keep the two product concepts distinct. Private chats are **not** modeled as
-2-member Circles.
+A `conversations` table unifies the two messaging types: Circle group chats (`type='circle'`) and
+private 1-to-1 chats (`type='direct'`). Direct conversations are **not** modeled as 2-member Circles.
+The `conversation_participants` table is the authoritative authorization source for direct chats.
+`direct_key` remains only as a uniqueness helper.
 
 ---
 
@@ -41,17 +39,19 @@ Purpose: an account. Identity is username-only — no email/phone columns exist.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
-| `username` | TEXT UNIQUE NOT NULL | stored lowercase; `^[a-z0-9_]{3,20}$`; case-insensitive uniqueness enforced via unique index on lower(username) |
+| `username` | TEXT UNIQUE NOT NULL | stored lowercase; `^[a-z0-9_]{3,20}$`; case-insensitive uniqueness via unique index on lower(username) |
 | `display_name` | TEXT NOT NULL | shown in UI, 1–40 chars |
 | `password_hash` | TEXT NOT NULL | Argon2id string (PHC format) |
 | `recovery_code_hash` | TEXT NOT NULL | Argon2id hash of the recovery code |
 | `bio` | TEXT NULL | optional, ≤ 200 chars |
 | `avatar_media_id` | UUID NULL → `media.id` | profile picture |
+| `notifications_enabled` | BOOLEAN NOT NULL DEFAULT true | global push notification enable/disable |
+| `notification_preview` | BOOLEAN NOT NULL DEFAULT true | global message-preview privacy default |
 | `last_seen_at` | TIMESTAMPTZ NULL | updated at most every 60s (presence) |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
-Relationships: 1→N sessions, circle_members, messages; 1→N media (owner).
-Indexes: `UNIQUE (lower(username))`. Reserved usernames blocked in app logic (`admin`, `circlechat`, `support`, …).
+Username is **fixed after account creation in MVP**; there is no username-change operation.
+Relationships: 1→N sessions, circle_members, conversation_participants, messages, media (owner).
 No PII beyond what the user typed. No email/phone/contact fields by design.
 
 ### 1.2 `circles`
@@ -63,82 +63,114 @@ Purpose: a private group of 2–5 members.
 | `id` | UUID PK | |
 | `name` | TEXT NOT NULL | 1–40 chars |
 | `description` | TEXT NULL | optional |
-| `avatar_media_id` | UUID NULL → `media.id` | |
+| `avatar_media_id` | UUID NULL → `media.id` | Circle avatar |
 | `created_by` | UUID NOT NULL → `users.id` | initial owner |
-| `members_count` | SMALLINT NOT NULL DEFAULT 1 | **denormalized counter maintained by trigger**; enables cheap limit checks and display; kept consistent transactionally |
-| `invite_code_hash` | TEXT UNIQUE NULL | SHA-256 hash of the active invite code (raw code never stored); NULL when invites disabled/expired |
-| `invite_expires_at` | TIMESTAMPTZ NULL | |
+| `members_count` | SMALLINT NOT NULL DEFAULT 1 | denormalized counter maintained transactionally/triggered |
+| `invite_code_hash` | TEXT UNIQUE NULL | SHA-256 hash of the active invite code; raw code is never stored |
+| `invite_expires_at` | TIMESTAMPTZ NULL | active invite expiry |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
-| `deleted_at` | TIMESTAMPTZ NULL | soft delete so "circle was deleted" can be shown gracefully |
+| `deleted_at` | TIMESTAMPTZ NULL | soft delete |
 
-Relationships: 1→1 `circle_settings`; 1→N `circle_members`, conversations (type=circle), pinboard_items.
+Relationships: 1→1 `circle_settings`; 1→N `circle_members`, one Circle conversation, pinboard items.
 Indexes: `UNIQUE (invite_code_hash)` (partial where not null).
+
+**Invite semantics:** the active invite code is multi-use while it is valid, revocable and the Circle
+has capacity. Capacity is inherently limited by the Circle's 5-member invariant; no separate usage
+counter is required. The raw invite code is generated and returned once, then only its hash is stored.
+Revoking an invite clears `invite_code_hash` and `invite_expires_at`.
 
 ### 1.3 `circle_members`
 
-Purpose: membership + role in a Circle; **the authorization table**.
+Purpose: Circle membership + role; **the Circle authorization table**.
 
 | Field | Type | Notes |
 |---|---|---|
 | `circle_id` | UUID, FK → `circles.id` ON DELETE CASCADE | composite PK part 1 |
 | `user_id` | UUID, FK → `users.id` ON DELETE CASCADE | composite PK part 2 |
-| `role` | TEXT NOT NULL CHECK (`role IN ('owner','admin','member')`) | exactly one `owner` per circle (partial unique index) |
+| `role` | TEXT NOT NULL CHECK (`role IN ('owner','admin','member')`) | exactly one owner per Circle |
 | `joined_at` | TIMESTAMPTZ NOT NULL | |
 
-Primary key: `(circle_id, user_id)` — a user can never be in a circle twice.
+Primary key: `(circle_id, user_id)` — a user can never be in a Circle twice.
 Additional index: `(user_id)` for "my circles" queries.
 
-**Server-side 5-member limit (must never be client-enforced only).** Joining runs in one
-transaction using **all three layers**:
+**Server-side 5-member limit.** Joining runs in one transaction using all three layers:
 
-1. **Conditional insert** (primary guard):
-   ```sql
-   INSERT INTO circle_members (circle_id, user_id, role)
-   SELECT $circleId, $userId, 'member'
-   WHERE (SELECT members_count FROM circles WHERE id = $circleId FOR UPDATE) < 5;
-   ```
-   `FOR UPDATE` locks the circle row so two concurrent joins cannot both pass the check.
-2. **Trigger** `trg_circle_members_guard`: `BEFORE INSERT` re-counts `circle_members` and raises
-   an exception at 5; also maintains `circles.members_count` on insert/delete (belt-and-braces
-   against any code path bypassing the helper).
-3. **`CHECK (members_count <= 5)`** on `circles` — final declarative guarantee.
+1. Lock the Circle row and conditionally insert only when `members_count < 5`.
+2. A `BEFORE INSERT` trigger re-counts membership and rejects a sixth member while maintaining the
+   denormalized counter on insert/delete.
+3. `CHECK (members_count <= 5)` remains the final declarative guard.
 
-Creating a circle inserts the owner as the first member (count = 1), so a Circle can have 1
-member only in the window between creation and the first invite — the *joinable* state of any
-circle is always 2–5.
+The application maps a zero-row conditional join caused by capacity to stable API error
+`CIRCLE_FULL` (HTTP 409). Database/trigger violations are also translated to the same stable error.
+
+Creating a Circle inserts the owner as the first member. A Circle may therefore temporarily have one
+member immediately after creation, before an invitee joins.
 
 ### 1.4 `circle_settings`
 
-Purpose: Circle identity/customization (spec: name/avatar/theme/accent/background + per-circle behavior).
+Purpose: Circle customization and behavior.
 
 | Field | Type | Notes |
 |---|---|---|
 | `circle_id` | UUID PK, FK → `circles.id` ON DELETE CASCADE | 1:1 |
-| `theme_preset` | TEXT NOT NULL DEFAULT 'dark_purple' | one of app-defined presets |
+| `theme_preset` | TEXT NOT NULL DEFAULT 'dark_purple' | app-defined presets |
 | `accent_color` | TEXT NULL | validated `#RRGGBB`, nullable |
 | `background_key` | TEXT NULL | reference to bundled background asset |
-| `status_text` | TEXT NULL | Circle status (V2 field, kept nullable) |
 | `updated_at` | TIMESTAMPTZ NOT NULL | |
 
-Editable by `owner`/`admin` only (enforced in API, not DB).
+`status_text` is intentionally removed. Circle description lives on `circles.description`.
+Editable by `owner`/`admin` only (enforced in API).
 
 ### 1.5 `conversations`
 
-Purpose: unifies the two conversation types for messaging.
+Purpose: unified message container for Circle chats and private direct chats.
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `type` | TEXT NOT NULL CHECK (`type IN ('circle','direct')`) | |
-| `circle_id` | UUID NULL → `circles.id` ON DELETE CASCADE | NOT NULL when type='circle'; **partial unique index** (one circle-conversation per circle) |
-| `direct_key` | TEXT NULL UNIQUE | for type='direct': `sorted(userA,userB)` UUID pair string; prevents duplicate private chats |
+| `circle_id` | UUID NULL → `circles.id` ON DELETE CASCADE | NOT NULL when type='circle'; one conversation per Circle |
+| `direct_key` | TEXT NULL UNIQUE | sorted UUID pair; uniqueness helper only |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
-| `last_message_at` | TIMESTAMPTZ NULL | denormalized for chat-list ordering |
+| `last_message_at` | TIMESTAMPTZ NULL | denormalized chat-list ordering |
 
-Constraints: `CHECK ((type='circle' AND circle_id IS NOT NULL AND direct_key IS NULL) OR (type='direct' AND direct_key IS NOT NULL AND circle_id IS NULL))`.
-Membership for `direct` conversations = the two users encoded in `direct_key` (parsed and re-verified server-side on every access; additionally enforced by a `conversation_participants` helper view/table during implementation if parsing proves error-prone — final decision at implementation).
+Constraints:
 
-### 1.6 `messages`
+```sql
+CHECK (
+  (type='circle' AND circle_id IS NOT NULL AND direct_key IS NULL)
+  OR
+  (type='direct' AND direct_key IS NOT NULL AND circle_id IS NULL)
+)
+```
+
+A `direct` conversation has exactly two rows in `conversation_participants`. **Never authorize a
+DM by parsing `direct_key`.** `direct_key` only prevents duplicate direct conversations.
+
+Creating a direct conversation also requires the two users to share at least one active Circle at
+the time it is created. The resulting direct conversation remains independent of that Circle.
+
+### 1.6 `conversation_participants`
+
+Purpose: authoritative participants/authorization for `direct` conversations.
+
+| Field | Type | Notes |
+|---|---|---|
+| `conversation_id` | UUID, FK → `conversations.id` ON DELETE CASCADE | composite PK part 1 |
+| `user_id` | UUID, FK → `users.id` ON DELETE CASCADE | composite PK part 2 |
+| `joined_at` | TIMESTAMPTZ NOT NULL | |
+
+Primary key: `(conversation_id, user_id)`.
+
+For `type='direct'`, exactly two distinct users must be present. Creation must insert both participant
+rows in the same transaction as the conversation. Access to direct messages, reads, reactions, media
+and realtime events is authorized by membership in this table. A database trigger/constraint check
+must prevent a direct conversation from ending up with anything other than two participants.
+
+Circle conversations do not use this table as their Circle-membership authority; `circle_members`
+remains authoritative for Circle-scoped resources.
+
+### 1.7 `messages`
 
 Purpose: chat messages for both conversation types.
 
@@ -147,20 +179,25 @@ Purpose: chat messages for both conversation types.
 | `id` | UUID PK | |
 | `conversation_id` | UUID NOT NULL → `conversations.id` ON DELETE CASCADE | |
 | `sender_id` | UUID NOT NULL → `users.id` | |
+| `client_message_id` | TEXT NOT NULL | client-generated idempotency key, unique per sender/conversation |
 | `type` | TEXT NOT NULL CHECK (`type IN ('text','image','video','voice','file')`) | MVP set |
-| `body` | TEXT NULL | text content; ≤ 4000 chars; NULL for pure-media messages |
+| `body` | TEXT NULL | ≤ 4000 chars; NULL for pure-media messages |
 | `media_id` | UUID NULL → `media.id` | NOT NULL when type ≠ text |
-| `reply_to_id` | UUID NULL → `messages.id` | reply threading (1 level, no deep threads) |
-| `edited_at` | TIMESTAMPTZ NULL | edit allowed to sender only, within 24h window (product rule) |
-| `deleted_at` | TIMESTAMPTZ NULL | soft delete → tombstone ("message deleted") for other members |
+| `reply_to_id` | UUID NULL → `messages.id` | one-level reply threading |
+| `edited_at` | TIMESTAMPTZ NULL | sender-only edit within approved window |
+| `deleted_at` | TIMESTAMPTZ NULL | tombstone |
 | `created_at` | TIMESTAMPTZ NOT NULL | ordering clock |
+
+Unique constraint: `(conversation_id, sender_id, client_message_id)`.
+This makes REST retries idempotent without allowing two users to collide on the same client key.
 
 Indexes:
 - `(conversation_id, created_at DESC, id)` — history pagination + stable ordering.
-- `(conversation_id, last-message lookup)` partial index `WHERE deleted_at IS NULL`.
-- `ON DELETE` for reply_to: `SET NULL` (a deleted message does not cascade-delete replies).
+- `(conversation_id, created_at DESC)` for latest-message lookup where `deleted_at IS NULL`.
 
-### 1.7 `message_reactions`
+`reply_to_id` uses `ON DELETE SET NULL` so deleting a message does not cascade-delete replies.
+
+### 1.8 `message_reactions`
 
 Purpose: emoji reactions on messages.
 
@@ -168,14 +205,14 @@ Purpose: emoji reactions on messages.
 |---|---|---|
 | `message_id` | UUID, FK → `messages.id` ON DELETE CASCADE | composite PK part 1 |
 | `user_id` | UUID, FK → `users.id` ON DELETE CASCADE | composite PK part 2 |
-| `emoji` | TEXT NOT NULL | composite PK part 3; restricted to a server-defined emoji set |
+| `emoji` | TEXT NOT NULL | server-defined emoji set |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
 PK `(message_id, user_id, emoji)` — a user may add several different emoji but never the same one twice.
 
-### 1.8 `media`
+### 1.9 `media`
 
-Purpose: metadata for uploaded files (bytes live in R2, never in the DB).
+Purpose: metadata for uploaded files; bytes live in private R2.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -183,18 +220,25 @@ Purpose: metadata for uploaded files (bytes live in R2, never in the DB).
 | `owner_id` | UUID NOT NULL → `users.id` | uploader |
 | `conversation_id` | UUID NULL → `conversations.id` | access scope for chat media |
 | `kind` | TEXT NOT NULL CHECK (`kind IN ('image','video','voice','file','avatar')`) | |
-| `mime_type` | TEXT NOT NULL | server-sniffed, from allowlist only |
+| `mime_type` | TEXT NOT NULL | server-validated/sniffed |
 | `size_bytes` | BIGINT NOT NULL CHECK (`size_bytes > 0`) | re-verified at confirm |
-| `storage_key` | TEXT NOT NULL UNIQUE | R2 object key (`media/{uuid}/{kind}/{random}` — non-guessable) |
-| `status` | TEXT NOT NULL CHECK (`status IN ('pending','ready','deleted')`) | lifecycle (§9 of ARCHITECTURE) |
+| `storage_key` | TEXT NOT NULL UNIQUE | non-guessable R2 object key |
+| `status` | TEXT NOT NULL CHECK (`status IN ('pending','ready','deleted')`) | lifecycle |
 | `width`/`height` | INTEGER NULL | images/videos |
 | `duration_ms` | INTEGER NULL | voice/video |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
-Indexes: `(conversation_id)` for gallery queries; `(owner_id, status)` for cleanup jobs.
-Access rule: downloadable by the owner, or by a member of the linked conversation (server checks at presign time).
+Indexes: `(conversation_id)` and `(owner_id, status)`.
 
-### 1.9 `sessions` (devices)
+Access rules are explicit and are enforced before presigning:
+
+- Chat media: owner or an authorized participant/member of the linked conversation.
+- Profile avatar: authorized viewers of that user's minimal profile; never a global media bypass.
+- Circle avatar: active members of that Circle.
+- Invite-preview Circle avatar: only through the specific valid invite-preview flow, with limited
+  pre-join fields and no general Circle/member access.
+
+### 1.10 `sessions` (devices)
 
 Purpose: one row per logged-in device; revocable; also holds push tokens.
 
@@ -202,54 +246,78 @@ Purpose: one row per logged-in device; revocable; also holds push tokens.
 |---|---|---|
 | `id` | UUID PK | |
 | `user_id` | UUID NOT NULL → `users.id` ON DELETE CASCADE | |
-| `token_hash` | TEXT NOT NULL UNIQUE | SHA-256 of the opaque session token (raw token never stored) |
-| `device_name` | TEXT NOT NULL | e.g. "Kaif's Pixel" |
+| `token_hash` | TEXT NOT NULL UNIQUE | SHA-256 of opaque session token |
+| `device_name` | TEXT NOT NULL | |
 | `platform` | TEXT NOT NULL CHECK (`platform IN ('android','ios','other')`) | |
-| `push_token` | TEXT NULL | Expo push token for this device |
+| `push_token` | TEXT NULL | Expo push token |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
-| `last_active_at` | TIMESTAMPTZ NOT NULL | refreshed on use (throttled) |
-| `expires_at` | TIMESTAMPTZ NOT NULL | 30 days, sliding |
-| `revoked_at` | TIMESTAMPTZ NULL | set on logout/revoke/"log out everywhere" |
+| `last_active_at` | TIMESTAMPTZ NOT NULL | refreshed on use, throttled |
+| `expires_at` | TIMESTAMPTZ NOT NULL | 30 days sliding |
+| `revoked_at` | TIMESTAMPTZ NULL | logout/revoke/recovery/password-change effects |
 
-Indexes: `(user_id)` for device list; `UNIQUE (token_hash)` is the login lookup.
-Cleanup job removes expired/revoked rows older than 30 days.
+Indexes: `(user_id)` and `UNIQUE (token_hash)`.
 
-### 1.10 `notifications`
+Revoked/expired rows older than the cleanup window may be removed. Revoking a session also disconnects
+its live Socket.IO connection(s); a revoked session must not remain authorized over an existing socket.
 
-Purpose: in-app activity log (Activity tab) + record of push delivery decisions.
+### 1.11 `conversation_notification_prefs`
+
+Purpose: per-conversation notification controls for both Circle and direct conversations.
+
+| Field | Type | Notes |
+|---|---|---|
+| `conversation_id` | UUID, FK → `conversations.id` ON DELETE CASCADE | composite PK part 1 |
+| `user_id` | UUID, FK → `users.id` ON DELETE CASCADE | composite PK part 2 |
+| `enabled` | BOOLEAN NOT NULL DEFAULT true | per-conversation notification enable/disable |
+| `muted` | BOOLEAN NOT NULL DEFAULT false | silent/muted state |
+| `mentions` | BOOLEAN NOT NULL DEFAULT true | mention notifications where applicable |
+| `preview` | BOOLEAN NOT NULL DEFAULT true | whether message text may appear in push preview |
+| `sound_key` | TEXT NULL | optional custom notification sound identifier |
+| `updated_at` | TIMESTAMPTZ NOT NULL | |
+
+Primary key: `(conversation_id, user_id)`.
+
+Effective push behavior is computed server-side from global user settings plus these per-conversation
+preferences. A global disable always suppresses notification delivery. A muted conversation suppresses
+normal message pushes; mention behavior is applied only where mentions are applicable. Preview privacy
+controls whether message content is included.
+
+### 1.12 `notifications`
+
+Purpose: in-app activity log for Circle activity; pure message pushes are not required to be stored here.
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `user_id` | UUID NOT NULL → `users.id` ON DELETE CASCADE | recipient |
-| `type` | TEXT NOT NULL | `poll_created`, `member_joined`, `poll_closed`, … (not per-message) |
-| `actor_id` | UUID NULL → `users.id` | who caused it |
+| `type` | TEXT NOT NULL | `poll_created`, `member_joined`, `poll_closed`, … |
+| `actor_id` | UUID NULL → `users.id` | |
 | `circle_id` | UUID NULL → `circles.id` ON DELETE CASCADE | context |
-| `payload` | JSONB NOT NULL DEFAULT '{}' | small display data (names, poll question) — **no message bodies** |
+| `payload` | JSONB NOT NULL DEFAULT '{}' | small display data; no message bodies |
 | `read_at` | TIMESTAMPTZ NULL | |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
-Index: `(user_id, created_at DESC)`; partial unread index `WHERE read_at IS NULL`.
-Per-device push state (mutes, preview privacy) lives on `sessions` + a `circle_members.notification_pref` column (`'all' | 'mentions' | 'muted'`, default `'all'`).
+Index: `(user_id, created_at DESC)` plus partial unread index.
 
-### 1.11 `polls`
+### 1.13 `polls`
 
-Purpose: simple Circle polls (MVP feature; Circle-only — `direct` conversations cannot have polls).
+Purpose: simple Circle polls; direct conversations cannot have polls.
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
-| `conversation_id` | UUID NOT NULL → `conversations.id` ON DELETE CASCADE | must be type='circle' (API-enforced + trigger check) |
+| `conversation_id` | UUID NOT NULL → `conversations.id` ON DELETE CASCADE | must be Circle conversation |
 | `created_by` | UUID NOT NULL → `users.id` | |
 | `question` | TEXT NOT NULL | ≤ 300 chars |
-| `options` | JSONB NOT NULL | array of 2–6 strings, `CHECK (jsonb_array_length(options) BETWEEN 2 AND 6)`, each ≤ 80 chars |
-| `allow_multiple` | BOOLEAN NOT NULL DEFAULT false | MVP: false (single choice) |
+| `options` | JSONB NOT NULL | array of 2–6 strings; each ≤ 80 chars |
 | `closes_at` | TIMESTAMPTZ NULL | optional deadline |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
-Index: `(conversation_id, created_at DESC)`.
+`allow_multiple` is intentionally removed. MVP polls are single-choice only.
+Constraint: `jsonb_array_length(options) BETWEEN 2 AND 6`; each option length is validated by the
+application and/or reviewed trigger as appropriate.
 
-### 1.12 `poll_votes`
+### 1.14 `poll_votes`
 
 Purpose: one member's vote on a poll.
 
@@ -257,23 +325,24 @@ Purpose: one member's vote on a poll.
 |---|---|---|
 | `poll_id` | UUID, FK → `polls.id` ON DELETE CASCADE | composite PK part 1 |
 | `user_id` | UUID, FK → `users.id` ON DELETE CASCADE | composite PK part 2 |
-| `option_index` | SMALLINT NOT NULL CHECK (`option_index >= 0 AND option_index < 6`) | exact bound (2–6) re-validated against `polls.options` in the vote transaction |
+| `option_index` | SMALLINT NOT NULL CHECK (`option_index >= 0 AND option_index < 6`) | validated against current options |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
-PK `(poll_id, user_id)` — **one vote per user** guaranteed by the primary key; vote changes
-allowed while poll is open (delete + insert in one transaction). Results visible to members;
-anonymous vote contents are never exposed, only tallies (product can decide to show who voted what later — V2).
+PK `(poll_id, user_id)` guarantees one vote per user. Vote changes are a delete+insert transaction while
+open. Results are visible to Circle members as defined by the product rules.
 
-### 1.13 `pinboard_items` (addition, MVP feature per spec)
+### 1.15 `pinboard_items`
+
+Purpose: Circle-level shared pins.
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `circle_id` | UUID NOT NULL → `circles.id` ON DELETE CASCADE | |
 | `created_by` | UUID NOT NULL → `users.id` | |
-| `content` | TEXT NOT NULL | ≤ 1000 chars (text pins in MVP) |
+| `content` | TEXT NOT NULL | ≤ 1000 chars |
 | `pinned_at` | TIMESTAMPTZ NOT NULL | |
-| `order_index` | INTEGER NOT NULL DEFAULT 0 | manual ordering |
+| `order_index` | INTEGER NOT NULL DEFAULT 0 | |
 
 Index: `(circle_id, pinned_at DESC)`.
 
@@ -281,18 +350,29 @@ Index: `(circle_id, pinned_at DESC)`.
 
 ## 2. Future Tables (V2 — named now, built later)
 
-`memories`, `events`, `moods`, `circle_status_history`, `saved_messages` — see Build Plan §9.
-They will follow the same conventions; nothing in the MVP schema blocks them.
+`memories`, `events`, `moods`, `circle_status_history`, `saved_messages` — see Build Plan future scope.
+They will follow the same conventions; nothing in the MVP schema requires implementing them now.
+
+Account deletion is **post-MVP** and therefore has no deletion-specific table or API requirement in the MVP schema.
 
 ## 3. Integrity & Performance Notes
 
-- **No cascading message deletion** from circles: a soft-deleted Circle keeps message rows for a defined grace period so members see a clear state; hard purge is a later, explicit decision.
-- All writes that span tables (join circle, vote, edit message) run in **transactions** with row locks on the contested parent row (`circles`, `polls`).
-- Pagination everywhere (`keyset` on `(created_at, id)`), no OFFSET scans.
-- Expected scale is tiny (≤ 5 members/circle), so indexes above are sufficient; no partitioning, no read replicas for MVP.
+- **No client-only authorization.** Circle membership uses `circle_members`; direct authorization uses `conversation_participants`.
+- **5-member limit:** the join transaction locks the Circle row; conditional insert + trigger + `CHECK` provide layered enforcement. A failed capacity join maps to `CIRCLE_FULL`.
+- **Direct participant invariant:** a direct conversation must have exactly two participants, created atomically with the conversation. `direct_key` is not an authorization source.
+- **Ownership transfer:** transfer must run as one transaction: lock the Circle, verify the current caller is owner and the target is an active member, demote the old owner, promote the target, and preserve the exactly-one-owner invariant. The caller cannot leave/demote the owner role in a way that leaves no owner.
+- **Invite lifecycle:** create/revoke/expiry updates the hashed invite fields atomically. Preview validates the supplied code against its hash, expiry, revocation state and Circle capacity before returning limited preview data.
+- **Idempotent messages:** `(conversation_id, sender_id, client_message_id)` prevents duplicate messages caused by retries.
+- All writes spanning tables run in transactions with row locks on contested parent rows.
+- Pagination uses keyset ordering; no OFFSET scans for message history.
+- Expected scale is tiny (≤5 members/Circle), so indexes above are sufficient; no partitioning/read replicas for MVP.
 
 ## 4. Migration Policy
 
 - Drizzle Kit generates SQL migrations; every migration is committed with the change that required it.
-- Migrations run automatically on deploy (and manually with a documented command otherwise); they are reviewed like code — especially anything touching `circle_members`.
-- Neon branching gives every PR/test run an isolated database copy.
+- Migrations run automatically on deploy (and manually with a documented command otherwise); they are
+  reviewed like code, especially anything touching `circle_members`, `conversation_participants`, or
+  ownership-transfer invariants.
+- Neon branching can provide isolated databases for PR/test work.
+- Schema changes that remove `circle_settings.status_text` or `polls.allow_multiple` must include the
+  corresponding migration and constraint/index updates; no compatibility column should be silently kept.
