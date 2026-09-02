@@ -1,89 +1,100 @@
 # CircleChat — Architecture
 
-> Status: **Proposed — awaiting approval.** This document is the technical source of truth for
-> how CircleChat is built. Product behavior comes from `docs/PRODUCT_SPEC.md`.
+> Status: **Approved technical direction — implementation must follow this document.** This document is the
+> technical source of truth for how CircleChat is built. Product behavior comes from
+> `docs/CircleChat_Product_Specification.md` and UX/design behavior from `design.md`.
+>
+> **Stack rule:** this document contains the final approved technical stack for MVP. AI agents must not
+> substitute React web/PWA, Flutter, a different backend framework, a different database/ORM, managed auth,
+> custom realtime infrastructure, or another storage/auth approach without explicit owner approval.
 
 ---
 
 ## 1. Guiding Constraints
 
-Every architectural decision below is driven by these constraints, in priority order:
-
-1. **Privacy** — username-only identity (no phone/email), minimal data collection, no message content exposed outside a Circle.
-2. **Security** — all authorization enforced server-side; the 5-member Circle limit is not bypassable by any client.
-3. **Simplicity** — smallest set of moving parts that implements the MVP; no microservices, no Kubernetes, no premature E2EE.
+1. **Privacy** — username-only identity, minimal data collection, no message content exposed outside authorized participants/Circle members.
+2. **Security** — all authorization enforced server-side; the 5-member Circle limit is not bypassable by a client.
+3. **Simplicity** — smallest set of moving parts for MVP; no microservices, Kubernetes, or premature E2EE.
 4. **Low cost** — free/cheap tiers during development; the 2–5 member model means tiny scale by design.
-5. **AI-agent maintainability** — one language (TypeScript) end-to-end, boring well-documented tools, small reviewable modules.
+5. **AI-agent maintainability** — one language (TypeScript) end-to-end and small reviewable modules.
 
 ---
 
-## 2. Recommended Stack (with reasoning)
+## 2. Final Approved Stack
 
 ### 2.1 Mobile app — **React Native + Expo + TypeScript (Android first)**
 
-- The MVP experience is mobile-first by definition: App Lock/biometrics, voice messages, camera, push notifications.
-- **Expo** gives managed native modules (`expo-secure-store`, `expo-local-authentication`, `expo-av`, `expo-notifications`) so a beginner never touches native build files for MVP features.
-- **Expo Router** provides file-based navigation that matches the screen list in the spec (Splash → Welcome → … → Circle Home).
-- **Android first**: Android APK/AAB via **EAS Build** requires no Mac; iOS can be added later with the same codebase.
-- A web/PWA client is **explicitly out of scope for MVP** — it would double the UI surface area. The API is client-agnostic, so a web client remains a later option.
-- Alternatives considered: **Flutter** (excellent, but splits the codebase into a second language/ecosystem — worse for one-person + AI-agent maintenance); **PWA-first** (biometric app lock, push, and voice recording are unreliable on iOS PWAs).
+- MVP is mobile-first: App Lock/biometrics, voice messages, camera and push notifications.
+- Expo provides managed native modules such as SecureStore, LocalAuthentication, audio and notifications.
+- Expo Router provides file-based navigation.
+- Android first; iOS later from the same codebase.
+- Web/PWA is post-MVP and must not be introduced during MVP implementation.
 
-### 2.2 Backend — **Node.js 22 LTS + Fastify (TypeScript)**
+### 2.2 Backend — **Node.js 22 LTS + Fastify + TypeScript**
 
-- **Fastify** is small, extremely well documented, schema-validation-first, and produces compact, reviewable modules — ideal for AI-agent development.
-- One process serves both the **REST API** and the **Socket.IO** realtime server. No service mesh, no queues for MVP (an in-process async job queue is enough at this scale).
-- Alternatives considered and rejected for MVP:
-  - **Supabase/Firebase as the whole backend** — both are excellent BaaS platforms, but their auth systems are email/phone-centric. CircleChat requires *username-only* accounts with *recovery-code* reset, which means custom auth code regardless. Fighting a hosted auth provider's assumptions (synthetic emails, disabled confirmations, admin-API workarounds) creates more confusion than it removes, and row-level-security policies are exactly the kind of security-critical code the Build Plan says requires the most careful review. The DB/storage layers of Supabase remain viable *a la carte* (see 2.3/2.6).
-  - **NestJS** — good framework, but heavy boilerplate for this size; Fastify is easier for a beginner to read end-to-end.
+- One process serves REST and Socket.IO.
+- No service mesh, separate realtime service, or queue infrastructure for MVP.
+- An in-process async job queue is sufficient at this scale.
 
-### 2.3 Database — **PostgreSQL + Drizzle ORM**
+### 2.3 Database — **PostgreSQL 16 + Drizzle ORM**
 
-- The domain is relational (users ↔ circles ↔ messages ↔ reactions/polls) — PostgreSQL fits naturally and the spec already proposes relational tables.
-- **Drizzle ORM**: typed schema-as-code, plain SQL visibility, simple generated SQL migrations, no heavy client runtime. AI agents read and write Drizzle schemas reliably.
-- **Hosting (dev/prod): Neon** free tier (serverless Postgres, branching for test databases). Alternatives: Supabase Postgres, Railway Postgres.
+- Relational domain: users, Circles, participants, messages, reactions, media, polls and notifications.
+- Neon is the default development/production Postgres host; Supabase Postgres/Railway Postgres remain alternatives only if explicitly approved.
 
 ### 2.4 Authentication — **custom username + password (Argon2id) + opaque session tokens**
 
-- Sign up with `username` + `password` only. Display name and avatar are separate profile fields.
-- Passwords hashed with **Argon2id** (OWASP parameters) using the `@node-rs/argon2` library. No custom crypto.
-- Sessions: 256-bit random opaque token, stored **hashed** (SHA-256) in the `sessions` table; the client keeps the raw token in **Expo SecureStore** and sends it as `Authorization: Bearer`. Sessions are revocable per device (see `docs/SECURITY.md`).
-- Password recovery via **recovery code** generated at signup (shown once, stored hashed). No email/SMS anywhere in the flow.
-- JWTs are deliberately **not** used for MVP: JWTs cannot be revoked cleanly, and "revoke this device" is a stated product requirement.
+- Signup uses username + password only.
+- Passwords and recovery codes use Argon2id via a vetted library.
+- Sessions use 32 random bytes, stored only as SHA-256 hashes; raw tokens are held in Expo SecureStore.
+- Authorization uses `Authorization: Bearer <session token>`.
+- JWT is not used for MVP because sessions must be revocable per device.
+- Username is fixed after account creation in MVP.
+- Account deletion is post-MVP; no deletion flow is implemented in MVP.
 
 ### 2.5 Realtime — **Socket.IO**
 
-- Rooms map 1:1 to the domain: `circle:{circleId}`, `user:{userId}`, and presence tracked per user.
-- Socket.IO gives battle-tested reconnection, heartbeat, and room semantics instead of hand-rolled WebSocket code.
-- Socket connections authenticate with the same session token (handshake middleware) and **join a room only after a server-side membership check**.
-- Events are **notifications, not data sources**: clients always fetch message history via REST; realtime events just say "something changed". This avoids consistency drift and makes offline recovery trivial.
+- Rooms map to domain concepts: `circle:{circleId}`, `user:{userId}` and conversation-specific rooms as needed.
+- The same session token authenticates the handshake.
+- Server-side participant/member authorization is required before room joins and on every relevant event.
+- Events are notifications, not the source of truth; clients recover state through REST.
+- **Session revocation must disconnect live sockets associated with that session.** A revoked session cannot continue receiving or emitting authorized events.
+- Socket event rate limits are required for message send, typing, joins and other abuse-sensitive events; limits are documented/tuned with the API security policy.
 
-### 2.6 Media storage — **Cloudflare R2 (S3-compatible) + presigned URLs**
+### 2.6 Media storage — **Cloudflare R2 + presigned URLs**
 
-- Private bucket; clients upload/download via **short-lived presigned URLs** issued by the API after authorization checks. The bucket is never public.
-- R2 free tier (10 GB storage, **zero egress fees**) suits a media-heavy messenger; media bandwidth is the main future cost driver for this product.
-- Upload flow is direct client→R2 (the API never proxies file bytes), which keeps the backend cheap and simple.
-- Alternatives: Supabase Storage (fine, smaller free tier), Backblaze B2 (cheap, egress fees), S3 (egress-expensive).
+- Private bucket; clients upload/download through short-lived presigned URLs.
+- Uploads go directly client → R2; the API does not proxy file bytes.
+- Presigned PUTs must bind the intended `Content-Type` and enforce a content-length range matching the media kind.
+- Server confirmation still performs size and magic-byte checks before media becomes `ready`.
+- Chat media, profile avatars, Circle avatars and invite-preview avatars have separate authorization rules.
+- GIF files may be uploaded as `image/gif` when allowed by the image upload path. A GIF picker/provider remains V2.
 
 ### 2.7 Push notifications — **Expo Push**
 
-- One integration (`expo-server-sdk`) that abstracts **FCM (Android)** and **APNs (iOS)**. Device push tokens are stored in the `sessions/devices` table.
-- Per-Circle mute and "hide message preview" (privacy) are enforced **server-side** when constructing push payloads.
+- Expo Push abstracts FCM/APNs.
+- Push tokens are associated with sessions/devices.
+- Global and per-conversation notification preferences are evaluated server-side before payload construction.
+- Muted conversations suppress normal notification delivery; mention behavior applies where applicable; message previews honor privacy settings.
 
-### 2.8 App Lock — **local-only layer (never a server concept)**
+### 2.8 App Lock — **local-only**
 
-- PIN (salted hash stored in `expo-secure-store`) and/or biometrics (`expo-local-authentication`).
-- Fully local: the server never knows whether App Lock is enabled (see §8).
+- PIN and/or biometrics use platform APIs.
+- PIN verification uses the documented local salted Argon2id approach and SecureStore.
+- The server never stores App-Lock state.
 
 ### 2.9 Testing — **Vitest (server) + Jest/RNTL (app)**
 
-- Server: unit tests (validation, permissions, poll logic) + integration tests via `fastify.inject` against a real Postgres (Neon branch or local).
-- App: component tests with React Native Testing Library.
-- E2E (device): **Maestro** flows deferred to the hardening milestone — manual test checklist until then.
+- Server unit/integration tests cover authorization, 5-member concurrency, direct participants, authentication, media and notification decisions.
+- Integration tests use a real PostgreSQL database.
+- App tests use React Native Testing Library.
+- Maestro device flows are deferred to hardening.
 
 ### 2.10 Deployment — **Railway (server) + Neon (Postgres) + R2 + EAS Build**
 
-- Free-tier friendly during development; ~$5/month class when always-on hosting is needed (see `docs/DEPLOYMENT.md`).
-- Render/Fly.io are documented as alternatives; Render's free tier sleeps and would break socket connections, so it is not the default.
+- Free/low-cost development tiers are the default.
+- Railway is the default server host; Neon is the default database host; R2 stores private media; EAS builds Android/iOS artifacts.
+- WebSocket connection timeout/keepalive behavior must be verified against the chosen Railway deployment configuration.
+- Neon connection pooling/cold-start behavior should be considered when configuring the server.
 
 ---
 
@@ -94,211 +105,217 @@ Every architectural decision below is driven by these constraints, in priority o
 │   Expo mobile app (TS)    │
 │  Android (iOS later)      │
 └─────────┬─────────────────┘
-          │ HTTPS (REST, JSON)      │ WSS (Socket.IO)
-          ▼                         ▼
+          │ HTTPS (REST)             │ WSS (Socket.IO)
+          ▼                          ▼
 ┌─────────────────────────────────────────────────┐
 │        Fastify server (Node 22, TypeScript)     │
-│  ┌──────────────┐  ┌──────────────────────────┐ │
-│  │ REST API     │  │ Socket.IO gateway        │ │
-│  │ (auth, circles,  │ │ (auth handshake, rooms,  │ │
-│  │  messages,    │  │  message/typing/presence │ │
-│  │  polls, media │  │  events, membership      │ │
-│  │  signing…)    │  │  checks on every join)   │ │
-│  └──────┬───────┘  └───────────┬──────────────┘ │
-│         │      in-process async jobs            │
-│         │  (push sending, thumbnail bookkeeping)│
-└─────────┼───────────────────┼──────────────────┘
-          ▼                   ▼
-   ┌────────────┐      ┌──────────────┐     ┌──────────────┐
-   │ PostgreSQL │      │ Cloudflare R2│     │ Expo Push    │
-   │ (Neon)     │      │ private      │     │ → FCM / APNs │
-   │ Drizzle ORM│      │ presigned    │     └──────────────┘
-   └────────────┘      └──────────────┘
+│  REST API + Socket.IO + in-process async jobs   │
+└──────────────┬──────────────────┬───────────────┘
+               ▼                  ▼
+        ┌────────────┐     ┌──────────────┐     ┌──────────────┐
+        │ PostgreSQL │     │ Cloudflare R2│     │ Expo Push    │
+        │   (Neon)   │     │    private   │     │ → FCM / APNs │
+        │ Drizzle ORM│     │   presigned  │     └──────────────┘
+        └────────────┘     └──────────────┘
 ```
 
 ---
 
 ## 4. Frontend Architecture (Expo app)
 
-- **Expo Router** with a route group per area:
-  - `(auth)` — splash, welcome, username, password, recovery-code display, profile setup
+- Expo Router route groups:
+  - `(auth)` — welcome, signup/signin, recovery code, profile setup
   - `(onboarding)` — create/join Circle, invite, App Lock setup
-  - `(app)` — home (Circles list), Circle Home, chat, members, pinboard, polls, settings
-- **State**: lightweight server-cache pattern (React Query) for REST data; Socket.IO events invalidate/update the cache. No global Redux-style store — the app is small.
-- **Design system first** (per Build Plan Phase 2, detailed in `design.md`): colors (`#7C3AED` primary on `#0B0714`), Inter, radius tokens, buttons/inputs/bubbles/avatars built as shared components **before** screens.
-- **Secure storage only** for the session token, App-Lock PIN hash, and recovery-code-acknowledged flag. Never `AsyncStorage` for secrets.
-- Offline behavior (MVP): optimistic send for text with a local outbox; media uploads require connectivity; failed sends are retried or marked failed in the UI.
+  - `(app)` — Home, Circle Home, chats, members, pinboard, polls, settings
+- React Query-style server cache for REST data; Socket.IO events invalidate/update cache.
+- No Redux-style global store for MVP.
+- Design tokens/components from `design.md` are the UI source of truth.
+- SecureStore is used for session token, App-Lock data and recovery-code acknowledgement. Never AsyncStorage for secrets.
+- Text messaging can use an optimistic local outbox; media uploads require connectivity.
+
+---
 
 ## 5. Backend Architecture (Fastify server)
 
 ```text
 apps/server/src/
-├── index.ts            # entry: builds Fastify, registers plugins, starts HTTP+WS
-├── config.ts           # env parsing (zod), no secret defaults
+├── index.ts
+├── config.ts
 ├── db/                 # Drizzle schema, migrations, query helpers
-├── plugins/            # auth (session validation), rate-limit, error handler
+├── plugins/            # auth, rate-limit, error handler
 ├── modules/
-│   ├── auth/           # signup, login, logout, recovery-code reset, sessions
+│   ├── auth/           # signup, login, change-password, logout, recovery, sessions
 │   ├── users/          # profile, username availability
-│   ├── circles/        # create/join/invite/leave/roles/settings/5-limit
-│   ├── conversations/  # direct + circle conversation resolution, read state
+│   ├── circles/        # create/join/invite/leave/roles/settings/ownership/5-limit
+│   ├── conversations/  # direct + Circle resolution, participants, read state
 │   ├── messages/       # send/list/edit/delete/react
-│   ├── media/          # upload intent → presigned URL, confirm, access check
+│   ├── media/          # upload intent, confirm, access checks
 │   ├── polls/          # create/vote/close
 │   ├── pinboard/       # pin/unpin/list
-│   └── notifications/  # device tokens, per-circle prefs, push dispatch
-├── realtime/           # Socket.IO auth, room joins, event publishing
-└── jobs/               # in-process async queue (push sending, cleanup)
+│   └── notifications/  # device tokens, preferences, push dispatch
+├── realtime/           # Socket.IO auth, rooms, event publishing/rate limits
+└── jobs/               # in-process async jobs and cleanup
 ```
 
-Rules that hold everywhere:
+Rules everywhere:
 
-- **Every** route: `authenticate → authorize → validate (zod) → execute`. Authorization helpers live in one module and are unit-tested, never inlined per route.
-- Errors: central error handler returns stable error codes (`AUTH_REQUIRED`, `NOT_A_MEMBER`, `CIRCLE_FULL`, `RATE_LIMITED`, …) with generic messages; stack traces never leave the server.
-- Logging: `pino`, structured, **no message content, usernames are allowed, no tokens** in logs.
+- `authenticate → authorize → validate (Zod) → execute`.
+- Shared authorization helpers are unit-tested; do not inline ad-hoc permission logic in routes.
+- Direct conversation authorization uses `conversation_participants`; never parse `direct_key` for authorization.
+- Stable error codes include `AUTH_REQUIRED`, `NOT_A_MEMBER`, `CIRCLE_FULL`, `RATE_LIMITED`, etc.
+- Logs never contain passwords, raw tokens, recovery codes or message bodies.
+
+---
 
 ## 6. Authentication Flow
 
 ```text
-Signup                          Login
-──────                          ─────
-username + password             username + password
-  ↓                               ↓
-validate (regex, uniqueness,      ↓ rate-limited
-password policy)                verify Argon2id hash
-  ↓                               ↓
-hash password (Argon2id)        create session row
-generate recovery code            (token = 256-bit random;
-hash recovery code                store SHA-256(token))
-  ↓                               ↓
-create user + session           return raw token → client
-  ↓                             stores in SecureStore
-return token + recovery code
-(shown exactly once)            Every request:
-                                Authorization: Bearer <token>
-Recovery reset                    ↓ server: token → SHA-256 →
-────────────────                    sessions lookup (unexpired,
-username + recovery code            not revoked) → attach user
-  ↓
-rate-limited hard               Logout:
-verify recovery-code hash       revoke that session row;
-  ↓                             client deletes token from
-set new Argon2id password       SecureStore
-  ↓
-revoke ALL sessions for user
-issue NEW recovery code
+Signup/Login
+username + password
+      ↓
+validate + rate limit
+      ↓
+Argon2id password verify/hash
+      ↓
+create/retrieve session
+      ↓
+raw 256-bit token → SecureStore
+      ↓
+Authorization: Bearer <token>
 ```
 
-Key properties:
+Recovery uses the one-time recovery code, rotates the recovery code and revokes all sessions.
 
-- One active session per device row; users can see and revoke devices (product requirement).
-- Recovery-code use rotates the code and kills every session — a stolen recovery code cannot silently coexist with the owner.
-- No email/phone exists in the system, so there is nothing to leak via notification services or forgot-password flows. Losing **both** password and recovery code means the account is unrecoverable — this is the spec's explicit trade-off and it is stated in the UI at signup.
+Change-password uses the current authenticated session, sets the new password, and revokes **all other sessions**. The current session may remain active after a successful password change.
+
+Losing both password and recovery code means the account is unrecoverable by design. Account deletion is deferred to post-MVP.
+
+---
 
 ## 7. Authorization Model
 
-The single most important rule: **the client renders UI; the server decides access.**
-
-```text
-Request → authenticated? → for circle-scoped resources:
-            is caller a circle_member? → what role? → is the action allowed for that role?
-```
+The client renders UI; the server decides access.
 
 | Resource | Who can access |
 |---|---|
-| Private conversation messages | Exactly the two participants (server resolves the direct conversation; others get `NOT_A_MEMBER` with no existence confirmation) |
-| Circle messages / members / polls / pinboard / media / settings | Active `circle_members` of that circle |
-| Circle settings edit, invite create/revoke, member remove | `owner` or `admin` |
-| Circle delete, ownership transfer | `owner` only |
-| Own profile, own sessions, own notifications | That user only |
+| Direct conversation | Exactly the two rows in `conversation_participants` |
+| Circle messages/members/polls/pinboard/media/settings | Active `circle_members` |
+| Circle settings, invite management, member removal | Owner/admin as specified by API |
+| Circle deletion/ownership transfer | Owner only |
+| Own profile/sessions/notifications | Caller only |
 
-- Direct 1-to-1 conversations are a distinct conversation type — **not** 2-member Circles — so Circle tooling (polls, pinboard) can never leak into private chats.
-- The **5-member limit** is enforced inside the join transaction (conditional insert + unique constraint + trigger — full detail in `docs/DATABASE.md` §3.3), never by counting in the client.
-- Membership checks always look at the database at request time; nothing is cached client-side in a way the server trusts.
+Direct-chat creation additionally requires the two users to share at least one active Circle. Once created,
+the direct conversation remains separate from Circles and never gains Circle features.
 
-### Preventing unauthorized Circle data access (explicit checklist)
+The 5-member limit is enforced in the database transaction, not by the client.
 
-1. REST: every circle-scoped handler calls the shared `requireCircleMember(circleId, userId, minRole?)` guard **before** any data read.
-2. Realtime: `socket.join("circle:{id}")` happens only after the same guard; the guard is re-checked on every event the socket emits (send/react/typing), not just at connect time.
-3. Media: presigned download URLs are issued **only** after a membership check; URLs expire in ~60 seconds; bucket is private.
-4. Push payloads: recipient list is computed from `circle_members`; users who muted a Circle get a silent/omitted payload; previews honor per-user privacy setting.
-5. Database: queries are always scoped (`WHERE circle_id = $1 AND user_id = $2`); there are no "get all messages" style endpoints; no raw SQL string building.
-6. IDs are UUIDs (non-enumerable); error responses do not reveal whether a resource exists to non-members.
+### Media authorization
+
+1. Chat media: authorized participant/member of the linked conversation.
+2. Profile avatar: only where the requesting user is allowed to view the user's minimal profile; avatar media is not a global bypass.
+3. Circle avatar: active members of that Circle.
+4. Invite-preview Circle avatar: only for a valid, active, non-expired invite-preview request and only with limited pre-join preview data.
+
+### Realtime authorization
+
+- Authenticate socket handshake with the session token.
+- Authorize conversation access before room join.
+- Re-check participant/Circle membership on every relevant send/react/typing/read event.
+- Disconnect sockets immediately when their backing session is revoked.
+- Apply per-session/user socket event rate limits.
+
+---
 
 ## 8. Realtime Messaging Flow
 
 ```text
-Send (client)                Server                          Other members
-────────────                 ──────                          ─────────────
-POST /messages ────────────▶ authorize membership
-(socket may be down;          validate (zod)
-REST is source of truth)      insert message row
-                              publish to Socket.IO rooms ───▶ `message:new` event
-                              enqueue push job (async) ─────▶ Expo Push → FCM
-◀──── 201 + message JSON
+POST /v1/conversations/:id/messages
+              ↓
+     authenticate + authorize
+              ↓
+ validate + idempotency check
+              ↓
+        insert message
+              ↓
+ publish Socket.IO notification
+              ↓
+ enqueue push notification job
 ```
 
-- **Events**: `message:new`, `message:updated` (edit), `message:deleted`, `reaction:changed`, `typing:start/stop`, `presence`, `read:update`, `circle:updated` (name/theme/avatar), `member:joined/left`.
-- **Typing/presence** are ephemeral (in-memory only) — never persisted.
-- **Read states** are per-user, per-conversation (`last_read_message_id`) — persisted so unread counts survive restarts.
-- **Reconnect**: client re-fetches `/messages?after=<lastId>` for each open conversation; missed events are recovered from REST, not replayed from sockets.
-- **Multiple devices**: each device gets its own socket; events fan out to `user:{id}` rooms so all of a user's devices stay in sync.
-- The server never trusts a client-claimed `circleId` on an event; the event payload's target is re-authorized server-side.
+- `clientMessageId` makes retries idempotent within `(conversation_id, sender_id, client_message_id)`.
+- Events are change notifications, not durable data.
+- Typing and presence are ephemeral.
+- Read state is persisted.
+- On reconnect, the client fetches missed messages through REST.
+- Presence visibility: Circle members may see one another's presence; direct-chat presence is visible only to the two participants. No global presence directory.
+
+---
 
 ## 9. Media Upload Flow
 
 ```text
-1. Client: POST /media/upload-intent {kind, size, mimeType, context}
-2. Server: authorize (member of circle / participant) → validate size cap + MIME allowlist
-   → INSERT media row (status='pending') → return {mediaId, presigned PUT URL (5 min)}
-3. Client: PUT file bytes directly to R2
-4. Client: POST /media/{id}/confirm
-5. Server: HEAD the object → verify size + sniff content type (magic bytes) matches allowlist
-   → status='ready'
-6. Client: POST /messages {conversationId, mediaId, …}  → message references ready media
+1. Client: POST /v1/media/upload-intent
+2. Server: authorize → validate kind/MIME/size
+3. Server: return presigned PUT with pinned Content-Type + content-length-range
+4. Client: PUT bytes directly to private R2
+5. Client: POST /v1/media/:id/confirm
+6. Server: HEAD + size + magic-byte verification → ready
+7. Client: send message referencing ready media
 ```
 
-- Upload caps (MVP): images 10 MB, videos 50 MB, voice 10 MB, avatars 2 MB. Client-side compression before upload where the platform allows.
-- Downloads: `GET /media/{id}/url` → membership check → 60-second presigned GET URL. Clients cache by `mediaId+version`.
-- Only ready media can be attached to messages; orphaned `pending` media rows are cleaned up by a daily job (cost + hygiene).
+Upload caps remain: images 10 MB, videos 50 MB, voice 10 MB, avatars 2 MB.
+
+Only ready media can be attached to messages. Downloads use short-TTL presigned GET URLs after an explicit access check.
+
+GIF files may use the image upload path as `image/gif`; this does **not** make a GIF picker/provider an MVP feature.
+
+---
 
 ## 10. Notification Flow
 
 ```text
-message inserted (REST or realtime path)
-  ↓ async job (never blocks the sender's response)
-resolve conversation → members − sender
-  ↓ per recipient: check per-circle mute, quiet hours (later), preview-privacy setting
-load device push tokens from sessions/devices
-  ↓
-Expo Push API (receipts checked for errors; invalid tokens pruned)
+message/activity occurs
+      ↓
+resolve recipients
+      ↓
+apply global + per-conversation preferences
+      ↓
+apply muted/mention/preview rules
+      ↓
+construct minimal push payload
+      ↓
+Expo Push
 ```
 
-- Notification payloads contain **at most**: circle/conversation name, sender display name, and (only if previews enabled) a truncated text. Media messages say "📷 Photo" — media is never inlined in push.
-- The in-app `notifications` table records mentionable events (poll created, member joined) for the Activity view; pure message pushes are not persisted as rows.
+Server-side notification construction must honor global notification enable/disable, per-conversation enabled/disabled,
+muted state, mentions where applicable, and message-preview privacy.
+
+---
 
 ## 11. App-Lock Architecture (local only)
 
 ```text
-App start / resume (AppState → active)
-  ↓
-lock enabled? (secure store) ──no──▶ normal app
-  ↓ yes
-last-unlock timestamp vs chosen policy (immediately / 1 min / 5 min / on leave)
-  ↓ expired
-Lock screen → biometrics (expo-local-authentication) if enrolled, else PIN
-  ↓ PIN path: salted hash compare (hash stored in SecureStore, salt in SecureStore)
-unlock → record timestamp
+App start/resume → lock policy check → biometrics or PIN → unlock
 ```
 
-- The server never stores or sees App-Lock state; losing the PIN ≠ losing the account. "Forgot PIN" clears App Lock and forces re-login against the server (session token remains valid server-side until revoked or expired — documented trade-off).
-- Privacy screens (`expo-screen-capture` prevention / blur on background) are part of this layer.
+The server never knows App-Lock state. The lock is a local privacy convenience layer, not server security.
 
 ---
 
-## 12. What Is Deliberately NOT in the MVP Architecture
+## 12. CI / Integration Testing
 
-- E2EE (single- and multi-device), key management, encrypted media — future, properly planned work.
-- GIF/sticker providers, shared memories, events, mood check-ins, circle status — V2 (spec).
-- Message search, disappearing messages — V2 (spec).
-- Web/PWA client, CDN in front of media, horizontal scaling, message queues, separate push worker service.
+GitHub Actions should use a **PostgreSQL service container** for server integration tests where appropriate.
+The CI job should start PostgreSQL, apply Drizzle migrations, run integration tests, and destroy the disposable database after the job.
+This keeps database authorization and transaction tests reproducible without using production data.
+
+---
+
+## 13. What Is Deliberately NOT in the MVP Architecture
+
+- E2EE, custom cryptography or encrypted-media key management.
+- Web/PWA client and desktop/tablet-first implementation; desktop/tablet layouts are post-MVP design scope.
+- GIF/sticker picker providers, shared memories, events, mood features and other V2/experimental features.
+- Message search, disappearing messages, CDN and horizontal scaling.
+- Separate realtime/push worker services or message queues.
+
+The architecture may evolve after MVP, but any stack change requires explicit owner approval.
