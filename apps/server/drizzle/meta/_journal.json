@@ -15,6 +15,13 @@
       "when": 1788368609660,
       "tag": "0001_m1_invariants",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788370721484,
+      "tag": "0002_poll_vote_integrity",
+      "breakpoints": true
     }
   ]
 }

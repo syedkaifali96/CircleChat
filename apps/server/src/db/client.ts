@@ -1,7 +1,15 @@
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import * as schema from './schema';
+import { drizzle, type NodePgClient, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import * as relations from './relations';
+import * as tables from './schema';
 
-export type Database = NodePgDatabase<typeof schema>;
+/**
+ * Complete runtime Drizzle schema object: tables AND relations.
+ * Relations must be present here for the relational query API
+ * (db.query.*) to work — a relations file alone is not enough.
+ */
+export const schema = { ...tables, ...relations };
+
+export type Database = NodePgDatabase<typeof schema> & { $client: NodePgClient };
 
 /**
  * PostgreSQL connection foundation (M1). Intentionally NOT wired into the

@@ -1,5 +1,8 @@
+import { eq } from 'drizzle-orm';
 import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createDatabase } from './index';
+import { circles } from './schema';
 import {
   migrateTestDatabase,
   resetTestDatabase,
@@ -16,6 +19,7 @@ import {
 
 let client: Client;
 let stopEmbedded: (() => Promise<void>) | undefined;
+let testDbUrl: string;
 
 beforeAll(async () => {
   let url = resolveTestDatabaseUrl();
@@ -24,6 +28,7 @@ beforeAll(async () => {
     stopEmbedded = embedded.stop;
     url = embedded.url;
   }
+  testDbUrl = url;
   client = new Client({ connectionString: url });
   await client.connect();
   // Apply the real committed migrations (0000 schema + 0001 invariants).
@@ -716,6 +721,70 @@ describe('polls + votes (docs/DATABASE.md §1.13–1.14)', () => {
       CHECK_VIOLATION,
     ); // negative index passes the trigger, fails the 0..5 CHECK
   });
+
+  it('blocks options updates that would invalidate existing votes', async () => {
+    const circle = await insertCircle();
+    const conversationId = await insertCircleConversation(circle.id);
+    const pollId = (
+      await client.query<{ id: string }>(
+        `INSERT INTO polls (conversation_id, created_by, question, options)
+         VALUES ($1, $2, 'Where?', $3::jsonb) RETURNING id`,
+        [conversationId, circle.ownerId, JSON.stringify(['beach', 'cinema', 'park'])],
+      )
+    ).rows[0]!.id;
+    await client.query(
+      `INSERT INTO poll_votes (poll_id, user_id, option_index) VALUES ($1, $2, 2)`,
+      [pollId, circle.ownerId],
+    );
+
+    // Shrinking options would leave the index-2 vote pointing past the array.
+    await expectPgError(
+      () =>
+        client.query(
+          `UPDATE polls SET options = $2::jsonb WHERE id = $1`,
+          [pollId, JSON.stringify(['beach', 'cinema'])],
+        ),
+      RAISE_EXCEPTION,
+      'POLL_OPTIONS_INVALIDATE_VOTES',
+    );
+    const unchanged = await client.query<{ options: string[] }>(
+      `SELECT options FROM polls WHERE id = $1`,
+      [pollId],
+    );
+    expect(unchanged.rows[0]!.options).toEqual(['beach', 'cinema', 'park']);
+
+    // Options updates that keep every existing vote valid remain allowed.
+    await client.query(
+      `UPDATE polls SET options = $2::jsonb WHERE id = $1`,
+      [pollId, JSON.stringify(['beach', 'cinema', 'museum'])],
+    );
+    // question / closes_at updates are unaffected by the guard.
+    await client.query(
+      `UPDATE polls SET question = $2, closes_at = now() + interval '2 days' WHERE id = $1`,
+      [pollId, 'Where to go?'],
+    );
+  });
+
+  it('allows shrinking options while no votes exist', async () => {
+    const circle = await insertCircle();
+    const conversationId = await insertCircleConversation(circle.id);
+    const pollId = (
+      await client.query<{ id: string }>(
+        `INSERT INTO polls (conversation_id, created_by, question, options)
+         VALUES ($1, $2, 'Flexible?', $3::jsonb) RETURNING id`,
+        [conversationId, circle.ownerId, JSON.stringify(['a', 'b', 'c'])],
+      )
+    ).rows[0]!.id;
+    await client.query(
+      `UPDATE polls SET options = $2::jsonb WHERE id = $1`,
+      [pollId, JSON.stringify(['a', 'b'])],
+    );
+    const res = await client.query<{ options: string[] }>(
+      `SELECT options FROM polls WHERE id = $1`,
+      [pollId],
+    );
+    expect(res.rows[0]!.options).toEqual(['a', 'b']);
+  });
 });
 
 describe('pinboard, notifications, prefs (docs/DATABASE.md §1.11–1.12, §1.15)', () => {
@@ -814,4 +883,97 @@ describe('migration integrity', () => {
     expect(columns).not.toContain('invite_code');
     expect(columns).not.toContain('invite_code_encrypted');
   });
+});
+
+describe('drizzle runtime schema wiring (relations registered)', () => {
+  let db: ReturnType<typeof createDatabase>;
+
+  beforeAll(() => {
+    db = createDatabase(testDbUrl);
+  });
+
+  afterAll(async () => {
+    // Close the drizzle-managed pool before the embedded server is stopped,
+    // otherwise teardown produces unhandled ECONNRESET errors.
+    await db.$client.end();
+  });
+
+  it('supports relational queries through the configured schema object', async () => {
+    const user = await insertUser('rel_user');
+    await client.query(
+      `INSERT INTO sessions (user_id, token_hash, device_name, platform, expires_at)
+       VALUES ($1, 'hash-rel-1', 'Rel Phone', 'android', now() + interval '30 days')`,
+      [user],
+    );
+    // `with` only works when relations are registered in the runtime schema.
+    const rows = await db.query.users.findMany({ with: { sessions: true } });
+    const row = rows.find((u) => u.username === 'rel_user');
+    expect(row).toBeTruthy();
+    expect(row!.sessions).toHaveLength(1);
+    expect(row!.sessions[0]!.tokenHash).toBe('hash-rel-1');
+  });
+
+  it('traverses circles -> members relationally', async () => {
+    const circle = await insertCircle();
+    await addMember(circle.id, await insertUser('rel_member'));
+    const row = await db.query.circles.findFirst({
+      where: eq(circles.id, circle.id),
+      with: { members: true },
+    });
+    expect(row).toBeTruthy();
+    expect(row!.members).toHaveLength(2); // owner + added member
+  });
+});
+
+describe('circle capacity concurrency (docs/DATABASE.md §1.3, §3)', () => {
+  it('serializes competing joins through the circle-row lock (service pattern)', async () => {
+    const circle = await insertCircle();
+    await addMember(circle.id, await insertUser('cc_a'));
+    await addMember(circle.id, await insertUser('cc_b'));
+    await addMember(circle.id, await insertUser('cc_c')); // owner + 3 = 4, one slot left
+
+    const t1 = new Client({ connectionString: testDbUrl });
+    const t2 = new Client({ connectionString: testDbUrl });
+    await t1.connect();
+    await t2.connect();
+    try {
+      // Service worker 1: lock the circle row, insert the last member.
+      await t1.query('BEGIN');
+      await t1.query(`SELECT id FROM circles WHERE id = $1 FOR UPDATE`, [circle.id]);
+      await t1.query(
+        `INSERT INTO circle_members (circle_id, user_id, role) VALUES ($1, $2, 'member')`,
+        [circle.id, await insertUser('cc_d')],
+      );
+      // Service worker 2 must block on the locked circle row — this proves the
+      // FOR UPDATE lock (not the trigger) is the serialization mechanism.
+      await t2.query('BEGIN');
+      await t2.query(`SET LOCAL lock_timeout = '1500ms'`);
+      await expectPgError(
+        () => t2.query(`SELECT id FROM circles WHERE id = $1 FOR UPDATE`, [circle.id]),
+        '55P03',
+      );
+      // The lock timeout aborted T2's transaction; start a clean one.
+      await t2.query('ROLLBACK');
+      await t1.query('COMMIT');
+      // After T1 commits, T2 acquires the lock and observes a full circle, so
+      // the documented conditional insert is skipped (clean path, no crash).
+      await t2.query('BEGIN');
+      await t2.query(`SELECT id FROM circles WHERE id = $1 FOR UPDATE`, [circle.id]);
+      const seen = await t2.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM circle_members WHERE circle_id = $1`,
+        [circle.id],
+      );
+      expect(seen.rows[0]!.n).toBe(5);
+      await t2.query('ROLLBACK');
+      const final = await client.query<{ members_count: number }>(
+        `SELECT members_count FROM circles WHERE id = $1`,
+        [circle.id],
+      );
+      expect(final.rows[0]!.members_count).toBe(5);
+    } finally {
+      await t1.end();
+      await t2.end();
+    }
+  });
+
 });

@@ -1,6 +1,8 @@
-# CircleChat — Changelog
+### M1 Final Fixes (post-implementation audit)
 
-## Unreleased
+- Wired Drizzle relations into the runtime schema object (`client.ts` now passes tables + relations; added `db/index.ts` barrel) — relational queries (`db.query.*`) are fully functional and covered by behavioral tests.
+- Closed the poll-vote update-path loophole: new trigger (migration `0002_poll_vote_integrity`) rejects options updates that would invalidate existing votes (`POLL_OPTIONS_INVALIDATE_VOTES`); safe updates (question, closes_at, options changes that keep votes valid) remain allowed.
+- Circle-capacity concurrency documented with evidence: a deterministic test proves the `FOR UPDATE` circle-row lock serializes competing joins (the trigger is the independent single-writer guard, not the serialization mechanism).
 
 ### M1 — Database Foundation
 
