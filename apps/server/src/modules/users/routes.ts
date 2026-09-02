@@ -28,16 +28,18 @@ export async function usersRoutes(
       .where(eq(users.id, request.authUser!.userId))
       .limit(1);
     const user = rows[0]!;
-    await reply.send({
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        bio: user.bio,
-        avatarMediaId: user.avatarMediaId,
-        createdAt: user.createdAt.toISOString(),
-      },
-    });
+    await reply
+      .header('cache-control', 'no-store')
+      .send({
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          bio: user.bio,
+          avatarMediaId: user.avatarMediaId,
+          createdAt: user.createdAt.toISOString(),
+        },
+      });
   });
 
   app.get(

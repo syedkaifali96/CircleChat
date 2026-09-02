@@ -119,7 +119,8 @@ CircleChat should collect the minimum information necessary to provide the servi
 | M0 — Foundation / scaffold (monorepo, server, mobile, CI) | ✅ Done |
 | M1 — Database schema, migrations, invariants, integration tests | ✅ Done |
 | M2 — Authentication (server + mobile) | ✅ Done |
-| M3 — Profiles | ⛔ Awaiting explicit approval |
+| M3 — Profiles (server + mobile, avatar media) | ✅ Done |
+| M4 — Circles | ⛔ Awaiting explicit approval |
 
 ## Getting Started (M0 scaffold)
 

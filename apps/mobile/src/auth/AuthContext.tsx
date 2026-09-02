@@ -17,6 +17,7 @@ interface AuthContextValue {
   /** Recovery code shown exactly once after signup/rotation. */
   pendingRecoveryCode: string | null;
   acknowledgeRecoveryCode: () => void;
+  updateUser: (updated: PublicUser) => void;
   signIn: (username: string, password: string) => Promise<void>;
   signUp: (username: string, displayName: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -79,6 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('unauthenticated');
   }, []);
 
+  /** Replaces the cached user after a profile edit; /v1/users/me stays authoritative. */
+  const updateUser = useCallback((updated: PublicUser) => {
+    setUser(updated);
+  }, []);
+
   const acknowledgeRecoveryCode = useCallback(() => setPendingRecoveryCode(null), []);
 
   const value = useMemo(
@@ -87,11 +93,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       pendingRecoveryCode,
       acknowledgeRecoveryCode,
+      updateUser,
       signIn,
       signUp,
       signOut,
     }),
-    [status, user, pendingRecoveryCode, acknowledgeRecoveryCode, signIn, signUp, signOut],
+    [status, user, pendingRecoveryCode, acknowledgeRecoveryCode, updateUser, signIn, signUp, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

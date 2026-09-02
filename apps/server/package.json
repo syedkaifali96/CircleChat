@@ -13,6 +13,9 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1125.0",
+    "@aws-sdk/s3-presigned-post": "^3.1125.0",
+    "@aws-sdk/s3-request-presigner": "^3.1125.0",
     "@circlechat/shared": "*",
     "@fastify/rate-limit": "^11.2.0",
     "@node-rs/argon2": "^2.2.0",
@@ -27,6 +30,7 @@
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.1",
     "embedded-postgres": "^18.4.0-beta.17",
+    "file-type": "^16.5.0",
     "socket.io-client": "^4.8.3",
     "tsx": "^4.19.4",
     "typescript": "~5.8.3",

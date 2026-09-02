@@ -3,6 +3,7 @@ import { createDatabase } from './db/client';
 import { buildApp } from './app';
 import { config } from './config';
 import { wireRealtime } from './realtime';
+import { readR2StorageConfig, R2StorageGateway } from './modules/media/storage';
 
 /**
  * CircleChat server entrypoint.
@@ -18,7 +19,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const db = createDatabase(config.databaseUrl);
-  const app = await buildApp({ db });
+  const r2Config = readR2StorageConfig();
+  if (!r2Config) {
+    console.error('R2 storage is not configured (docs/DEPLOYMENT.md section 3). Startup aborted.');
+    process.exit(1);
+  }
+  const storage = new R2StorageGateway(r2Config);
+  const app = await buildApp({ db, storage });
 
   const io = new SocketServer(app.server, {
     // Same-origin defaults, no CORS widening. Handshake auth: session token.

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### M3 — Profiles
+
+- Server (docs/API.md contract): PATCH /v1/users/me (displayName/bio, explicit update schema, username immutable), POST /v1/users/me/avatar (own READY avatar media only), GET /v1/users/:username (minimal profile: display name + avatar; viewer rule = self or ≥1 shared active Circle, existence hidden), GET /v1/users/me/avatar-url (short-TTL presigned GET for the caller's avatar).
+- Media lifecycle (docs/ARCHITECTURE.md §9): POST /v1/media/upload-intent (avatar kind, MIME allowlist, 2 MB cap, non-guessable storage key, presigned POST with pinned Content-Type + content-length-range) and POST /v1/media/:id/confirm (HEAD + size re-check + magic-byte sniff via file-type; failures delete the pending row). Private R2 gateway via S3 API; in-memory gateway for tests; profile/media routes only registered when storage is configured.
+- Privacy: shared-cache protection (Cache-Control: no-store on all private profile responses), avatar access requires minimal-profile view permission, no sensitive fields in any response.
+- Mobile (Expo): profile screen (avatar placeholder/upload, display name, username read-only, bio, empty states), edit flow (validation, saving state, success/back), avatar picker via expo-image-picker with the full intent→direct-upload→confirm→assign flow; AuthContext gains updateUser so /users/me stays the single identity source.
+- Tests: 15 new server integration tests (upload lifecycle, ownership, viewer rules, secret leakage, no-store headers, revoked sessions) + 5 mobile profile tests.
+
 ### M2 Follow-up — Revoked-session socket disconnect
 
 - Closed the SECURITY.md §3 gap: change-password, revoke-all-other-sessions and recovery-reset now disconnect the live Socket.IO connections of every revoked session (logout and single-session revoke already did). Revocation helpers return the revoked session IDs; the DB revocation stays authoritative and socket disconnect happens after it, outside the transaction.

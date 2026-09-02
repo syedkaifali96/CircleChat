@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { colors } from '../../src/design/tokens';
@@ -25,6 +26,7 @@ export default function HomeScreen() {
           Signed in as {user.displayName} (@{user.username})
         </Text>
       ) : null}
+      <Link href="/(app)/profile" style={styles.profileLink} testID="home-profile-link">View profile</Link>
       <Text style={styles.note}>
         Your Circles will live here. Authentication is ready — the product experience arrives in
         upcoming milestones.
@@ -62,4 +64,5 @@ const styles = StyleSheet.create({
   },
   buttonPressed: { opacity: 0.85 },
   logoutText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  profileLink: { color: colors.accent, marginTop: 16, fontSize: 15, fontWeight: '600' },
 });

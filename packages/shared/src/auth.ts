@@ -12,7 +12,8 @@ export const usernameSchema = z.string().regex(/^[a-z0-9_]{3,20}$/);
 /** docs/SECURITY.md §4.2: minimum 10, maximum 128, no composition rules. */
 export const passwordSchema = z.string().min(10).max(128);
 
-export const displayNameSchema = z.string().trim().min(1).max(40);
+/** Signup display name (docs/SECURITY.md §4.2 limits; profile updates use profile.ts). */
+export const signupDisplayNameSchema = z.string().trim().min(1).max(40);
 
 export const recoveryCodeSchema = z
   .string()
@@ -21,7 +22,7 @@ export const recoveryCodeSchema = z
 
 export const signupSchema = z.object({
   username: usernameSchema,
-  displayName: displayNameSchema,
+  displayName: signupDisplayNameSchema,
   password: passwordSchema,
 });
 

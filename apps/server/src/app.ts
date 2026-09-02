@@ -6,6 +6,9 @@ import { config, type AppConfig } from './config';
 import { registerAuthPlugin } from './plugins/auth';
 import { authRoutes } from './modules/auth/routes';
 import { usersRoutes } from './modules/users/routes';
+import { profileRoutes } from './modules/profile/routes';
+import { mediaRoutes } from './modules/media/routes';
+import { R2StorageGateway, readR2StorageConfig, type StorageGateway } from './modules/media/storage';
 import { healthRoutes } from './routes/health';
 
 /** Client-facing error body: stable machine code + generic human message. */
@@ -101,6 +104,7 @@ export async function buildApp(
     logger?: FastifyServerOptions['logger'];
     db?: Database;
     rateLimit?: boolean;
+    storage?: StorageGateway;
   } = {},
 ): Promise<FastifyInstance> {
   const app = Fastify({
@@ -121,6 +125,12 @@ export async function buildApp(
     registerAuthPlugin(app, config.sessionTtlDays);
     await app.register(authRoutes, { db: options.db, ttlDays: config.sessionTtlDays });
     await app.register(usersRoutes, { db: options.db });
+    // Private storage: R2 when configured, in-memory only for tests.
+    const storage = options.storage ?? (readR2StorageConfig() ? new R2StorageGateway(readR2StorageConfig()!) : undefined);
+    if (storage) {
+      await app.register(profileRoutes, { db: options.db, storage });
+      await app.register(mediaRoutes, { db: options.db, storage });
+    }
   }
 
   app.setErrorHandler(async (error: FastifyError, _request, reply) => {

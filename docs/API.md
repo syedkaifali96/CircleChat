@@ -20,7 +20,7 @@ GET  /v1/users/me                       profile
 PATCH /v1/users/me                      {displayName?, bio?}
 POST /v1/users/me/avatar                {mediaId}
 GET  /v1/users/username-available?u=    public-ish [rate-limited] → {available}
-GET  /v1/users/:username                minimal profile (display name, avatar only; access/existence rules apply)
+GET  /v1/users/:username                minimal profile (display name, avatar only) — viewer rule: self or ≥1 shared active Circle; otherwise 404 (existence hidden)
 
 POST /v1/circles                        create circle (+ owner membership, conversation, default settings)
 GET  /v1/circles                        my circles + unread counts
@@ -53,7 +53,8 @@ PATCH /v1/conversations/:id/notification-pref {enabled?, muted?, mentions?, prev
 
 POST /v1/media/upload-intent            {kind, mimeType, sizeBytes, context} → {mediaId, uploadUrl}
 POST /v1/media/:id/confirm              server verifies object → status ready
-GET  /v1/media/:id/url                  authorized owner/participant/member check → short-TTL presigned GET
+GET  /v1/media/:id/url                  authorized owner/participant/member check → short-TTL presigned GET (M3: avatar media; M5 adds chat media)
+GET  /v1/users/me/avatar-url            auth → short-TTL presigned GET for the caller's own avatar (404 when none set)
 
 POST /v1/conversations/:id/polls        circle conversations only {question, options[2–6], closesAt?}
 GET  /v1/conversations/:id/polls        list
