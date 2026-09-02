@@ -373,6 +373,7 @@ Account deletion is **post-MVP** and therefore has no deletion-specific table or
 - Migrations run automatically on deploy (and manually with a documented command otherwise); they are
   reviewed like code, especially anything touching `circle_members`, `conversation_participants`, or
   ownership-transfer invariants.
-- Neon branching can provide isolated databases for PR/test work.
+- Integration tests run against a **PostgreSQL service container in GitHub Actions** (`services: postgres`) — no external database dependency or CI secret required for tests.
+- Neon branching remains an optional extra for preview environments; it is not required for CI.
 - Schema changes that remove `circle_settings.status_text` or `polls.allow_multiple` must include the
   corresponding migration and constraint/index updates; no compatibility column should be silently kept.

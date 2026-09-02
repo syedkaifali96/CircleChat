@@ -47,7 +47,7 @@ NODE_ENV=production
 ## 4. CI/CD (GitHub Actions)
 
 ```text
-pull request →  install → typecheck → lint → unit tests → integration tests (Neon branch DB)
+pull request →  install → typecheck → lint → unit tests → integration tests (PostgreSQL service container in GitHub Actions)
              → Drizzle migration dry-run check
 merge to main → same checks → deploy server to staging → run migrations → smoke test (/health, socket ping)
 tag v*       → deploy to production → migrations → smoke test → Sentry release marker
