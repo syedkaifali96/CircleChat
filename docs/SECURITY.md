@@ -1,149 +1,250 @@
 # CircleChat — Security Design
 
-> Status: **Proposed — awaiting approval.**
-> Honest framing: this document describes a *realistic, layered* security posture for a small
-> private messenger. It does **not** promise "100% security" or "perfect privacy". No system
-> can. What it does promise: no invented cryptography, defense in depth on the things that
-> matter for this product (account access, Circle membership, media), and clearly stated
-> limitations.
+> Status: **Approved security direction for the documentation gate.**
+> Honest framing: this document describes a realistic, layered security posture for a small private
+> messenger. It does **not** promise 100% security or perfect privacy. No system can.
 
 ---
 
 ## 1. Threat Model (what we actually defend against)
 
-| Threat | Mitigation (where) |
+| Threat | Mitigation |
 |---|---|
-| Password guessing / credential stuffing | Argon2id + per-IP/per-username rate limiting + generic errors (§4, §6) |
-| Stolen session token | hashed token storage, device list + revocation, 30-day expiry, TLS-only (§3) |
-| Non-member reading Circle data (IDOR) | server-side membership guard on **every** REST handler and socket event; UUIDs; existence-hiding errors (§5) |
-| Bypassing the 5-member limit | transactional conditional insert + trigger + CHECK (§5, DATABASE §1.3) |
-| Malicious file uploads | MIME allowlist + magic-byte sniffing + size caps + private bucket (§7) |
-| Media hotlinking/leakage | private bucket, short-TTL presigned URLs, membership checks at presign (§7) |
-| Recovery-code theft | single-use code, hashed at rest, rotation + global session revocation on use (§4.3) |
-| Shoulder-surfing / borrowed phone | local App Lock (PIN/biometric) — explicitly a convenience layer, not server security (§10) |
-| SQL injection | ORM parameterization only; no string-built SQL (§9) |
-| XSS in chat | React Native text rendering (no WebView for user content); server-side length/format validation (§6) |
+| Password guessing / credential stuffing | Argon2id + per-IP/per-username rate limiting + generic errors |
+| Stolen session token | hashed token storage, device revocation, 30-day expiry, TLS-only |
+| Non-member reading Circle data (IDOR) | server-side membership guard on every REST handler and socket event; UUIDs; existence-hiding errors |
+| Unauthorized direct-chat access | authoritative `conversation_participants` authorization; `direct_key` is not parsed for access |
+| Bypassing the 5-member limit | transactional conditional insert + trigger + CHECK |
+| Malicious file uploads | MIME allowlist + magic-byte sniffing + size caps + private bucket + pinned upload constraints |
+| Media hotlinking/leakage | private bucket, short-TTL presigned URLs, explicit access checks |
+| Recovery-code theft | hashed one-time code, rotation + global session revocation on use |
+| Shoulder-surfing / borrowed phone | local App Lock (convenience layer, not server security) |
+| SQL injection | ORM parameterization; reviewed raw SQL only where required for constraints/triggers |
+| Chat injection | React Native text rendering; validation; no WebView for user content |
+| Socket/event abuse | per-user/session socket event rate limits |
 
-Out of scope for MVP (stated, not hidden): end-to-end encryption, protection against a
-compromised server or the hosting provider, targeted nation-state attackers, client-side
-malware on a rooted device.
+Out of scope for MVP: end-to-end encryption, protection against a compromised server/hosting provider,
+targeted nation-state attackers, and client-side malware on a rooted device.
+
+---
 
 ## 2. Transport
 
-- **HTTPS/TLS 1.2+ everywhere** (REST + WebSocket). HSTS on the deployment; no plain-HTTP endpoints, even for health checks that don't need it.
-- Certificates managed by the platform (Railway/Neon/R2 all TLS by default).
-- The mobile app talks only to `https://api.<domain>` — certificate pinning is a **post-MVP hardening item** (it complicates key rotation for a beginner project; noted honestly).
+- HTTPS/TLS 1.2+ everywhere for REST and WebSocket.
+- HSTS on deployment; no plain-HTTP API endpoints.
+- Certificates are managed by the hosting platform.
+- Certificate pinning is post-MVP hardening because key rotation becomes more operationally complex.
+
+---
 
 ## 3. Sessions
 
-- Token: 32 random bytes from `crypto.randomBytes` (CSPRNG), base64url-encoded. **Opaque token, not JWT** — instant revocation is a product requirement (device management).
-- Stored: server keeps only `SHA-256(token)` in `sessions.token_hash` (UNIQUE). A database leak does not expose usable tokens.
-- Client keeps the raw token in **Expo SecureStore** (hardware-backed keystore where available). Never AsyncStorage, never logs.
-- Sent as `Authorization: Bearer <token>`; the Socket.IO handshake uses the same token.
-- Lifetime: 30 days sliding (`expires_at` refreshed on use, throttled). Revoked tokens fail closed.
-- Device management UI: list sessions (device name, platform, last active), revoke one, revoke all ("log out everywhere" also offered immediately after a recovery-code reset).
-- Logout deletes the session row server-side **and** the token client-side.
+- Token: 32 random bytes from `crypto.randomBytes`, base64url-encoded.
+- Token is opaque, not JWT.
+- Server stores only `SHA-256(token)` in `sessions.token_hash`.
+- Client stores the raw token in Expo SecureStore.
+- Sent using `Authorization: Bearer <token>`; Socket.IO handshake uses the same token.
+- Lifetime: 30 days sliding; revoked/expired sessions fail closed.
+- Device management supports listing, single-session revoke and revoke-all-other-sessions.
+- **Session revocation must terminate the corresponding live Socket.IO connection(s).** A revoked session
+  must not remain authorized through an already-open socket.
+- Token-hash comparisons/lookup logic must use established cryptographic primitives and **timing-safe
+  comparison** where a secret value is compared directly; do not use ordinary string comparison for
+  security-sensitive token material.
+- Logout revokes the session server-side and clears the client token.
+
+### CSRF
+
+CSRF is **N/A for the MVP authentication model** because authenticated API requests use an
+`Authorization` header with bearer tokens rather than browser cookies. This does not remove the need for
+normal input validation, authorization and origin/network protections where relevant.
+
+---
 
 ## 4. Authentication & Password Handling
 
 ### 4.1 Password storage
-- **Argon2id** via `@node-rs/argon2`, OWASP-recommended baseline parameters
-  (memory 19 MiB, iterations 2, parallelism 1 — or the current OWASP pick at implementation time; parameters live in one config constant).
-- Rehash-on-login when parameters are upgraded.
-- No custom hashing, no pepper-rolling, no home-made KDFs. Fallback choice if the native module is problematic on a platform: `bcrypt` cost 12 — documented trade-off, still a vetted library.
 
-### 4.2 Password policy (NIST 800-63B flavored)
-- Minimum **10 characters**; maximum 128. No forced composition rules; instead a small denylist (username, "circlechat", common patterns) and optional zxcvbn-style strength meter in the UI.
-- Passwords are compared only inside the Argon2 verify call; they are never logged or stored anywhere else.
+- Argon2id via `@node-rs/argon2` using one centralized configuration constant.
+- Parameters follow the current vetted baseline selected at implementation time and can be rehashed on login when upgraded.
+- No custom cryptography or homemade KDF.
+- A vetted bcrypt fallback may be documented only if the approved Argon2id native implementation is unavailable on a target platform.
+
+### 4.2 Password policy
+
+- Minimum 10 characters; maximum 128.
+- No forced character-class composition.
+- Small denylist for username/common patterns.
+- Passwords are verified only inside the password-hash verification routine and are never logged/stored elsewhere.
 
 ### 4.3 Username-only accounts & recovery codes
-- Signup: unique username + password. No email/phone is collected, so there is nothing to phish from the account side or leak through a reset channel.
-- Recovery code: generated server-side with CSPRNG from a ~60-bit space, formatted `XXXX-XXXX-XXXX` (Crockford base32, no ambiguous chars), **displayed once** at signup with an explicit "store this safely" screen and a "I saved it" confirmation.
-- Stored only as an Argon2id hash (`users.recovery_code_hash`).
-- Reset flow: username + recovery code → strict rate limiting → on success: new password set, **new recovery code issued and shown once**, **all sessions revoked** (so a thief who used the code cannot keep a live session, and the owner notices they were logged out).
-- If both password and recovery code are lost, the account is unrecoverable **by design** — stated in the UI at signup and in Settings. Support cannot restore access; this is the privacy/convenience trade-off from the spec.
+
+- Signup: unique username + password. No email/phone is collected.
+- Username is fixed after creation in MVP; no username-change endpoint.
+- Recovery code is generated with a CSPRNG, shown once, then stored only as an Argon2id hash.
+- Recovery reset is rate-limited and rotates the recovery code while revoking **all** sessions.
+- Losing both password and recovery code makes the account unrecoverable by design.
+- Account deletion is explicitly **post-MVP**; there is no MVP deletion endpoint.
+
+### 4.4 Change password
+
+`POST /v1/auth/change-password` requires the authenticated user's current password and a valid new password.
+On success, the current session may remain active, but **all other sessions are revoked and their live sockets are disconnected**.
+
+---
 
 ## 5. Authorization
 
-- Single shared guard module, unit-tested: `requireAuth`, `requireCircleMember(circleId, userId, minRole?)`, `requireConversationAccess(conversationId, userId)`.
-- Applied **inside every handler** before any data access, and in the Socket.IO layer before room joins and on every emitted event. UI-level hiding is treated as cosmetics only.
-- Direct conversations: access = the two participants only; errors to third parties are indistinguishable between "no access" and "does not exist".
-- The 5-member limit: server-transactional (see `docs/DATABASE.md` §1.3) — the client cannot create a 6th membership even with a modified app.
-- Roles: `owner > admin > member`; role changes and member removal are owner/admin actions, re-checked server-side on every call; the last owner cannot leave or be demoted (guard + test).
-- No client-supplied role/identity fields are ever trusted; identity comes exclusively from the session token.
+- Shared guards: `requireAuth`, `requireCircleMember(circleId, userId, minRole?)`, and `requireConversationAccess(conversationId, userId)`.
+- Guards run before protected data access.
+- Direct conversations are authorized from `conversation_participants` only. `direct_key` is a uniqueness helper, never an authorization source.
+- Direct-chat creation requires the two users to share at least one active Circle. After creation, the direct conversation remains separate from Circles.
+- Third-party access failures must not reveal whether a direct conversation exists.
+- Circle roles are `owner > admin > member`; owner invariants are enforced server-side and transactionally.
+- Ownership transfer is owner-only and atomic: target must already be an active Circle member; old owner is demoted and target promoted in one transaction, preserving exactly one owner.
+- The last owner cannot leave/demote themselves in a way that leaves the Circle without an owner.
+- No client-supplied identity or role is trusted.
+
+### Direct conversation invariant
+
+A `direct` conversation must have exactly two `conversation_participants` rows. All message, read, reaction,
+media and realtime access checks use this table.
+
+### 5-member Circle invariant
+
+The database transaction uses row locking, conditional insert, trigger protection and a `CHECK (members_count <= 5)`.
+A capacity failure maps to `CIRCLE_FULL` (HTTP 409).
+
+---
 
 ## 6. Rate Limiting & Abuse Controls
 
-| Endpoint group | Limit (initial, tunable) |
+| Endpoint/event group | Initial limit |
 |---|---|
-| Login / recovery reset | per-IP: 10/min; per-username: 5 per 15 min with growing delay |
+| Login / recovery reset | per-IP: 10/min; per-username: 5/15 min with growing delay |
 | Signup | per-IP: 5/hour |
-| Username availability check | per-IP: 30/min |
-| Message send (REST) | per-user: 60/min (plenty for 2–5 people) |
+| Username availability | per-IP: 30/min |
+| Message send | per-user: 60/min |
 | Media upload-intent | per-user: 30/hour |
 | General API | per-IP: 120/min |
+| Socket event spam | per-user/session event limits; tuned per event type |
 
-- Implemented with `@fastify/rate-limit` (in-memory for MVP — single instance; noted: if the server ever scales horizontally, the limiter must move to Redis).
-- Limits return `429` with `RATE_LIMITED` and `Retry-After`; no user enumeration via differing messages.
-- Message body length caps (4000 chars), poll option caps, and username regex also cap abuse surface.
+- `@fastify/rate-limit` in-memory for the single MVP server instance.
+- Limits return `429 RATE_LIMITED` with `Retry-After` and generic messaging.
+- Socket rate limits apply to message sends, typing, joins and other abuse-sensitive events. The server
+  must not rely on the client to throttle realtime events.
+
+### Username enumeration
+
+Username availability and username-based lookup create an **accepted residual username-enumeration risk**.
+This is intentional because username-only identity is a product requirement. Mitigations are rate limiting,
+generic errors and minimal profile exposure; the system does not claim enumeration is impossible.
+
+---
 
 ## 7. File Uploads & Media Access
 
-- **Never trust** client filename, extension, or declared MIME type. Validation pipeline: size cap → MIME allowlist → (at confirm) server-side `HEAD` + magic-byte sniff (`file-type`) → mismatch rejects and deletes.
-- Allowlist (MVP): `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `video/mp4`, audio formats for voice (`audio/aac`, `audio/m4a`, `audio/mp4`). **No SVG, no PDF-executable surprises, no unknown binaries.**
-- Size caps: image 10 MB, video 50 MB, voice 10 MB, avatar 2 MB (config constants).
-- Storage: **private** R2 bucket. Object keys are unguessable (`uuid/`+random). No public ACL, no bucket listing.
-- Downloads: API issues presigned GET URLs (~60 s TTL) **only after** a membership check; uploads use 5-minute presigned PUTs scoped to the validated key.
-- Avatars and media are served with safe content types; user content is never rendered in a WebView.
-- Daily cleanup job deletes orphaned `pending` uploads and tombstoned objects.
+- Never trust filename, extension or declared MIME type alone.
+- Validation pipeline: configured size range → MIME allowlist → at confirm, server-side object size + magic-byte sniffing → mismatch rejects/deletes.
+- Allowlist includes JPEG, PNG, WebP, GIF, MP4 and supported voice formats.
+- Size caps: image 10 MB, video 50 MB, voice 10 MB, avatar 2 MB.
+- R2 bucket is private with unguessable object keys and no public ACL/listing.
+- **Presigned PUTs must pin the intended `Content-Type` and enforce a `content-length-range` matching the media kind.**
+- The server still confirms the object before setting `status='ready'`.
+- Downloads use short-lived presigned GET URLs after an explicit authorization check.
+
+### Avatar access
+
+- **Profile avatars:** accessible only in authorized minimal-profile contexts; avatar media cannot be used as a global public-download bypass.
+- **Circle avatars:** accessible only to active Circle members.
+- **Invite-preview Circle avatars:** accessible only through a valid, active, non-expired invite-preview request and only for the limited preview response.
+- Avatar access checks are separate from generic chat-media authorization.
+
+### GIF clarification
+
+`image/gif` may be accepted by the normal image upload path when supported. This does **not** include a GIF
+picker/provider in MVP; the picker remains V2.
+
+---
 
 ## 8. Database Security
 
-- Least-privilege DB role for the app (no superuser, no DDL at runtime; migrations use a separate admin credential in CI only).
-- TLS required to Neon; credentials only via environment variables/secrets manager — never in code, never in the repo (`.env` is git-ignored; `.env.example` documents names only).
-- All queries parameterized via Drizzle; raw SQL (the few trigger definitions) is reviewed like security-critical code.
-- Backups: Neon PITR on; restore tested once before launch (checklist item in DEPLOYMENT.md).
-- Local dev uses a throwaway database; **no real user data in development**.
+- Application DB role is least privilege; migrations use a separate credential.
+- TLS required to Neon.
+- Secrets exist only in environment/platform secret stores; never commit them.
+- Drizzle queries are parameterized; any trigger SQL is reviewed as security-sensitive code.
+- Backups/PITR and restore testing are launch checklist items.
+- Local development uses throwaway data; no real user data in development.
+
+---
 
 ## 9. Input Validation & Injection Defense
 
-- Every route validates input with **Zod** schemas (shared with the client via `packages/shared` where useful): types, lengths, enum membership, array sizes.
-- SQL injection: parameterized ORM queries only.
-- Chat XSS: React Native renders text safely (no HTML injection surface); if a web client is ever added, text is rendered as text — never `dangerouslySetInnerHTML`.
-- Client-supplied IDs are always UUID-parsed; malformed input is a generic `400`, not a DB error.
+- Every route validates input with Zod.
+- IDs are parsed as UUIDs.
+- Lengths/enums/array sizes are bounded.
+- SQL uses parameterized Drizzle queries.
+- React Native renders chat text as text, not executable HTML.
+
+---
 
 ## 10. App Lock (local privacy layer)
 
-- PIN stored as a salted Argon2id/SHA-256 hash in SecureStore — never plaintext, never synced to the server.
-- Biometrics via platform APIs (`expo-local-authentication`) with PIN fallback.
-- The server never knows App-Lock state; App Lock protects against casual phone access, not against server compromise. "Forgot PIN" clears the lock and requires server re-login.
-- Privacy screen (hide content in app switcher) included in this layer.
+- PIN verification uses **Argon2id with a per-PIN random salt**, with the resulting hash and salt stored locally in Expo SecureStore.
+- The PIN is never sent to or stored by the server.
+- Biometrics use `expo-local-authentication` with PIN fallback.
+- "Forgot PIN" clears the local lock and requires server re-login; the server never receives the PIN.
+- App Lock protects against casual device access, not a compromised device/server.
+
+---
 
 ## 11. Sensitive Information Handling
 
-- Never collected: phone number, email, contacts, precise location, advertising IDs, behavioral analytics beyond crash-free counts.
-- Secrets (DB URL, R2 keys, EAS keys) live in platform secret stores; `.env.example` lists names, never values; a pre-commit check prevents committing `.env`.
-- Push payloads contain no message bodies unless the user explicitly enables previews; media is never in push.
-- Logs: structured, redacted — **no message content, no tokens, no recovery codes, no password material**. Usernames and IDs are allowed (needed for debugging auth issues).
+Never collected: phone number, email, contacts, precise location, advertising IDs and unnecessary behavioral analytics.
+
+Push payloads contain no message body when previews are disabled. Media is never placed directly in push payloads.
+Logs contain no passwords, raw tokens, recovery codes or message bodies.
+
+---
 
 ## 12. Logging & Error Handling
 
-- Central Fastify error handler: clients receive stable error codes + generic messages (`INVALID_CREDENTIALS` — never "wrong password" vs "no such user"); stack traces stay server-side.
-- Auth events are logged (success/failure, recovery-code use, session revoke, role change) — an audit trail for the operator without exposing content.
-- Crash reporting (Sentry or platform equivalent) with PII scrubbing enabled.
-- 5xx responses include a correlation ID for support, but no internal details.
+- Central Fastify error handler returns stable error codes and generic messages.
+- Never distinguish "wrong password" from "no such user" in user-facing auth errors.
+- Auth events, recovery use, session revocation and role changes may be logged without secrets/content.
+- Crash reporting must use PII scrubbing.
+- Correlation IDs may be returned on 5xx responses without internal details.
 
-## 13. Known Limitations (kept visible on purpose)
+---
 
-1. Messages are protected by TLS + server controls, **not E2EE** — the server can technically read message content. This is acceptable for the MVP and stated in-app ("not end-to-end encrypted yet") rather than implied otherwise.
-2. Rate limiting is in-memory; a single server instance is assumed.
-3. No certificate pinning until post-MVP.
-4. Recovery-code reset means whoever obtains both your password-less username and your recovery code can take over the account before you rotate it — the UI therefore encourages storing the code offline, and any reset revokes all sessions immediately.
-5. Client-side storage (media cache) is only as safe as the device; App Lock mitigates casual access only.
+## 13. Known Limitations
 
-## 14. Security Review Checklist (run at Phase 11 / before launch)
+1. MVP messages use TLS + server-side controls, **not E2EE**.
+2. Rate limiting is in-memory and assumes one server instance.
+3. Certificate pinning is post-MVP.
+4. Username enumeration remains a bounded, accepted risk because username-only identity is required.
+5. Client/device compromise can expose data available to that device; App Lock is not a substitute for device security.
+6. Losing both password and recovery code makes an account unrecoverable by design.
 
-Authentication ✔ sessions ✔ authorization (all endpoints + socket events) ✔ 5-member limit ✔
-recovery flow ✔ rate limits ✔ upload validation ✔ media presign checks ✔ DB roles/backups ✔
-secrets hygiene ✔ log redaction ✔ error messages ✔ dependency audit (`npm audit`, Dependabot) ✔
-manual penetration pass on auth + circle-access paths ✔
+---
+
+## 14. Security Review Checklist
+
+Before launch, verify:
+
+- [ ] Authentication and recovery flows
+- [ ] Change-password session revocation
+- [ ] Socket disconnection after session revocation
+- [ ] Direct-chat authorization using `conversation_participants`
+- [ ] Circle membership authorization on every endpoint/event
+- [ ] 5-member concurrency invariant
+- [ ] Ownership-transfer atomicity
+- [ ] Invite expiry/revocation/capacity behavior
+- [ ] Rate limits, including socket events
+- [ ] Presigned PUT Content-Type/content-length pinning
+- [ ] Avatar access rules
+- [ ] Media magic-byte verification
+- [ ] Notification privacy rules
+- [ ] DB roles/backups
+- [ ] Secret/log hygiene
+- [ ] Dependency audit and manual auth/Circle-access penetration pass
