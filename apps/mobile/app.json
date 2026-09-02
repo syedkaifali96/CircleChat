@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "CircleChat",
+    "slug": "circlechat",
+    "version": "0.1.0",
+    "scheme": "circlechat",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0714",
+    "plugins": ["expo-router"]
+  }
+}

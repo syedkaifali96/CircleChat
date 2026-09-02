@@ -71,19 +71,19 @@ Rules for AI coding agents: [AGENTS.md](AGENTS.md)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the reasoning behind each choice.
 
-## Repository Layout (planned)
+## Repository Layout
 
 ```text
 circlechat/
 ├── apps/
-│   ├── mobile/          # Expo (React Native) app — the CircleChat client
-│   └── server/          # Fastify API + Socket.IO realtime server
+│   ├── mobile/          # Expo (React Native) app — Expo Router, M0 scaffold
+│   └── server/          # Fastify API + Socket.IO foundation, GET /health
 ├── packages/
 │   └── shared/          # Shared TypeScript types, Zod schemas, constants
 ├── docs/                # All project documentation (source of truth)
-├── design.md            # Design system & UX specification
-├── .github/workflows/   # CI: typecheck, lint, tests
+├── .github/workflows/   # CI: lint, typecheck, tests, build (+ Postgres service for M1+)
 ├── AGENTS.md            # AI coding-agent rules
+├── design.md            # Design system & UX specification
 └── README.md
 ```
 
@@ -110,12 +110,29 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-🚧 **Phase 0 — Architecture & Foundation.** No application code exists yet.
+**Phase 0 (docs) complete — M0 scaffold complete.**
 
 | Milestone | Status |
 |---|---|
-| Product specification | ✅ Done |
-| Design system & UX specification | ✅ Done (`design.md`) |
-| Repository audit | ✅ Done |
-| Architecture, database, security, API, deployment docs | ✅ Proposed — awaiting approval |
-| Phase 1 implementation | ⛔ Awaiting explicit approval |
+| Product specification, design system, build plan | ✅ Done |
+| Architecture, database, security, API, deployment docs | ✅ Done (audit-approved) |
+| M0 — Foundation / scaffold (monorepo, server, mobile, CI) | ✅ Done |
+| M1 — Database schema & migrations | ⛔ Awaiting explicit approval |
+
+## Getting Started (M0 scaffold)
+
+Requires Node.js 22+.
+
+```bash
+npm install          # install all workspaces
+npm run dev:server   # Fastify API + Socket.IO on http://localhost:3000 (GET /health)
+npm run dev:mobile   # Expo dev server (press a for Android)
+npm run typecheck    # all workspaces
+npm run lint         # eslint
+npm run test         # server + shared + mobile tests
+npm run build        # build all workspaces (shared dist, server dist, mobile export)
+```
+
+`apps/server/src/db/schema.ts` is intentionally empty in M0; `npm run db:generate` /
+`npm run db:migrate` become meaningful in M1 (see docs/DATABASE.md). Copy `.env.example`
+to `.env` for local configuration — never commit real values.
