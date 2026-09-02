@@ -8,14 +8,24 @@ describe('loadConfig', () => {
     expect(cfg.nodeEnv).toBe('development');
     expect(cfg.port).toBe(3000);
     expect(cfg.logLevel).toBe('info');
+    expect(cfg.databaseUrl).toBeUndefined();
+    expect(cfg.sessionTtlDays).toBe(30);
   });
 
   it('accepts explicit valid values', () => {
-    const cfg = loadConfig({ NODE_ENV: 'production', PORT: '8080', LOG_LEVEL: 'warn' });
+    const cfg = loadConfig({
+      NODE_ENV: 'production',
+      PORT: '8080',
+      LOG_LEVEL: 'warn',
+      DATABASE_URL: 'postgres://localhost:5432/circlechat',
+      SESSION_TTL_DAYS: '14',
+    });
 
     expect(cfg.nodeEnv).toBe('production');
     expect(cfg.port).toBe(8080);
     expect(cfg.logLevel).toBe('warn');
+    expect(cfg.databaseUrl).toBe('postgres://localhost:5432/circlechat');
+    expect(cfg.sessionTtlDays).toBe(14);
   });
 
   it('fails closed on invalid values (startup must not continue with bad config)', () => {
@@ -23,14 +33,12 @@ describe('loadConfig', () => {
       /Invalid environment configuration/,
     );
     expect(() => loadConfig({ NODE_ENV: 'staging' })).toThrow(/Invalid environment configuration/);
+    expect(() => loadConfig({ SESSION_TTL_DAYS: '0' })).toThrow(/Invalid environment configuration/);
   });
 
-  it('does not read DATABASE_URL or any secret in M0 (database arrives in M1)', () => {
-    const cfg = loadConfig({ DATABASE_URL: 'postgres://user:pass@db.internal:5432/circlechat' });
-
-    expect(Object.keys(cfg).sort()).toEqual(['logLevel', 'nodeEnv', 'port']);
-    expect(JSON.stringify(cfg)).not.toContain('postgres://');
-    expect(JSON.stringify(cfg)).not.toContain('pass');
+  it('reads DATABASE_URL for the database connection (docs/DEPLOYMENT.md §3)', () => {
+    const cfg = loadConfig({ DATABASE_URL: 'postgres://user:secret@localhost:5432/circlechat' });
+    expect(cfg.databaseUrl).toBe('postgres://user:secret@localhost:5432/circlechat');
   });
 
   it('never includes raw values in validation failure messages', () => {

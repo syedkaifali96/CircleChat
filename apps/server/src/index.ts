@@ -1,28 +1,32 @@
 import { Server as SocketServer } from 'socket.io';
+import { createDatabase } from './db/client';
 import { buildApp } from './app';
 import { config } from './config';
+import { wireRealtime } from './realtime';
 
 /**
- * CircleChat server entrypoint (M0 foundation).
+ * CircleChat server entrypoint.
  *
- * Wires the Fastify app and the Socket.IO foundation onto one HTTP server with
- * clean startup/shutdown. Realtime authorization and messaging events arrive
- * in later milestones per docs/ARCHITECTURE.md §8 — intentionally none exist here.
+ * M2 wires the database, the authentication module and the authenticated
+ * Socket.IO foundation (handshake session auth + revocation disconnects) onto
+ * one HTTP server with clean startup/shutdown. No product realtime events
+ * exist yet (docs/ARCHITECTURE.md §8 — messaging arrives in M5).
  */
 async function main(): Promise<void> {
-  const app = await buildApp();
+  if (!config.databaseUrl) {
+    console.error('DATABASE_URL is required (docs/DEPLOYMENT.md §3). Startup aborted.');
+    process.exit(1);
+  }
+  const db = createDatabase(config.databaseUrl);
+  const app = await buildApp({ db });
 
   const io = new SocketServer(app.server, {
-    // M0: same-origin defaults, no CORS widening. M2 adds the session-token
-    // handshake auth; M5 adds room joins with server-side membership checks.
+    // Same-origin defaults, no CORS widening. Handshake auth: session token.
   });
-  io.on('connection', (socket) => {
-    // Log the socket id only — never handshake auth payloads or headers.
-    app.log.debug({ socketId: socket.id }, 'socket connected');
-    socket.on('disconnect', (reason) => {
-      app.log.debug({ socketId: socket.id, reason }, 'socket disconnected');
-    });
-  });
+  const realtime = wireRealtime(io, db, config.sessionTtlDays);
+  app.decorate('revokeSessionSockets', (sessionId: string) =>
+    realtime.disconnectSessionSockets(sessionId),
+  );
 
   // Idempotent shutdown: SIGINT + SIGTERM (or repeats) must not double-close.
   let shuttingDown = false;

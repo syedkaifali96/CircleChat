@@ -1,9 +1,11 @@
-import Fastify, {
-  type FastifyError,
-  type FastifyInstance,
-  type FastifyServerOptions,
-} from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import rateLimit from '@fastify/rate-limit';
+import type { Database } from './db/client';
+import { AppError } from './errors';
 import { config, type AppConfig } from './config';
+import { registerAuthPlugin } from './plugins/auth';
+import { authRoutes } from './modules/auth/routes';
+import { usersRoutes } from './modules/users/routes';
 import { healthRoutes } from './routes/health';
 
 /** Client-facing error body: stable machine code + generic human message. */
@@ -70,33 +72,71 @@ export function loggerOptionsFor(
   return {
     level: nodeEnv === 'test' ? 'silent' : logLevel,
     redact: {
-      paths: ['req.headers.authorization', 'req.headers.cookie'],
+      paths: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.body.password',
+        'req.body.newPassword',
+        'req.body.currentPassword',
+        'req.body.recoveryCode',
+        'req.headers.recoveryCode',
+      ],
       censor: '[REDACTED]',
     },
   };
 }
 
 /**
- * Fastify application bootstrap (M0 foundation only).
+ * Fastify application bootstrap.
  *
- * M1+ will register domain modules here (auth, circles, messages, …) and the
- * database plugin per docs/ARCHITECTURE.md §5. Nothing product-specific exists.
+ * M2: registers the authentication module (signup, login, change-password,
+ * recovery-reset, logout, sessions) plus /users/me and username availability,
+ * the requireAuth preHandler and optional rate limiting. `db` is optional only
+ * so bootstrap unit tests can run without a database; the real entrypoint
+ * always provides it (docs/ARCHITECTURE.md §5).
  * `options.logger` exists purely for test instrumentation.
  */
 export async function buildApp(
-  options: { logger?: FastifyServerOptions['logger'] } = {},
+  options: {
+    logger?: FastifyServerOptions['logger'];
+    db?: Database;
+    rateLimit?: boolean;
+  } = {},
 ): Promise<FastifyInstance> {
   const app = Fastify({
     logger: options.logger ?? loggerOptionsFor(config.nodeEnv, config.logLevel),
   });
 
+  if (options.rateLimit === true) {
+    await app.register(rateLimit, {
+      global: true,
+      max: 120,
+      timeWindow: '1 minute',
+    });
+  }
+
   await app.register(healthRoutes);
+  if (options.db) {
+    app.decorate('db', options.db);
+    registerAuthPlugin(app, config.sessionTtlDays);
+    await app.register(authRoutes, { db: options.db, ttlDays: config.sessionTtlDays });
+    await app.register(usersRoutes, { db: options.db });
+  }
 
   app.setErrorHandler(async (error: FastifyError, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
     if (statusCode >= 500) {
       // Full details stay server-side; clients get a generic message only.
       app.log.error({ err: error }, 'unhandled error');
+    }
+    if (error instanceof AppError) {
+      // App-authored code + safe message (docs/SECURITY.md §12).
+      await reply.code(error.statusCode).send({ code: error.code, message: error.message });
+      return;
+    }
+    if (statusCode === 429) {
+      await reply.code(429).send(buildClientErrorBody(429));
+      return;
     }
     await reply.code(statusCode).send(buildClientErrorBody(statusCode));
   });

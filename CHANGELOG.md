@@ -1,3 +1,23 @@
+# CircleChat — Changelog
+
+## Unreleased
+
+### M2 — Authentication
+
+- Server (Fastify + Argon2id + opaque session tokens), implementing docs/API.md exactly:
+  - POST /v1/auth/signup → 201 with token, one-time recovery code, user; rate-limited 5/hour.
+  - POST /v1/auth/login → token + user; generic INVALID_CREDENTIALS, timing-equalized unknown-username verification, per-username lockout guard (5 failures → 15 min), rate-limited 10/min.
+  - POST /v1/auth/change-password (auth) → verifies current password, rehashes, revokes all other sessions; current session stays valid.
+  - POST /v1/auth/recovery-reset → verifies recovery-code hash, rotates the code, revokes ALL sessions.
+  - POST /v1/auth/logout (auth) → revokes the current session.
+  - GET /v1/auth/sessions (auth) with current flag; DELETE /v1/auth/sessions/:id (own only, foreign → 404); DELETE /v1/auth/sessions → revoke all others.
+  - GET /v1/users/me (auth) for session bootstrap; GET /v1/users/username-available (rate-limited).
+- Security: Argon2id (OWASP baseline, single constant), 256-bit CSPRNG tokens stored as SHA-256 hashes with timing-safe comparison, sliding 30-day expiry, passwords/recovery codes/tokens never logged (logger redact list extended), stable error codes with app-authored messages only.
+- Realtime foundation: Socket.IO handshake requires a valid session token; per-session rooms; session revocation force-disconnects that session's sockets. No product events (M5).
+- requireAuth opt-in preHandler (config.auth: true); identity derived exclusively from the validated bearer token.
+- Mobile (Expo): AuthProvider bootstrap (secure token restore → server validation → authenticated/login routing), login, registration, one-time recovery-code screen, authenticated home placeholder with logout; session token stored only in expo-secure-store; typed API client with stable error surfacing.
+- Tests: 80 server (unit: crypto/tokens/guard/config; integration: full auth flows, rate limiting, expiry/revocation, secret-leak prevention) + 8 mobile — all against real PostgreSQL.
+
 ### M1 Final Fixes (post-implementation audit)
 
 - Wired Drizzle relations into the runtime schema object (`client.ts` now passes tables + relations; added `db/index.ts` barrel) — relational queries (`db.query.*`) are fully functional and covered by behavioral tests.

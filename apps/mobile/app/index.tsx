@@ -1,19 +1,27 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
+import { useAuth } from '../src/auth/AuthContext';
 import { colors } from '../src/design/tokens';
 
 /**
- * M0 scaffold landing screen — proves the Expo app boots and identifies the
- * project. No product UI exists yet: auth, Home, Circle screens, chat, app
- * lock, etc. arrive in their own milestones (docs/CircleChat_AI_Build_Plan.md).
+ * Auth gate (M2): restores the session, then routes to the authenticated app
+ * or the login flow. The old M0 landing content lives on while sessions load.
  */
-export default function LandingScreen() {
-  return (
-    <View style={styles.container} testID="landing-screen">
-      <Text style={styles.title}>CircleChat</Text>
-      <Text style={styles.tagline}>Your little private world.</Text>
-      <Text style={styles.note}>M0 scaffold — no product features yet.</Text>
-    </View>
-  );
+export default function AuthGate() {
+  const { status } = useAuth();
+
+  if (status === 'loading') {
+    return (
+      <View style={styles.container} testID="auth-loading">
+        <Text style={styles.title}>CircleChat</Text>
+        <Text style={styles.tagline}>Your little private world.</Text>
+      </View>
+    );
+  }
+  if (status === 'authenticated') {
+    return <Redirect href="/(app)/home" />;
+  }
+  return <Redirect href="/(auth)/login" />;
 }
 
 const styles = StyleSheet.create({
@@ -24,20 +32,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  title: {
-    color: colors.text,
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  tagline: {
-    color: colors.accent,
-    fontSize: 16,
-    marginTop: 8,
-  },
-  note: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 24,
-    textAlign: 'center',
-  },
+  title: { color: colors.text, fontSize: 32, fontWeight: '700' },
+  tagline: { color: colors.accent, fontSize: 16, marginTop: 8 },
 });

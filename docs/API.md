@@ -8,8 +8,8 @@
 > stack for implementation. Agents must not substitute the stack without explicit owner approval.
 
 ```text
-POST /v1/auth/signup             public  {username, password} → token, recoveryCode (once), user
-POST /v1/auth/login              public  {username, password} → token, user        [rate-limited]
+POST /v1/auth/signup             public  {username, displayName, password, deviceName?, platform?} → 201 token, recoveryCode (once), user
+POST /v1/auth/login              public  {username, password, deviceName?, platform?} → token, user        [rate-limited]
 POST /v1/auth/change-password             {currentPassword, newPassword} → session status; revokes other sessions
 POST /v1/auth/recovery-reset     public  {username, recoveryCode, newPassword} → new recoveryCode, revokes all sessions
 POST /v1/auth/logout                     revoke current session
