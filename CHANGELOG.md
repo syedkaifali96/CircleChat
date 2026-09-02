@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### M2 Follow-up — Revoked-session socket disconnect
+
+- Closed the SECURITY.md §3 gap: change-password, revoke-all-other-sessions and recovery-reset now disconnect the live Socket.IO connections of every revoked session (logout and single-session revoke already did). Revocation helpers return the revoked session IDs; the DB revocation stays authoritative and socket disconnect happens after it, outside the transaction.
+- Tests: real Socket.IO clients prove other-session sockets die while the current one survives (change-password, revoke-all), and that recovery-reset disconnects every socket; route-level tests prove the exact revoked session IDs are passed (never the current session's).
+
 ### M2 — Authentication
 
 - Server (Fastify + Argon2id + opaque session tokens), implementing docs/API.md exactly:

@@ -128,22 +128,24 @@ export async function revokeSession(db: Database, sessionId: string): Promise<bo
   return rows.length > 0;
 }
 
-export async function revokeAllOtherSessions(db: Database, userId: string, keepSessionId: string): Promise<number> {
+/** Returns the IDs of the sessions revoked (callers disconnect their sockets). */
+export async function revokeAllOtherSessions(db: Database, userId: string, keepSessionId: string): Promise<string[]> {
   const rows = await db
     .update(sessions)
     .set({ revokedAt: sql`now()` })
     .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), sql`${sessions.id} <> ${keepSessionId}`))
     .returning({ id: sessions.id });
-  return rows.length;
+  return rows.map((row) => row.id);
 }
 
-export async function revokeAllSessions(db: Database, userId: string): Promise<number> {
+/** Returns the IDs of the sessions revoked (callers disconnect their sockets). */
+export async function revokeAllSessions(db: Database, userId: string): Promise<string[]> {
   const rows = await db
     .update(sessions)
     .set({ revokedAt: sql`now()` })
     .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)))
     .returning({ id: sessions.id });
-  return rows.length;
+  return rows.map((row) => row.id);
 }
 
 export async function listActiveSessions(db: Database, userId: string) {

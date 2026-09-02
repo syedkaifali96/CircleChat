@@ -172,9 +172,14 @@ export async function authRoutes(app: FastifyInstance, options: AuthRoutesOption
       ]);
       await updatePasswordHash(db, user.id, newPasswordHash);
       await updateRecoveryCodeHash(db, user.id, newRecoveryHash);
-      const revoked = await revokeAllSessions(db, user.id);
-      request.log.info({ userId: user.id, revokedSessions: revoked }, 'recovery-reset');
-      await reply.send({ recoveryCode: newRecoveryCode, revokedSessions: revoked });
+      const revokedIds = await revokeAllSessions(db, user.id);
+      // DB revocation is authoritative; disconnecting live sockets is the
+      // immediate consequence (docs/SECURITY.md §3). ALL sessions die here.
+      for (const sessionId of revokedIds) {
+        request.server.revokeSessionSockets?.(sessionId);
+      }
+      request.log.info({ userId: user.id, revokedSessions: revokedIds.length }, 'recovery-reset');
+      await reply.send({ recoveryCode: newRecoveryCode, revokedSessions: revokedIds.length });
     },
   );
 
@@ -203,10 +208,14 @@ export async function authRoutes(app: FastifyInstance, options: AuthRoutesOption
       }
       const newPasswordHash = await hashSecret(newPassword);
       await updatePasswordHash(db, authUser!.userId, newPasswordHash);
-      // Current session stays valid; every other session is revoked (docs/SECURITY.md §4.4).
-      const revoked = await revokeAllOtherSessions(db, authUser!.userId, authUser!.sessionId);
-      request.log.info({ userId: authUser!.userId, revokedSessions: revoked }, 'change-password');
-      await reply.send({ ok: true, revokedSessions: revoked });
+      // Current session stays valid; every other session is revoked (docs/SECURITY.md §4.4)
+      // and its live sockets are disconnected — only the OTHER sessions.
+      const revokedIds = await revokeAllOtherSessions(db, authUser!.userId, authUser!.sessionId);
+      for (const sessionId of revokedIds) {
+        request.server.revokeSessionSockets?.(sessionId);
+      }
+      request.log.info({ userId: authUser!.userId, revokedSessions: revokedIds.length }, 'change-password');
+      await reply.send({ ok: true, revokedSessions: revokedIds.length });
     },
   );
 
@@ -243,8 +252,13 @@ export async function authRoutes(app: FastifyInstance, options: AuthRoutesOption
 
   app.delete('/v1/auth/sessions', { config: { auth: true } }, async (request, reply) => {
     const { authUser } = request;
-    const revoked = await revokeAllOtherSessions(db, authUser!.userId, authUser!.sessionId);
-    request.log.info({ revokedSessions: revoked }, 'revoke-other-sessions');
-    await reply.send({ ok: true, revokedSessions: revoked });
+    // Current session is preserved; all others are revoked and their sockets
+    // disconnected.
+    const revokedIds = await revokeAllOtherSessions(db, authUser!.userId, authUser!.sessionId);
+    for (const sessionId of revokedIds) {
+      request.server.revokeSessionSockets?.(sessionId);
+    }
+    request.log.info({ revokedSessions: revokedIds.length }, 'revoke-other-sessions');
+    await reply.send({ ok: true, revokedSessions: revokedIds.length });
   });
 }
