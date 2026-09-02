@@ -78,7 +78,7 @@ Supporting colors should be used sparingly. Purple remains the main brand identi
 - Lavender: highlights, secondary accents, subtle focus states.
 - Deep background: application shell and dark-mode page background.
 - Surface: cards, panels, dialogs, chat composer, navigation surfaces.
-- Text: high-priority content only.
+- Text: high-priority content.
 - Muted text: metadata, timestamps, secondary descriptions.
 
 Do not use bright purple for every element. The UI should have visual hierarchy.
@@ -108,16 +108,7 @@ Use sentence case. Avoid unnecessary ALL CAPS.
 
 Use a consistent 4px base spacing system.
 
-Suggested spacing tokens:
-
-- `4px` — tiny gaps
-- `8px` — icon/text gaps
-- `12px` — compact padding
-- `16px` — standard padding
-- `20px` — comfortable padding
-- `24px` — section spacing
-- `32px` — major spacing
-- `48px` — hero spacing
+Suggested spacing tokens: `4px`, `8px`, `12px`, `16px`, `20px`, `24px`, `32px`, `48px`.
 
 ### Border Radius
 
@@ -136,13 +127,9 @@ The UI should feel soft and friendly without making every element extremely roun
 
 Prefer subtle borders and low-contrast elevation over heavy shadows.
 
-Use:
+Use thin borders for separation and soft shadows only for dialogs, menus, and elevated surfaces. Avoid strong black shadows around every card.
 
-- Thin borders for separation.
-- Soft shadows only for dialogs, menus, and elevated surfaces.
-- No strong black shadows around every card.
-
-The dark UI should have enough contrast to clearly separate the background, surfaces, and interactive elements.
+The dark UI must have enough contrast to clearly separate background, surfaces, and interactive elements.
 
 ---
 
@@ -150,73 +137,47 @@ The dark UI should have enough contrast to clearly separate the background, surf
 
 Use one consistent icon family throughout the product.
 
-Icons should be:
+Icons should be simple, easy to understand, consistent in stroke weight, and never decorative when an action is required.
 
-- Simple
-- Rounded where appropriate
-- Easy to understand
-- Consistent in stroke weight
-- Never decorative when an action is required
+Examples: Message, Users/Circle, Plus, Search, Settings, Lock, Bell, Image, Video, Mic, Smile, Pin, Poll, More.
 
-Examples:
-
-- Message
-- Users/Circle
-- Plus
-- Search
-- Settings
-- Lock
-- Bell
-- Image
-- Video
-- Mic
-- Smile
-- Pin
-- Poll
-- More
-
-Do not mix multiple unrelated icon styles.
-
-Every icon-only button must have an accessible label.
+Do not mix unrelated icon styles. Every icon-only button must have an accessible label.
 
 ---
 
 ## 7. Layout Philosophy
 
-### Desktop
+### MVP scope
+
+**Mobile is the first-class and only primary client layout for MVP.** Android is the first target, with iOS later from the same mobile codebase.
+
+**Desktop and tablet layouts are POST-MVP.** The layout guidance below is retained for future implementation planning, but AI agents must not build desktop/tablet-specific UI during MVP unless explicitly approved.
+
+### Desktop — POST-MVP
 
 Use a focused messenger layout rather than a full enterprise dashboard.
-
-Recommended structure:
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │                         CircleChat                           │
 ├──────────────┬───────────────────────┬───────────────────────┤
 │ Navigation   │ Main Content           │ Context Panel         │
-│              │                        │ optional              │
 │ Circles      │ Circle Home / Chat     │ Members / Details     │
-│ Private      │                        │                       │
+│ Private      │                        │ optional              │
 │ Chats        │                        │                       │
 │ Settings     │                        │                       │
 └──────────────┴───────────────────────┴───────────────────────┘
 ```
 
-Do not force a third column on every screen. Context panels should appear only when useful.
+Do not force a third column on every screen.
 
-### Mobile
-
-Mobile is a first-class experience.
-
-Recommended structure:
+### Mobile — MVP
 
 ```text
 ┌─────────────────────────┐
 │ Header                  │
 ├─────────────────────────┤
-│                         │
 │ Main content            │
-│                         │
 │                         │
 ├─────────────────────────┤
 │ Bottom navigation       │
@@ -269,48 +230,27 @@ Quick actions
 
 ### Circle Card
 
-A Circle card should show:
-
-- Circle avatar
-- Circle name
-- Member count
-- Latest activity/message preview
-- Unread indicator when needed
-
-Avoid showing too much metadata.
+Show Circle avatar, name, member count, latest activity/message preview, and unread indicator when needed. Avoid excessive metadata.
 
 ### Empty State
-
-If the user has no Circles:
 
 > **Your little world starts here.**
 >
 > Create a Circle or join one with an invite code.
 
-Primary action: **Create a Circle**
-
-Secondary action: **Join a Circle**
+Primary: **Create a Circle**. Secondary: **Join a Circle**.
 
 ---
 
 ## 10. Circle Home
 
-Circle Home is one of the most important differentiators of CircleChat.
-
-It should feel like entering a shared private space.
+Circle Home should feel like entering a shared private space.
 
 ### Header
 
-Show:
-
-- Circle avatar
-- Circle name
-- Member count
-- More/settings action
+Show Circle avatar, name, member count, and more/settings action.
 
 ### Main Sections
-
-Recommended order:
 
 1. Circle identity/header
 2. Latest activity
@@ -319,7 +259,7 @@ Recommended order:
 5. Memories/events when available
 6. Open Circle Chat
 
-The Circle Home should not become a dashboard full of widgets. Keep it lightweight.
+Keep it lightweight rather than turning it into a dashboard.
 
 ### Circle Identity
 
@@ -328,7 +268,7 @@ Each Circle can have:
 - Name
 - Avatar
 - Theme/accent
-- Short status/description
+- Short **description**
 
 Example:
 
@@ -349,25 +289,15 @@ Circle Chat is the primary messaging experience inside a Circle.
 
 ### Header
 
-Show:
-
-- Circle avatar
-- Circle name
-- Member count
-- Optional typing indicator
-- More menu
+Show Circle avatar, name, member count, optional typing indicator, and more menu.
 
 ### Message Layout
 
-Messages should prioritize readability.
-
-Show sender name when necessary, especially for group messages.
-
-Message metadata should remain subtle.
+Prioritize readability. Show sender name when necessary, especially for group messages. Keep metadata subtle.
 
 ### Message Actions
 
-Long press/right click should expose:
+Long press on mobile (and right-click in future desktop scope) can expose:
 
 - Reply
 - React
@@ -381,59 +311,37 @@ Do not display every action permanently beside every message.
 
 ### Composer
 
-Recommended structure:
-
 ```text
 [ + ] [ Write a message...                 ] [ 😊 ] [ 🎙 ]
 ```
 
-The attachment button opens:
-
-- Photo
-- Video
-- File if supported
-- Camera where supported
-
-The composer should remain easy to reach on mobile.
+Attachment options can include Photo, Video, File where supported, and Camera where supported. The composer should remain easy to reach on mobile.
 
 ---
 
 ## 12. Private 1-to-1 Chat
 
-Private Chat should look familiar enough to be usable but visually remain part of CircleChat's identity.
+Private Chat should be familiar enough to use while remaining part of CircleChat's identity.
 
 Header:
 
 - Avatar
 - Display name
 - Username
-- Online/last-seen state only if implemented
+- Online/last-seen state when implemented and permitted
 - More menu
 
-The experience should clearly communicate that the conversation is private.
+A user may start a private chat only with another user who shares at least one **active Circle** with them. The private conversation remains separate from Circles and has no Circle features.
 
-Avoid confusing private chats with Circle group chats.
+The experience should clearly communicate that the conversation is private and should not be confused with Circle group chats.
 
 ---
 
 ## 13. Chat Bubble Design
 
-Use subtle visual distinction between incoming and outgoing messages.
+Use subtle visual distinction between incoming and outgoing messages. Outgoing messages can use the primary purple family; incoming messages use a neutral surface.
 
-Outgoing messages can use the primary purple family.
-
-Incoming messages should use a neutral surface color.
-
-Do not use extremely saturated colors for large message areas.
-
-Message bubbles should:
-
-- Have readable line length
-- Support multiline text
-- Support media previews
-- Show reactions without covering the message
-- Handle long usernames safely
-- Wrap long text/URLs without breaking the layout
+Message bubbles should support multiline text, media previews, reactions, long usernames, and long URLs without breaking layout.
 
 ---
 
@@ -441,46 +349,27 @@ Message bubbles should:
 
 ### Images
 
-- Use rounded previews.
-- Preserve aspect ratio.
-- Open into a focused viewer.
-- Show loading state while uploading.
-- Show retry state if upload fails.
+Use rounded previews, preserve aspect ratio, open into a focused viewer, show upload progress, and provide retry state on failure.
 
 ### Videos
 
-- Show thumbnail.
-- Provide clear play control.
-- Keep playback UI simple.
+Show thumbnail, clear play control, and simple playback UI.
 
 ### Voice Messages
-
-Use a compact player:
 
 ```text
 [ ▶ ] ───── waveform/progress ───── 0:18
 ```
 
-Include playback progress and duration.
+Include playback progress and duration without letting the voice UI dominate the conversation.
 
-Never make the voice-message UI visually dominate the conversation.
+GIF files may be uploaded through the image upload path when supported. The GIF picker/provider remains V2.
 
 ---
 
 ## 15. Reactions & Replies
 
-Reactions should feel lightweight.
-
-Recommended quick reactions:
-
-- ❤️
-- 😂
-- 👍
-- 😮
-- 😢
-- 🔥
-
-Users should be able to open a larger emoji picker when needed.
+Reactions should feel lightweight. Recommended quick reactions: ❤️ 😂 👍 😮 😢 🔥.
 
 Replies should show a compact referenced-message preview above the reply.
 
@@ -488,34 +377,15 @@ Replies should show a compact referenced-message preview above the reply.
 
 ## 16. Pinboard
 
-The Pinboard is a Circle-level shared space for important things.
+The Pinboard is a Circle-level shared space for important things such as an important message, address, plan, link, reminder, or shared note.
 
-Examples:
-
-- Important message
-- Address
-- Plan
-- Link
-- Reminder
-- Shared note
-
-Design it as a clean collection, not a complicated document editor.
-
-Each item should show:
-
-- Content
-- Author
-- Date
-- Optional preview
-- Pin/remove action
+Design it as a clean collection, not a document editor. Each item shows content, author, date, optional preview, and pin/remove action.
 
 ---
 
 ## 17. Polls
 
 Poll cards should be compact and easy to answer.
-
-Example:
 
 ```text
 Where should we go?
@@ -532,9 +402,7 @@ Where should we go?
 [ Vote ]
 ```
 
-After voting, clearly show the user's selected option.
-
-Prevent accidental multiple submissions according to the poll rules.
+MVP polls are **single-choice**. After voting, clearly show the user's selected option and prevent accidental multiple submissions.
 
 ---
 
@@ -545,18 +413,13 @@ Profile should show:
 - Avatar
 - Display name
 - Username
-- Status
-- About/bio
+- **Bio**
 
-Do not make profile pages feel like public social-media profiles.
-
-The product is private by design.
+Username is fixed after account creation in MVP and is not editable. Do not make profiles feel like public social-media profiles.
 
 ---
 
 ## 19. Create Circle Flow
-
-Recommended flow:
 
 ```text
 Create Circle
@@ -572,9 +435,7 @@ Invite people
 Circle Home
 ```
 
-Keep the initial setup short.
-
-Do not require users to customize everything before entering the Circle.
+Keep setup short. Do not require users to customize everything before entering the Circle.
 
 ### Invite UI
 
@@ -585,6 +446,9 @@ Clearly show:
 - Share action where supported
 - Current member count
 - Remaining capacity
+- Invite expiry/revocation state where useful
+
+Invites are **multi-use while active**, but are limited by the Circle's 5-member capacity, expire, and can be revoked. The raw invite code is shown only once.
 
 Example:
 
@@ -592,13 +456,11 @@ Example:
 >
 > You can invite 2 more people.
 
-The 5-member limit must be respected by backend authorization, not only by the UI.
+The 5-member limit is enforced by backend authorization, not only UI.
 
 ---
 
 ## 20. Join Circle Flow
-
-Recommended flow:
 
 ```text
 Join Circle
@@ -612,14 +474,14 @@ Confirm
 Circle Home
 ```
 
-Circle preview can show:
+Circle preview can show only:
 
 - Circle avatar
 - Circle name
 - Member count
 - Short description
 
-Do not expose unnecessary private information before joining.
+Do not expose unnecessary private information before joining. Preview must be based on a valid, active, non-expired, non-revoked invite.
 
 ---
 
@@ -632,11 +494,9 @@ Required screens:
 - Sign in
 - Recovery code
 - Password recovery
-- Optional session/device management
+- Session/device management
 
 ### Welcome
-
-Keep it minimal.
 
 ```text
         CircleChat
@@ -647,15 +507,11 @@ Keep it minimal.
    [ Sign in ]
 ```
 
-No phone number should be presented as mandatory.
-
-No unnecessary onboarding carousel.
+No phone number is mandatory. No unnecessary onboarding carousel.
 
 ### Recovery Code
 
 Because email/phone are not mandatory, recovery must be clearly explained.
-
-Example:
 
 > **Save your recovery code**
 >
@@ -669,7 +525,7 @@ Never reveal recovery codes after creation unless the security architecture expl
 
 App Lock is a local privacy layer.
 
-Settings should allow supported options such as:
+Settings may allow:
 
 - Off
 - Immediately
@@ -678,7 +534,7 @@ Settings should allow supported options such as:
 - After 15 minutes
 - On app restart
 
-Supported biometric unlock should use the device/platform capability rather than custom biometric handling.
+Biometric unlock uses platform capability rather than custom biometric handling.
 
 ### Locked Screen
 
@@ -697,12 +553,10 @@ The locked state should not reveal private message previews.
 
 ## 23. Settings
 
-Organize settings into clear sections.
-
 ### Account
 
 - Profile
-- Username
+- **Username (fixed; display only in MVP)**
 - Password
 - Recovery
 - Sessions/devices
@@ -717,9 +571,10 @@ Organize settings into clear sections.
 ### Notifications
 
 - Global notifications
-- Per-chat settings
-- Custom sound
-- Silent chat
+- Per-conversation settings
+- Custom sound where supported
+- Silent/muted conversation
+- Mentions where applicable
 - Message previews
 
 ### Appearance
@@ -731,7 +586,7 @@ Organize settings into clear sections.
 
 ### Circle Settings
 
-Only when inside a Circle:
+Only inside a Circle:
 
 - Circle name
 - Avatar
@@ -741,26 +596,19 @@ Only when inside a Circle:
 - Invite management
 - Leave Circle
 
+Account deletion is **post-MVP** and must not be presented as an MVP setting or flow.
+
 Keep destructive actions visually separated.
 
 ---
 
 ## 24. Themes & Personalization
 
-Personalization is a major part of the product identity, but it should not destroy readability.
+Personalization should not destroy readability.
 
-Users may customize:
-
-- Circle theme
-- Accent color
-- Chat background
-- Dark/light appearance
-
-### Theme Rule
+Users may customize Circle theme, accent color, chat background, and supported appearance settings.
 
 User-selected colors must pass readable contrast requirements.
-
-Do not allow a customization option to make buttons, text, or message content unreadable.
 
 ---
 
@@ -770,36 +618,26 @@ Notifications should be useful without becoming noisy.
 
 Support:
 
-- Global notification preferences
-- Per-chat notification settings
-- Silent chat
+- Global notification enable/disable
+- Per-conversation notification settings
+- Muted/silent conversations
+- Mentions where applicable
 - Custom sound where platform supports it
-- Message preview control
+- Message preview privacy
 
-On locked screens, respect the user's privacy preference and avoid exposing sensitive message content when previews are disabled.
+Server-side notification decisions must respect these preferences. On locked screens, avoid exposing sensitive message content when previews are disabled.
 
 ---
 
 ## 26. Loading States
 
-Never leave a blank screen while content is loading.
-
-Use:
-
-- Skeletons for lists
-- Small inline spinners for actions
-- Upload progress for media
-- Clear loading text only when necessary
+Never leave a blank screen while content is loading. Use skeletons for lists, small inline spinners for actions, upload progress for media, and clear loading text only when necessary.
 
 Avoid excessive skeleton animation.
 
 ---
 
 ## 27. Empty States
-
-Empty states should explain what the user can do next.
-
-Examples:
 
 ### No Chats
 
@@ -823,7 +661,7 @@ Examples:
 
 > **Your shared memories will live here.**
 
-Avoid generic messages such as "No data found."
+Avoid generic "No data found."
 
 ---
 
@@ -842,22 +680,13 @@ Better:
 >
 > [ Try again ]
 
-Do not expose raw stack traces or internal server information to users.
+Do not expose raw stack traces or internal server information.
 
 ---
 
 ## 29. Confirmation & Destructive Actions
 
-Use confirmation dialogs only for meaningful destructive actions.
-
-Examples:
-
-- Delete message
-- Leave Circle
-- Remove member
-- Delete account
-
-The dialog should clearly state what happens next.
+Use confirmation dialogs only for meaningful destructive actions, such as deleting a message, leaving a Circle, or removing a member.
 
 Example:
 
@@ -867,15 +696,13 @@ Example:
 >
 > [ Cancel ] [ Leave Circle ]
 
-Avoid confirmation dialogs for harmless actions.
+Account deletion is not an MVP action because it is deferred to post-MVP.
 
 ---
 
 ## 30. Toasts & Feedback
 
-Use short, clear feedback messages.
-
-Examples:
+Use short, clear feedback messages:
 
 - `Message deleted`
 - `Copied to clipboard`
@@ -892,68 +719,47 @@ Toasts should not contain long paragraphs.
 
 Motion should communicate state, not decorate everything.
 
-Recommended:
+Recommended: 150–250ms small UI transitions, smooth dialogs/sheets, subtle message appearance, upload progress, and button feedback.
 
-- 150–250ms for small UI transitions
-- Smooth panel/dialog transitions
-- Subtle message appearance
-- Upload progress
-- Button feedback
+Avoid constant floating animations, excessive bounce effects, long transitions, or motion that delays common actions.
 
-Avoid:
-
-- Constant floating animations
-- Excessive bounce effects
-- Long transitions
-- Motion that delays common actions
-
-Respect `prefers-reduced-motion` on web and equivalent platform settings on mobile.
+Respect platform reduced-motion settings.
 
 ---
 
 ## 32. Accessibility
 
-Accessibility is required, not optional.
+Accessibility is required.
 
 Minimum requirements:
 
-- Keyboard navigation on web
-- Visible focus states
-- Semantic buttons and controls
 - Accessible labels for icon-only buttons
 - Sufficient color contrast
-- Text should remain readable when enlarged
+- Readable text when enlarged
 - Do not communicate information through color alone
 - Screen-reader-friendly form labels
-- Touch targets should be comfortably tappable
+- Comfortable touch targets
 - Reduced-motion support
 
-Never rely on hover as the only way to access an action.
+Desktop keyboard/focus guidance is retained for the post-MVP desktop client; MVP is mobile-first.
 
 ---
 
 ## 33. Responsive Rules
 
-### Small Mobile
+### Small Mobile — MVP
 
-Prioritize:
+Prioritize chat, composer, navigation, and Circle identity. Hide secondary panels behind menus/sheets.
 
-- Chat
-- Composer
-- Navigation
-- Circle identity
+### Tablet — POST-MVP
 
-Hide secondary panels behind menus/sheets.
+A two-column layout may be used where useful after MVP.
 
-### Tablet
+### Desktop — POST-MVP
 
-Allow a two-column layout where useful.
+Use wider layouts while preserving focused reading width for conversations. Do not stretch message content across the entire monitor.
 
-### Desktop
-
-Use wider layouts while preserving a focused reading width for conversations.
-
-Do not stretch message content across the entire monitor.
+AI agents must not implement tablet/desktop-specific layouts during MVP without explicit approval.
 
 ---
 
@@ -968,7 +774,7 @@ Design rules:
 - Make account/session controls easy to find.
 - Clearly distinguish private chats from Circle chats.
 - Do not expose Circle information before joining unnecessarily.
-- Avoid collecting UI information that the product does not need.
+- Avoid collecting UI information the product does not need.
 - Never claim the app is "100% secure" or "unhackable."
 
 Security-sensitive actions should use clear explanations rather than scary language.
@@ -977,13 +783,7 @@ Security-sensitive actions should use clear explanations rather than scary langu
 
 ## 35. Microcopy Style
 
-Use language that is:
-
-- Short
-- Human
-- Clear
-- Friendly
-- Calm
+Use language that is short, human, clear, friendly, and calm.
 
 Good examples:
 
@@ -994,20 +794,11 @@ Good examples:
 - `Try again`
 - `Circle created`
 
-Avoid:
-
-- Corporate jargon
-- Long technical explanations in normal UI
-- Aggressive warning language
-- Fake urgency
-
-Technical/security explanations can be detailed inside dedicated settings/help screens.
+Avoid corporate jargon, fake urgency, and long technical explanations in normal UI.
 
 ---
 
 ## 36. Component Library
-
-The implementation should build reusable components instead of designing each screen independently.
 
 Core components:
 
@@ -1027,7 +818,7 @@ Core components:
 - Tooltip
 - Tabs
 - NavigationBar
-- Sidebar
+- Sidebar (post-MVP desktop)
 - MessageBubble
 - MediaMessage
 - VoiceMessage
@@ -1052,7 +843,7 @@ Components should support consistent states and accessibility.
 Interactive components should account for:
 
 - Default
-- Hover
+- Hover (post-MVP desktop)
 - Focus
 - Active
 - Selected
@@ -1102,10 +893,11 @@ The design must support:
 - New device/session
 - Invalid recovery code
 - Password change
-- Account deletion
 - Circle access denied
-- Invite expired
+- Invite expired/revoked
 - Circle full
+
+Account deletion is post-MVP and is intentionally excluded from the MVP state list.
 
 Never show sensitive backend details in these states.
 
@@ -1121,10 +913,11 @@ Never show sensitive backend details in these states.
 - Prioritize readability.
 - Keep private conversations clearly private.
 - Use reusable components.
-- Design mobile and desktop together.
+- Treat mobile as the MVP first-class experience.
 - Handle loading/error/empty states.
 - Preserve accessibility.
 - Keep personalization readable.
+- Keep desktop/tablet work post-MVP.
 
 ### Don't
 
@@ -1134,16 +927,15 @@ Never show sensitive backend details in these states.
 - Fill every screen with cards.
 - Use gradients everywhere.
 - Hide important settings.
-- Make security claims that cannot be verified.
+- Make unverifiable security claims.
 - Design only the successful state.
 - Put too many actions beside every message.
 - Let Circle customization destroy usability.
+- Implement desktop/tablet layouts during MVP without approval.
 
 ---
 
 ## 41. MVP Design Priority
-
-The first implementation should prioritize:
 
 ### P0 — Must Feel Excellent
 
@@ -1173,7 +965,7 @@ The first implementation should prioritize:
 
 ### P2 — Later
 
-- GIFs
+- GIF picker
 - Stickers
 - Memories
 - Mood
@@ -1201,19 +993,23 @@ Any AI coding agent working on CircleChat must read:
 1. `README.md`
 2. `docs/CircleChat_Product_Specification.md`
 3. `docs/CircleChat_AI_Build_Plan.md`
-4. `design.md`
-
-These documents should be treated as project-level product/design guidance.
+4. `docs/ARCHITECTURE.md`
+5. `docs/DATABASE.md`
+6. `docs/SECURITY.md`
+7. `docs/API.md`
+8. `design.md`
+9. `AGENTS.md`
 
 Before implementing a UI feature, the agent should:
 
 1. Identify the screen and user goal.
 2. Reuse existing design tokens/components.
-3. Check responsive behavior.
-4. Define loading, empty, error, and success states.
-5. Check accessibility.
-6. Avoid introducing a new visual style without a clear reason.
-7. Keep the implementation consistent with the Circle-first product philosophy.
+3. Check mobile behavior first.
+4. Keep desktop/tablet behavior out of MVP unless explicitly approved.
+5. Define loading, empty, error, and success states.
+6. Check accessibility.
+7. Avoid introducing a new visual style without a clear reason.
+8. Keep implementation consistent with the Circle-first product philosophy.
 
 Do not generate an entirely new UI pattern for every feature.
 
@@ -1225,13 +1021,13 @@ A UI feature is not considered complete until:
 
 - [ ] It follows the CircleChat visual system.
 - [ ] It works on mobile.
-- [ ] It works on desktop where applicable.
+- [ ] It does not introduce desktop/tablet MVP scope.
 - [ ] Typography and spacing are consistent.
 - [ ] Interactive states exist.
 - [ ] Loading state exists where needed.
 - [ ] Empty state exists where needed.
 - [ ] Error state exists where needed.
-- [ ] Accessibility labels/focus behavior are present.
+- [ ] Accessibility labels/focus behavior are present where applicable.
 - [ ] Long content does not break the layout.
 - [ ] The design does not expose unnecessary private information.
 - [ ] Existing reusable components are used where possible.
