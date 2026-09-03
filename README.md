@@ -15,7 +15,7 @@ CircleChat is intentionally **not a WhatsApp clone**. The Circle itself is the c
 - **Private Chat:** 1-to-1 conversation between two members.
 - **Circle Chat:** private group conversation for a maximum of 5 members.
 
-### Core MVP
+### Core MVP — target scope (progress tracked in Status below)
 
 - Username/password accounts
 - Recovery code
@@ -44,7 +44,7 @@ Product & design sources of truth:
 - [Design System & UX Specification](design.md)
 - [AI-Assisted Development Plan](docs/CircleChat_AI_Build_Plan.md)
 
-Technical foundation (proposed — awaiting approval):
+Technical foundation (approved and implemented through M5):
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Database Design](docs/DATABASE.md)
@@ -54,7 +54,7 @@ Technical foundation (proposed — awaiting approval):
 
 Rules for AI coding agents: [AGENTS.md](AGENTS.md)
 
-## Tech Stack (proposed — pending approval)
+## Tech Stack (approved)
 
 | Layer | Choice |
 |---|---|
@@ -76,8 +76,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the reasoning behind each c
 ```text
 circlechat/
 ├── apps/
-│   ├── mobile/          # Expo (React Native) app — Expo Router, M0 scaffold
-│   └── server/          # Fastify API + Socket.IO foundation, GET /health
+│   ├── mobile/          # Expo (React Native) app — auth, profiles, circles, chats
+│   └── server/          # Fastify API + Socket.IO (auth, profiles, circles, messaging, realtime)
 ├── packages/
 │   └── shared/          # Shared TypeScript types, Zod schemas, constants
 ├── docs/                # All project documentation (source of truth)
@@ -110,7 +110,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**Phase 0 (docs) complete — M0 scaffold complete.**
+**M0–M5 complete (docs approved, audit-approved milestones, all suites green).**
+
+Latest verification: server 170/170 tests (Vitest, real PostgreSQL), mobile 33/33 tests (Jest + RNTL), typecheck 0 errors, lint clean.
 
 | Milestone | Status |
 |---|---|
@@ -120,11 +122,17 @@ CircleChat should collect the minimum information necessary to provide the servi
 | M1 — Database schema, migrations, invariants, integration tests | ✅ Done |
 | M2 — Authentication (server + mobile) | ✅ Done |
 | M3 — Profiles (server + mobile, avatar media) | ✅ Done |
-| M4 — Circles | ⛔ Awaiting explicit approval |
+| M4 — Circles (create/join/invites/roles/5-member limit, server + mobile) | ✅ Done |
+| M5 — Direct + Circle text messaging (idempotent sends, history, reactions, read state, realtime events) | ✅ Done |
+| M6 — Realtime (typing, presence) | ⬜ Not started |
+| M7 — Media (chat media upload/download, voice) | ⬜ Not started |
+| M8+ — Notifications, Circle Home, Pinboard, Polls, App Lock | ⬜ Not started |
 
-## Getting Started (M0 scaffold)
+## Getting Started
 
-Requires Node.js 22+.
+Requires Node.js 22+. Local integration tests additionally use PostgreSQL 16
+(`TEST_DATABASE_URL`) — without it the server suite starts an ephemeral
+embedded PostgreSQL automatically where supported.
 
 ```bash
 npm install          # install all workspaces
