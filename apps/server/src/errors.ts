@@ -40,3 +40,19 @@ export function rateLimited(): AppError {
 export function notFound(message = 'Resource not found.'): AppError {
   return new AppError('NOT_FOUND', 404, message);
 }
+
+export function circleFull(): AppError {
+  return new AppError('CIRCLE_FULL', 409, 'This Circle is full.');
+}
+
+export function alreadyMember(): AppError {
+  return new AppError('ALREADY_MEMBER', 409, 'You are already a member of this Circle.');
+}
+
+export function ownerMustTransfer(): AppError {
+  return new AppError('OWNER_MUST_TRANSFER', 409, 'Transfer ownership before leaving the Circle.');
+}
+
+export function forbidden(message = 'You do not have access to this resource.'): AppError {
+  return new AppError('FORBIDDEN', 403, message);
+}

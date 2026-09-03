@@ -1,6 +1,7 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Database } from '../../db/client';
-import { circleMembers, circles, users } from '../../db/schema';
+import { users } from '../../db/schema';
+import { activeCircleIdsForUser, usersSharingAnyCircle } from '../circles/service';
 
 /**
  * Profile service (docs/API.md, M3). Profile fields live on the existing
@@ -58,21 +59,13 @@ export async function getProfileByUsername(
 
 /** True when the two users share at least one active Circle (non-deleted). */
 export async function sharesActiveCircle(db: Database, userA: string, userB: string): Promise<boolean> {
-  const rows = await db
-    .select({ circleId: circleMembers.circleId })
-    .from(circleMembers)
-    .innerJoin(circles, eq(circles.id, circleMembers.circleId))
-    .where(and(eq(circleMembers.userId, userA), isNull(circles.deletedAt)));
-  const circleIds = rows.map((row) => row.circleId);
+  // Single source of truth lives in the circles module (M4).
+  const circleIds = await activeCircleIdsForUser(db, userA);
   if (circleIds.length === 0) {
     return false;
   }
-  const shared = await db
-    .select({ circleId: circleMembers.circleId })
-    .from(circleMembers)
-    .where(and(eq(circleMembers.userId, userB), inArray(circleMembers.circleId, circleIds)))
-    .limit(1);
-  return shared.length > 0;
+  const members = await usersSharingAnyCircle(db, circleIds);
+  return members.includes(userB);
 }
 
 export interface ProfileUpdate {

@@ -153,3 +153,185 @@ export async function uploadAndAssignAvatar(
   await confirmMedia(token, intent.mediaId);
   return assignAvatar(token, intent.mediaId);
 }
+
+/* ---------------------------------------------------- circles (M4) ------ */
+
+export type CircleRole = 'owner' | 'admin' | 'member';
+
+export interface CircleListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  avatarMediaId: string | null;
+  membersCount: number;
+  callerRole: CircleRole;
+  unreadCount: number;
+}
+
+export interface CircleMember {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: CircleRole;
+  joinedAt: string;
+}
+
+export interface CircleSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  avatarMediaId: string | null;
+  membersCount: number;
+  callerRole: CircleRole;
+  createdAt: string;
+  members: CircleMember[];
+}
+
+export interface InvitePreview {
+  name: string;
+  memberCount: number;
+  avatarMediaId: string | null;
+  avatarUrl: string | null;
+}
+
+export interface CircleSettings {
+  themePreset: string;
+  accentColor: string | null;
+  backgroundKey: string | null;
+}
+
+export async function listCircles(token: string): Promise<{ circles: CircleListItem[] }> {
+  return apiFetch(`${API_BASE_URL}/circles`, { method: 'GET', token });
+}
+
+export async function createCircle(
+  token: string,
+  input: { name: string; description?: string | null },
+): Promise<{ circle: { id: string; name: string; membersCount: number; callerRole: CircleRole } }> {
+  return apiFetch(`${API_BASE_URL}/circles`, {
+    method: 'POST',
+    token,
+    body: {
+      name: input.name,
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    },
+  });
+}
+
+export async function fetchCircle(token: string, circleId: string): Promise<{ circle: CircleSummary }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}`, { method: 'GET', token });
+}
+
+export async function updateCircle(
+  token: string,
+  circleId: string,
+  input: { name?: string; description?: string | null },
+): Promise<{ circle: { id: string; name: string; description: string | null; callerRole: CircleRole } }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}`, {
+    method: 'PATCH',
+    token,
+    body: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    },
+  });
+}
+
+export async function deleteCircle(token: string, circleId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}`, { method: 'DELETE', token });
+}
+
+/** Raw invite code is shown exactly once; the server stores only its hash. */
+export async function createInvite(
+  token: string,
+  circleId: string,
+  expiresInDays = 7,
+): Promise<{ inviteCode: string }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/invite`, {
+    method: 'POST',
+    token,
+    body: { expiresInDays },
+  });
+}
+
+export async function revokeInvite(token: string, circleId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/invite`, { method: 'DELETE', token });
+}
+
+/** Public pre-join preview — no token; limited fields only (docs/API.md). */
+export async function fetchInvitePreview(code: string): Promise<{ preview: InvitePreview }> {
+  return apiFetch(`${API_BASE_URL}/circles/invite-preview?code=${encodeURIComponent(code)}`, {
+    method: 'GET',
+  });
+}
+
+export async function joinCircle(token: string, inviteCode: string): Promise<{ circleId: string }> {
+  return apiFetch(`${API_BASE_URL}/circles/join`, {
+    method: 'POST',
+    token,
+    body: { inviteCode },
+  });
+}
+
+export async function leaveCircle(token: string, circleId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/members/me`, { method: 'DELETE', token });
+}
+
+export async function removeMember(
+  token: string,
+  circleId: string,
+  userId: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/members/${userId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+export async function updateMemberRole(
+  token: string,
+  circleId: string,
+  userId: string,
+  role: 'admin' | 'member',
+): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/members/${userId}`, {
+    method: 'PATCH',
+    token,
+    body: { role },
+  });
+}
+
+export async function transferOwnership(
+  token: string,
+  circleId: string,
+  newOwnerUserId: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/ownership-transfer`, {
+    method: 'POST',
+    token,
+    body: { newOwnerUserId },
+  });
+}
+
+export async function fetchCircleSettings(
+  token: string,
+  circleId: string,
+): Promise<{ settings: CircleSettings }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/settings`, { method: 'GET', token });
+}
+
+export async function updateCircleSettings(
+  token: string,
+  circleId: string,
+  patch: { themePreset?: string; accentColor?: string | null; backgroundKey?: string | null },
+): Promise<{ settings: CircleSettings }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/settings`, {
+    method: 'PATCH',
+    token,
+    body: {
+      ...(patch.themePreset !== undefined ? { themePreset: patch.themePreset } : {}),
+      ...(patch.accentColor !== undefined ? { accentColor: patch.accentColor } : {}),
+      ...(patch.backgroundKey !== undefined ? { backgroundKey: patch.backgroundKey } : {}),
+    },
+  });
+}

@@ -6,6 +6,7 @@ import { config, type AppConfig } from './config';
 import { registerAuthPlugin } from './plugins/auth';
 import { authRoutes } from './modules/auth/routes';
 import { usersRoutes } from './modules/users/routes';
+import { circleRoutes } from './modules/circles/routes';
 import { profileRoutes } from './modules/profile/routes';
 import { sharesActiveCircle } from './modules/profile/service';
 import { mediaRoutes } from './modules/media/routes';
@@ -129,6 +130,9 @@ export async function buildApp(
     await app.register(usersRoutes, { db });
     // Private storage: R2 when configured, in-memory only for tests.
     const storage = options.storage ?? (readR2StorageConfig() ? new R2StorageGateway(readR2StorageConfig()!) : undefined);
+    // Circles never touch object storage directly; storage is optional and only
+    // used for invite-preview avatar URLs.
+    await app.register(circleRoutes, { db, storage });
     if (storage) {
       await app.register(profileRoutes, { db, storage });
       await app.register(mediaRoutes, {

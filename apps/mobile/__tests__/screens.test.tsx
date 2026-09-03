@@ -21,6 +21,7 @@ jest.mock('expo-router', () => {
     ),
     Redirect: ({ href }: { href: string }) => <RNText testID="redirect">{href}</RNText>,
     useRouter: () => ({ replace: jest.fn() }),
+    useFocusEffect: () => undefined,
   };
 });
 
@@ -38,6 +39,7 @@ jest.mock('../src/lib/api', () => ({
   signup: jest.fn(),
   fetchCurrentUser: jest.fn(),
   logout: jest.fn(),
+  listCircles: jest.fn().mockResolvedValue({ circles: [] }),
 }));
 
 jest.mock('../src/auth/session', () => ({
