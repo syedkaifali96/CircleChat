@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { eq } from 'drizzle-orm';
 import {
   circleRoleSchema,
   circleSettingsSchema,
@@ -9,6 +10,7 @@ import {
   updateCircleSchema,
 } from '@circlechat/shared';
 import type { Database } from '../../db/client';
+import { conversations } from '../../db/schema';
 import { notFound, validationFailed } from '../../errors';
 import { findReadyAvatarById, issueMediaDownloadUrl } from '../media/service';
 import type { StorageGateway } from '../media/storage';
@@ -305,10 +307,18 @@ export async function circleRoutes(
   app.get('/v1/circles/:id/home', { config: { auth: true } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { circle, role } = await requireCircle(id, request.authUser!.userId);
-    // M4: no messaging/polls/pins yet — those sections populate in M5+.
+    // One conversation per Circle (docs/DATABASE.md §1.5); the chat screen
+    // opens through it (M5).
+    const conversation = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(eq(conversations.circleId, circle.id))
+      .limit(1);
+    // M5 adds messaging; polls/pins populate in M11/M10.
     await reply.header('cache-control', 'no-store').send({
       home: {
         circleId: circle.id,
+        conversationId: conversation[0]?.id ?? null,
         name: circle.name,
         description: circle.description,
         avatarMediaId: circle.avatarMediaId,

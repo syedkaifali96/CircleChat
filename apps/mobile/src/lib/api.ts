@@ -23,7 +23,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   token?: string;
 }
@@ -332,6 +332,155 @@ export async function updateCircleSettings(
       ...(patch.themePreset !== undefined ? { themePreset: patch.themePreset } : {}),
       ...(patch.accentColor !== undefined ? { accentColor: patch.accentColor } : {}),
       ...(patch.backgroundKey !== undefined ? { backgroundKey: patch.backgroundKey } : {}),
+    },
+  });
+}
+
+/* ------------------------------------------ messaging (M5, text-only) ---- */
+
+export interface ConversationListItem {
+  id: string;
+  type: 'circle' | 'direct';
+  circleId: string | null;
+  circleName: string | null;
+  circleAvatarMediaId: string | null;
+  partnerUsername: string | null;
+  partnerDisplayName: string | null;
+  partnerAvatarMediaId: string | null;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  unreadCount: number;
+}
+
+export interface MessageReaction {
+  emoji: string;
+  userId: string;
+  username: string;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderUsername: string;
+  senderDisplayName: string;
+  type: 'text' | 'image' | 'video' | 'voice' | 'file';
+  body: string | null;
+  mediaId: string | null;
+  replyToId: string | null;
+  replyPreview: { id: string; senderUsername: string; body: string | null; deleted: boolean } | null;
+  editedAt: string | null;
+  deleted: boolean;
+  createdAt: string;
+  reactions: MessageReaction[];
+}
+
+export interface ChatHeader {
+  type: 'circle' | 'direct';
+  title: string;
+  avatarMediaId: string | null;
+  subtitle: string;
+  circleRole: string | null;
+}
+
+export async function listConversations(token: string): Promise<{ conversations: ConversationListItem[] }> {
+  return apiFetch(`${API_BASE_URL}/conversations`, { method: 'GET', token });
+}
+
+export async function createDirectConversation(
+  token: string,
+  username: string,
+): Promise<{ conversationId: string; created: boolean }> {
+  return apiFetch(`${API_BASE_URL}/conversations/direct`, {
+    method: 'POST',
+    token,
+    body: { username },
+  });
+}
+
+export async function fetchChatHeader(token: string, conversationId: string): Promise<{ header: ChatHeader }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/header`, { method: 'GET', token });
+}
+
+export async function fetchMessages(
+  token: string,
+  conversationId: string,
+  options: { before?: string; limit?: number } = {},
+): Promise<{ messages: Message[]; nextBeforeCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.before) {
+    params.set('before', options.before);
+  }
+  if (options.limit) {
+    params.set('limit', String(options.limit));
+  }
+  const qs = params.toString();
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/messages${qs ? `?${qs}` : ''}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function sendMessage(
+  token: string,
+  conversationId: string,
+  input: { body: string; replyToId?: string; clientMessageId: string },
+): Promise<{ message: Message; created: boolean }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    token,
+    body: { type: 'text', body: input.body, clientMessageId: input.clientMessageId, ...(input.replyToId ? { replyToId: input.replyToId } : {}) },
+  });
+}
+
+export async function editMessage(token: string, messageId: string, body: string): Promise<{ message: Message }> {
+  return apiFetch(`${API_BASE_URL}/messages/${messageId}`, { method: 'PATCH', token, body: { body } });
+}
+
+export async function deleteMessage(token: string, messageId: string): Promise<{ message: Message }> {
+  return apiFetch(`${API_BASE_URL}/messages/${messageId}`, { method: 'DELETE', token });
+}
+
+export async function addReaction(token: string, messageId: string, emoji: string): Promise<{ message: Message }> {
+  return apiFetch(`${API_BASE_URL}/messages/${messageId}/reactions`, {
+    method: 'PUT',
+    token,
+    body: { emoji },
+  });
+}
+
+export async function removeReaction(token: string, messageId: string, emoji: string): Promise<{ message: Message }> {
+  return apiFetch(
+    `${API_BASE_URL}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+    { method: 'DELETE', token },
+  );
+}
+
+export async function markConversationRead(
+  token: string,
+  conversationId: string,
+  lastReadMessageId: string,
+): Promise<{ unreadCount: number; lastReadMessageId: string | null }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/read`, {
+    method: 'POST',
+    token,
+    body: { lastReadMessageId },
+  });
+}
+
+export async function updateNotificationPref(
+  token: string,
+  conversationId: string,
+  patch: { enabled?: boolean; muted?: boolean; mentions?: boolean; preview?: boolean },
+): Promise<{ pref: { enabled: boolean; muted: boolean; mentions: boolean; preview: boolean } }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/notification-pref`, {
+    method: 'PATCH',
+    token,
+    body: {
+      ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+      ...(patch.muted !== undefined ? { muted: patch.muted } : {}),
+      ...(patch.mentions !== undefined ? { mentions: patch.mentions } : {}),
+      ...(patch.preview !== undefined ? { preview: patch.preview } : {}),
     },
   });
 }

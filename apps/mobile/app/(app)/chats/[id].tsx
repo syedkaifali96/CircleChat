@@ -1,0 +1,465 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  addReaction,
+  deleteMessage,
+  editMessage,
+  fetchChatHeader,
+  fetchMessages,
+  markConversationRead,
+  removeReaction,
+  sendMessage,
+  type ChatHeader,
+  type Message,
+} from '../../../src/lib/api';
+import { loadSessionToken } from '../../../src/auth/session';
+import { useAuth } from '../../../src/auth/AuthContext';
+import { MessageBubble } from '../../../src/chat/MessageBubble';
+import { colors } from '../../../src/design/tokens';
+
+/**
+ * Conversation screen (M5): Circle or private chat — newest messages at the
+ * bottom, keyset pagination upward, long-press actions, and the text composer
+ * (media/voice controls are intentionally deferred to M7/M6). REST is the
+ * source of truth; the view reloads after every mutation.
+ */
+
+const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
+
+function makeClientMessageId(): string {
+  return `m5_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export default function ConversationScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { user } = useAuth();
+  const [header, setHeader] = useState<ChatHeader | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<Message | null>(null);
+  const [reacting, setReacting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState('');
+  const [actionEditTarget, setActionEditTarget] = useState<Message | null>(null);
+  const myUserId = user?.id ?? null;
+  const listRef = useRef<FlatList<Message>>(null);
+
+  const load = useCallback(async () => {
+    setLoadError(false);
+    try {
+      const token = (await loadSessionToken()) ?? '';
+      const [headerRes, history] = await Promise.all([
+        fetchChatHeader(token, id),
+        fetchMessages(token, id, { limit: 30 }),
+      ]);
+      setHeader(headerRes.header);
+      setMessages(history.messages.reverse()); // oldest first for the FlatList
+      setOlderCursor(history.nextBeforeCursor);
+      // Mark the newest message read; failures are non-fatal.
+      const newest = history.messages[0];
+      if (newest) {
+        try {
+          await markConversationRead(token, id, newest.id);
+        } catch {
+          // Read-state sync is best-effort; REST history stays authoritative.
+        }
+      }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const onLoadOlder = useCallback(async () => {
+    if (!olderCursor || loadingOlder) {
+      return;
+    }
+    setLoadingOlder(true);
+    try {
+      const token = (await loadSessionToken()) ?? '';
+      const page = await fetchMessages(token, id, { before: olderCursor, limit: 30 });
+      setMessages((current) => [...page.messages.reverse(), ...current]);
+      setOlderCursor(page.nextBeforeCursor);
+    } catch {
+      // Keep the loaded history; a retry can fetch older pages again.
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [id, olderCursor, loadingOlder]);
+
+  const onSend = async () => {
+    const body = draft.trim();
+    if (body.length === 0 || sending) {
+      return;
+    }
+    setSendError(null);
+    setSending(true);
+    try {
+      const token = (await loadSessionToken()) ?? '';
+      const { message } = await sendMessage(token, id, { body, clientMessageId: makeClientMessageId() });
+      setMessages((current) => [...current, message]);
+      setDraft('');
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    } catch {
+      setSendError("Message couldn't be sent. Check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const onReact = (message: Message, emoji: string) => {
+    setActionMessage(null);
+    void (async () => {
+      setReacting(true);
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        const mine = message.reactions.find((r) => r.userId === myUserId && r.emoji === emoji);
+        const result = mine
+          ? await removeReaction(token, message.id, emoji)
+          : await addReaction(token, message.id, emoji);
+        setMessages((current) => current.map((m) => (m.id === result.message.id ? result.message : m)));
+      } catch {
+        // Reactions are best-effort in the UI; the server state stays correct.
+      } finally {
+        setReacting(false);
+      }
+    })();
+  };
+
+  const onDelete = (message: Message) => {
+    setActionMessage(null);
+    Alert.alert('Delete this message?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          void (async () => {
+            try {
+              const token = (await loadSessionToken()) ?? '';
+              const { message: tombstone } = await deleteMessage(token, message.id);
+              setMessages((current) => current.map((m) => (m.id === tombstone.id ? tombstone : m)));
+            } catch {
+              // Leave the message as-is; the server rejected the delete.
+            }
+          })(),
+      },
+    ]);
+  };
+
+  const onSaveEdit = async () => {
+    if (!actionEditTarget) {
+      return;
+    }
+    const body = editDraft.trim();
+    if (body.length === 0) {
+      return;
+    }
+    setEditing(false);
+    try {
+      const token = (await loadSessionToken()) ?? '';
+      const { message } = await editMessage(token, actionEditTarget.id, body);
+      setMessages((current) => current.map((m) => (m.id === message.id ? message : m)));
+    } catch {
+      // Editing stays unchanged if the server rejects (e.g. window expired).
+    }
+  };
+
+  const openActions = (message: Message) => {
+    setActionMessage(message);
+    const withinWindow = Date.now() - new Date(message.createdAt).getTime() < 24 * 60 * 60 * 1000;
+    setActionEditTarget(message.deleted ? null : message.senderId === myUserId && withinWindow ? message : null);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centered} testID="conversation-loading">
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (loadError || !header) {
+    return (
+      <View style={styles.centered} testID="conversation-error">
+        <Text style={styles.stateTitle}>Something went wrong.</Text>
+        <Text style={styles.stateText}>Couldn't open this chat.</Text>
+        <Pressable style={styles.secondaryButton} onPress={() => void load()} testID="conversation-retry">
+          <Text style={styles.secondaryButtonText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'android' ? undefined : 'padding'}
+    >
+      <View style={styles.headerBar} testID="conversation-header">
+        <Pressable onPress={() => router.back()} hitSlop={12} testID="conversation-back">
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle} numberOfLines={1}>{header.title}</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>{header.subtitle}</Text>
+        </View>
+      </View>
+
+      <FlatList
+        ref={listRef}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <MessageBubble
+            message={item}
+            isOwn={item.senderId === myUserId}
+            showSender={header.type === 'circle'}
+            onLongPress={openActions}
+          />
+        )}
+        inverted={false}
+        onEndReached={() => void onLoadOlder()}
+        onEndReachedThreshold={0.6}
+        ListFooterComponent={loadingOlder ? <ActivityIndicator color={colors.accent} style={{ margin: 12 }} /> : null}
+        contentContainerStyle={styles.listContent}
+        testID="conversation-list"
+      />
+
+      {sendError ? (
+        <Text style={styles.sendError} testID="conversation-send-error">{sendError}</Text>
+      ) : null}
+
+      <View style={styles.composer} testID="composer">
+        <Pressable style={styles.composerPlus} disabled testID="composer-attachments">
+          <Text style={styles.composerPlusText}>+</Text>
+        </Pressable>
+        <TextInput
+          style={styles.composerInput}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Write a message..."
+          placeholderTextColor={colors.textMuted}
+          multiline
+          editable={!sending}
+          testID="composer-input"
+        />
+        <Pressable style={styles.composerSend} onPress={() => void onSend()} disabled={sending || draft.trim().length === 0} testID="composer-send">
+          {sending ? (
+            <ActivityIndicator color={colors.text} size="small" />
+          ) : (
+            <Text style={styles.composerSendText}>Send</Text>
+          )}
+        </Pressable>
+      </View>
+
+      <Modal visible={actionMessage !== null} transparent animationType="fade" onRequestClose={() => setActionMessage(null)}>
+        {actionMessage ? (
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard} testID="message-actions">
+              <View style={styles.reactionRow}>
+                {QUICK_REACTIONS.map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    style={styles.reactionOption}
+                    onPress={() => onReact(actionMessage, emoji)}
+                    disabled={reacting}
+                    testID={`react-${emoji}`}
+                  >
+                    <Text style={styles.reactionOptionText}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {actionEditTarget ? (
+                <>
+                  <TextInput
+                    style={styles.editInput}
+                    value={editDraft}
+                    onChangeText={setEditDraft}
+                    multiline
+                    maxLength={4000}
+                    testID="edit-input"
+                  />
+                  <Pressable style={styles.menuOption} onPress={() => void onSaveEdit()} testID="edit-save">
+                    <Text style={styles.menuOptionText}>Save edit</Text>
+                  </Pressable>
+                </>
+              ) : null}
+              <Pressable
+                style={styles.menuOption}
+                onPress={() => {
+                  const text = actionMessage.body ?? '';
+                  setActionMessage(null);
+                  if (text) {
+                    void import('react-native').then(({ Clipboard }) => Clipboard.setString(text));
+                  }
+                }}
+                testID="action-copy"
+              >
+                <Text style={styles.menuOptionText}>Copy</Text>
+              </Pressable>
+              {actionMessage.senderId === myUserId || header.circleRole === 'owner' || header.circleRole === 'admin' ? (
+                <Pressable style={styles.menuOptionDanger} onPress={() => onDelete(actionMessage)} testID="action-delete">
+                  <Text style={styles.menuOptionDangerText}>Delete</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={styles.textButton} onPress={() => setActionMessage(null)} testID="actions-close">
+                <Text style={styles.textButtonText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </Modal>
+
+      <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard} testID="edit-modal">
+            <Text style={styles.modalTitle}>Edit message</Text>
+            <TextInput style={styles.editInput} value={editDraft} onChangeText={setEditDraft} multiline maxLength={4000} testID="edit-modal-input" />
+            <Pressable style={styles.primaryButton} onPress={() => void onSaveEdit()} testID="edit-modal-save">
+              <Text style={styles.primaryButtonText}>Save</Text>
+            </Pressable>
+            <Pressable style={styles.textButton} onPress={() => setEditing(false)} testID="edit-modal-cancel">
+              <Text style={styles.textButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background, paddingTop: 56 },
+  centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backText: { color: colors.accent, fontSize: 28, fontWeight: '700', paddingHorizontal: 6 },
+  headerCenter: { marginLeft: 8, flex: 1 },
+  headerTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  headerSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
+  listContent: { padding: 16, paddingBottom: 8 },
+  sendError: { color: colors.error, fontSize: 12, paddingHorizontal: 16, paddingVertical: 4 },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 8,
+  },
+  composerPlus: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.5, // attachments arrive with M7 — intentionally inert
+  },
+  composerPlusText: { color: colors.textMuted, fontSize: 22, fontWeight: '600' },
+  composerInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 18,
+    color: colors.text,
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    maxHeight: 110,
+  },
+  composerSend: {
+    backgroundColor: colors.primary,
+    borderRadius: 19,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  composerSendText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  secondaryButton: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    marginTop: 16,
+  },
+  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(11,7,20,0.8)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 20,
+    alignSelf: 'stretch',
+  },
+  modalTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  reactionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  reactionOption: { padding: 8 },
+  reactionOptionText: { fontSize: 26 },
+  editInput: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    color: colors.text,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
+  menuOption: { paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.border },
+  menuOptionText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  menuOptionDanger: { paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.border },
+  menuOptionDangerText: { color: colors.error, fontSize: 15, fontWeight: '600' },
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  primaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  textButton: { alignItems: 'center', marginTop: 10, padding: 6 },
+  textButtonText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+});

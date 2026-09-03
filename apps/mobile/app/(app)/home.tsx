@@ -138,11 +138,18 @@ export default function HomeScreen() {
         : null}
 
       <View style={styles.quickActions}>
-        <Link href="/(app)/circles/create" asChild>
-          <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]} testID="home-create-circle">
-            <Text style={styles.primaryButtonText}>Create a Circle</Text>
+        <Link href="/(app)/chats" asChild>
+          <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]} testID="home-chats">
+            <Text style={styles.primaryButtonText}>Chats</Text>
           </Pressable>
         </Link>
+        <Link href="/(app)/circles/create" asChild>
+          <Pressable style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]} testID="home-create-circle">
+            <Text style={styles.secondaryButtonText}>Create a Circle</Text>
+          </Pressable>
+        </Link>
+      </View>
+      <View style={styles.quickActions}>
         <Link href="/(app)/circles/join" asChild>
           <Pressable
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}

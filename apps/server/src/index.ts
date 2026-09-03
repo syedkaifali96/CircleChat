@@ -2,7 +2,7 @@ import { Server as SocketServer } from 'socket.io';
 import { createDatabase } from './db/client';
 import { buildApp } from './app';
 import { config } from './config';
-import { wireRealtime } from './realtime';
+import { wireRealtime, conversationPublisher } from './realtime';
 import { readR2StorageConfig, R2StorageGateway } from './modules/media/storage';
 
 /**
@@ -10,8 +10,8 @@ import { readR2StorageConfig, R2StorageGateway } from './modules/media/storage';
  *
  * M2 wires the database, the authentication module and the authenticated
  * Socket.IO foundation (handshake session auth + revocation disconnects) onto
- * one HTTP server with clean startup/shutdown. No product realtime events
- * exist yet (docs/ARCHITECTURE.md §8 — messaging arrives in M5).
+ * one HTTP server with clean startup/shutdown. M5 adds the messaging REST
+ * modules plus minimal message change notifications (docs/ARCHITECTURE.md §8).
  */
 async function main(): Promise<void> {
   if (!config.databaseUrl) {
@@ -25,12 +25,14 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const storage = new R2StorageGateway(r2Config);
-  const app = await buildApp({ db, storage });
 
-  const io = new SocketServer(app.server, {
+  const io = new SocketServer({
     // Same-origin defaults, no CORS widening. Handshake auth: session token.
   });
   const realtime = wireRealtime(io, db, config.sessionTtlDays);
+  const publish = conversationPublisher(realtime);
+  const app = await buildApp({ db, storage, publish });
+  io.attach(app.server);
   app.decorate('revokeSessionSockets', (sessionId: string) =>
     realtime.disconnectSessionSockets(sessionId),
   );

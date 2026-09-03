@@ -245,6 +245,11 @@ export const conversationParticipants = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    // Read pointer (M5, docs/API.md POST /conversations/:id/read): the newest
+    // message the user has seen in THIS conversation. FK is declared without
+    // .references() to avoid a circular CREATE TABLE dependency (messages is
+    // defined below); the physical FK lives in migration 0003.
+    lastReadMessageId: uuid('last_read_message_id'),
   },
   (table) => [
     primaryKey({ columns: [table.conversationId, table.userId] }),

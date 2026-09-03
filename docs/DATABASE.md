@@ -152,13 +152,14 @@ the time it is created. The resulting direct conversation remains independent of
 
 ### 1.6 `conversation_participants`
 
-Purpose: authoritative participants/authorization for `direct` conversations.
+Purpose: authoritative participants/authorization for `direct` conversations; read-pointer storage for both conversation types.
 
 | Field | Type | Notes |
 |---|---|---|
 | `conversation_id` | UUID, FK → `conversations.id` ON DELETE CASCADE | composite PK part 1 |
 | `user_id` | UUID, FK → `users.id` ON DELETE CASCADE | composite PK part 2 |
 | `joined_at` | TIMESTAMPTZ NOT NULL | |
+| `last_read_message_id` | UUID NULL, FK → `messages.id` ON DELETE SET NULL | newest message the user has seen in this conversation (M5); NULL/missing row = everything unread |
 
 Primary key: `(conversation_id, user_id)`.
 
@@ -168,7 +169,10 @@ and realtime events is authorized by membership in this table. A database trigge
 must prevent a direct conversation from ending up with anything other than two participants.
 
 Circle conversations do not use this table as their Circle-membership authority; `circle_members`
-remains authoritative for Circle-scoped resources.
+remains authoritative for Circle-scoped resources. A participant row for a Circle conversation is
+created lazily on the first `POST /v1/conversations/:id/read` call (upsert) and serves only as that
+user's read pointer; unread counts are always computed server-side from this pointer, never trusted
+from clients. Stale/out-of-order read pointers never move the marker backward.
 
 ### 1.7 `messages`
 

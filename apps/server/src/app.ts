@@ -7,6 +7,8 @@ import { registerAuthPlugin } from './plugins/auth';
 import { authRoutes } from './modules/auth/routes';
 import { usersRoutes } from './modules/users/routes';
 import { circleRoutes } from './modules/circles/routes';
+import { conversationRoutes } from './modules/conversations/routes';
+import { messageRoutes } from './modules/messages/routes';
 import { profileRoutes } from './modules/profile/routes';
 import { sharesActiveCircle } from './modules/profile/service';
 import { mediaRoutes } from './modules/media/routes';
@@ -107,6 +109,8 @@ export async function buildApp(
     db?: Database;
     rateLimit?: boolean;
     storage?: StorageGateway;
+    /** M5: change-notification publisher (wired to Socket.IO in index/tests). */
+    publish?: (event: string, payload: unknown) => void;
   } = {},
 ): Promise<FastifyInstance> {
   const app = Fastify({
@@ -133,6 +137,11 @@ export async function buildApp(
     // Circles never touch object storage directly; storage is optional and only
     // used for invite-preview avatar URLs.
     await app.register(circleRoutes, { db, storage });
+    // Messaging (M5): REST writes are the source of truth; `publish` fans out
+    // change notifications when a Socket.IO server is attached.
+    const publish = options.publish ?? (() => undefined);
+    await app.register(conversationRoutes, { db, publish });
+    await app.register(messageRoutes, { db, publish });
     if (storage) {
       await app.register(profileRoutes, { db, storage });
       await app.register(mediaRoutes, {

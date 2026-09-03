@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### M5 — Direct + Circle Messaging
+
+- Server (docs/API.md contract): POST /v1/conversations/direct (find-or-create, both users must share ≥1 active Circle — D1; existence hidden behind generic 404; duplicates return the same conversation), GET /v1/conversations (caller-scoped circles + directs with last message preview + server-computed unread), POST /v1/conversations/:id/read (server-side read pointer; stale pointers never regress), PATCH /v1/conversations/:id/notification-pref (caller-only upsert).
+- Messages (docs/DATABASE.md §1.7–1.8): POST /v1/conversations/:id/messages (text-only, idempotent via (conversation_id, sender_id, client_message_id) — concurrent duplicates resolve to one row), GET keyset-paginated history (newest-first, ≤50/page, no OFFSET), PATCH /v1/messages/:id (sender-only, ≤24h window, tombstones never editable), DELETE /v1/messages/:id (sender, or Circle owner/admin for member messages; direct non-senders rejected; tombstone keeps the row but body/media are never exposed again), PUT/DELETE /v1/messages/:id/reactions (server-validated emoji set; one per user/emoji/message).
+- Realtime (minimal, docs/ARCHITECTURE.md §8): conversation rooms with server-side access re-check on every join; message:new, message:updated, message:deleted, reaction:changed, read:update change notifications after committed DB writes; REST remains the source of truth. Typing/presence stay deferred to M6.
+- Database: migration 0003 adds conversation_participants.last_read_message_id (FK → messages, ON DELETE SET NULL); unread = messages newer than the pointer (missing row/NULL = all unread).
+- Mobile (Expo): Chats list (circle + direct rows, last-message preview, unread badges, loading/empty/error states, private-chat start by username), conversation screen (header with circle/direct identity, MessageBubble with own/incoming styles, sender name, reply preview, edited marker, tombstones, reaction chips), composer (text-only; attachment control intentionally inert until M7), keyset pagination upward, long-press actions (react/copy/edit-within-24h/permission-gated delete), read marking on open.
+- Tests: 31 server tests (direct rules incl. duplicate + existence hiding, idempotent + concurrent sends, reply validation, keyset pagination, edit window, tombstone + delete permissions, reactions, read pointers, prefs, revoked sessions) + 6 realtime tests (authorized join, non-member rejection, all five events, revocation disconnect) + 11 mobile tests (bubble states, chats list, private-chat start, send flow, permission-gated actions).
+
+### M4 — Circles
+
+- Server (docs/API.md contract): create/list/get/update/delete Circle (soft delete, owner-only), multi-use capacity-limited expiring revocable invites (CSPRNG codes shown once; only SHA-256 hashes stored, normalized so typed codes match), join with the layered 5-member enforcement (FOR UPDATE row lock + conditional insert + BEFORE INSERT trigger + CHECK — a documented concurrent-join test proves 10 racing joins yield exactly 4 successes and a 5-member cap), leave (owner must transfer first), owner/admin member removal, owner-only role changes, atomic ownership transfer, per-Circle settings, Circle Home payload.
+- Server: invite-preview endpoint (public; limited pre-join fields + short-TTL presigned avatar URL; members never exposed).
+- Mobile (Expo): Home with Circle cards + empty/loading/error states, Create Circle, Join Circle (code → preview → confirm), Circle Home (members, role badges, invite modal with one-time code + revoke, role menu, transfer, leave), Circle Settings (rename, owner-only delete). API client extended for circles.
+- Tests: 22 server tests (create, invite lifecycle incl. hash-only storage + expiry bounds, join/preview, sixth-join rejection, concurrent joins never exceeding 5 members, owner-leave block, removal/role rules, atomic transfer, cross-circle lockout, revoked sessions) + 9 mobile tests.
+
 ### M3 Follow-up — Authorized media download endpoint
 
 - Implemented the documented GET /v1/media/:id/url: authenticated, READY-avatar-only, avatar-visibility rule enforced (self or >=1 shared active Circle with the avatar owner) BEFORE the short-TTL presigned GET is issued; generic 404 on every failure (existence not leaked); Cache-Control no-store; storage keys/credentials never in responses. Deleted Circles lose access. In-memory gateway download URLs are opaque tokens (mirroring R2). 12 integration tests.
