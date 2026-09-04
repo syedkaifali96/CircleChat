@@ -36,6 +36,18 @@ CircleChat is intentionally **not a WhatsApp clone**. The Circle itself is the c
 - Session/device management
 - Notification controls
 
+## Current Capabilities (implemented through M7.1)
+
+What actually ships today, verified by the test suites referenced below:
+
+- **Authentication:** username/password accounts, recovery codes, session/device management with revocation (revoked sessions also disconnect live sockets)
+- **Profiles:** display name, bio, avatars via private R2 storage with authorized presigned access
+- **Circles:** create/join via multi-use expiring revocable invites, roles (owner/admin/member), ownership transfer, server-enforced 5-member limit (transaction + trigger + CHECK)
+- **Messaging:** Direct (requires a shared active Circle) and Circle text chats with idempotent sends, keyset-paginated history, reactions, replies, 24-hour sender-only edits, sender/admin tombstone deletes, read state and unread counts
+- **Realtime:** typing indicators (server-side TTL expiry) and online/offline presence with last-seen timestamps
+- **Media messaging:** images, video, voice messages (2-minute server-enforced limit) via presigned uploads to private R2 with magic-byte verification; image thumbnails (400px) served alongside originals
+- **GIF search:** via **GIPHY**, called directly from the client per GIPHY's API terms (proxying prohibited), with the "Powered By GIPHY" attribution in the picker
+
 ## Documentation
 
 Product & design sources of truth:
@@ -110,9 +122,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M5 complete (docs approved, audit-approved milestones, all suites green).**
+**M0–M7.1 complete (all suites green).**
 
-Latest verification: server 170/170 tests (Vitest, real PostgreSQL), mobile 33/33 tests (Jest + RNTL), typecheck 0 errors, lint clean.
+Latest verification: server 195/195 tests (Vitest, real PostgreSQL), mobile 50/50 tests (Jest + RNTL), typecheck 0 errors, lint clean.
 
 | Milestone | Status |
 |---|---|
@@ -124,9 +136,11 @@ Latest verification: server 170/170 tests (Vitest, real PostgreSQL), mobile 33/3
 | M3 — Profiles (server + mobile, avatar media) | ✅ Done |
 | M4 — Circles (create/join/invites/roles/5-member limit, server + mobile) | ✅ Done |
 | M5 — Direct + Circle text messaging (idempotent sends, history, reactions, read state, realtime events) | ✅ Done |
-| M6 — Realtime (typing, presence) | ⬜ Not started |
-| M7 — Media (chat media upload/download, voice) | ⬜ Not started |
-| M8+ — Notifications, Circle Home, Pinboard, Polls, App Lock | ⬜ Not started |
+| M6 — Realtime typing + presence (TTL expiry, last-seen, multi-device) | ✅ Done |
+| M7 — Media messaging (presigned uploads, images/video/voice, confirmed-upload gate) | ✅ Done |
+| M7.1 — Image thumbnails (sharp) + GIF search (GIPHY client-side) | ✅ Done |
+| M8 — Push notifications | ⬜ Next |
+| M9+ — Circle Home, Pinboard, Polls, App Lock | ⬜ Not started |
 
 ## Getting Started
 
@@ -148,3 +162,29 @@ npm run build        # build all workspaces (shared dist, server dist, mobile ex
 migrations live in `apps/server/drizzle/` and are applied to a fresh database by
 the integration tests. `npm run db:generate` / `npm run db:migrate` manage them.
 Copy `.env.example` to `.env` for local configuration — never commit real values.
+
+## Environment Variables
+
+**Server** (`.env` at repo root, from `.env.example`; all real values gitignored):
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string (required in production) |
+| `NODE_ENV`, `PORT`, `LOG_LEVEL` | Server runtime basics |
+| `SESSION_TTL_DAYS` | Session lifetime (default 30) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PRESIGN_TTL_SECONDS` | Private Cloudflare R2 storage (profile avatars + chat media) |
+
+**Mobile** (`apps/mobile/.env`, from `apps/mobile/.env.example` — Expo inlines
+`EXPO_PUBLIC_*` values into the bundle, so these are never secrets):
+
+| Variable | Purpose |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | Server base URL |
+| `EXPO_PUBLIC_GIPHY_API_KEY` | GIPHY app key for GIF search. Goes in `apps/mobile/.env` (gitignored), NOT `.env.example`. Get a beta key at developers.giphy.com. Dev keys are rate-limited to ~42 requests/hour; a production-tier key requires submitting the app to GIPHY for review once the "Powered By GIPHY" attribution is live in the app. |
+
+## Known Limitations
+
+- Typing/presence state is single-process in-memory; a multi-node deployment would need a shared store (Redis).
+- Presence is only shown for the direct-chat partner; no group-wide online indicator.
+- Video thumbnails are not generated (frame extraction needs ffmpeg-scale native tooling).
+- No real Android emulator/device UI pass yet — realtime and media behavior were verified server-side with real Socket.IO clients plus automated suites.
