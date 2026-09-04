@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### M7.1 — GIF Search + Image Thumbnails
+
+- GIF search (Tenor, M7.1a): `GET /v1/media/gif-search` proxies Tenor server-side (per-user 30/min rate limit; `TENOR_API_KEY` lives only in the server environment — never client-visible, 503 when unconfigured). External GIFs send as `type='gif'` with the provider URL stored on a `kind='gif'` media row (`external_url`) — no storage round-trip; message visibility stays D1-gated. Provider: Tenor over Giphy (free tier, no attribution/branding requirements).
+- Image thumbnails (M7.1b): on confirm, chat images generate a max-400px JPEG thumbnail (sharp) stored as `<storage-key>-thumb` in the private bucket; `GET /v1/media/:id/url?variant=thumb` serves it and falls back to the original on failure — thumbnail generation never blocks message visibility. Video frame thumbnails deferred (needs ffmpeg-scale native tooling).
+- Mobile: GIF picker in the attachment menu (debounced search-as-you-type, grid of previews, tap to send), bubbles render thumbnails by default with tap-to-full-res, external GIFs render directly from the provider URL.
+- Migrations: 0004 adds `media.thumbnail_key` + `media.external_url`; 0005 extends the `messages.type` / `media.kind` CHECKs with `'gif'`.
+- Tests: 9 new server tests (search 503/401/proxy/key-hiding/rate-limit/validation, external GIF idempotency + URL validation, thumbnail generation + fallback) + mobile test updates.
+
 ### M7 — Media / Voice Messaging
 
 - Server (docs/API.md): `POST /v1/conversations/:id/media/upload-url` issues presigned uploads for chat attachments after sender authorization + per-kind validation (image 10 MB: jpeg/png/webp/gif, video 50 MB mp4, voice 10 MB aac/m4a/mp4 with a 2-minute server-enforced duration ceiling); `POST /v1/media/:id/confirm` unchanged (size re-check + magic-byte sniff); `GET /v1/media/:id/url` now serves conversation media under the D1 rule (conversation member/participant or uploader) alongside avatar media. `POST /v1/conversations/:id/messages` accepts media types but only references a READY, conversation-bound, sender-owned media row — pending/foreign media is rejected, and the idempotency key pattern carries over unchanged.

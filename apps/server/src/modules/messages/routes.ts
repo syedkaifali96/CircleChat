@@ -68,6 +68,7 @@ export async function messageRoutes(
       type: parsed.data.type,
       body: parsed.data.body,
       mediaId: parsed.data.mediaId,
+      externalUrl: parsed.data.externalUrl,
       replyToId: parsed.data.replyToId,
       clientMessageId: parsed.data.clientMessageId,
     });

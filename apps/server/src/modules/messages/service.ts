@@ -121,7 +121,8 @@ export async function serializeMessage(db: Database, row: MessageRow) {
   const deleted = row.deletedAt !== null;
   // Media metadata (M7): mime/dimensions/duration come from the media row so
   // clients can render without a second fetch; download URLs stay separate,
-  // short-lived and authorization-checked.
+  // short-lived and authorization-checked. M7.1 adds externalUrl (Tenor GIFs
+  // render directly; no bucket object) and hasThumbnail for image bubbles.
   let mediaInfo: {
     kind: string;
     mimeType: string;
@@ -129,6 +130,8 @@ export async function serializeMessage(db: Database, row: MessageRow) {
     durationMs: number | null;
     width: number | null;
     height: number | null;
+    externalUrl: string | null;
+    hasThumbnail: boolean;
   } | null = null;
   if (row.mediaId && !deleted) {
     const mediaRows = await db
@@ -139,6 +142,8 @@ export async function serializeMessage(db: Database, row: MessageRow) {
         durationMs: media.durationMs,
         width: media.width,
         height: media.height,
+        externalUrl: media.externalUrl,
+        thumbnailKey: media.thumbnailKey,
       })
       .from(media)
       .where(and(eq(media.id, row.mediaId), eq(media.status, 'ready')))
@@ -151,6 +156,8 @@ export async function serializeMessage(db: Database, row: MessageRow) {
         durationMs: mediaRows[0].durationMs,
         width: mediaRows[0].width,
         height: mediaRows[0].height,
+        externalUrl: mediaRows[0].externalUrl,
+        hasThumbnail: mediaRows[0].thumbnailKey !== null,
       };
     }
   }
@@ -160,7 +167,7 @@ export async function serializeMessage(db: Database, row: MessageRow) {
     senderId: row.senderId,
     senderUsername: sender.username,
     senderDisplayName: sender.displayName,
-    type: row.type as 'text' | 'image' | 'video' | 'voice' | 'file',
+    type: row.type as 'text' | 'image' | 'video' | 'voice' | 'file' | 'gif',
     body: deleted ? null : row.body,
     mediaId: deleted ? null : row.mediaId,
     media: mediaInfo,
@@ -185,9 +192,10 @@ export async function sendMessage(
   input: {
     conversationId: string;
     senderId: string;
-    type: 'text' | 'image' | 'video' | 'voice' | 'file';
+    type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'gif';
     body?: string;
     mediaId?: string;
+    externalUrl?: string;
     replyToId?: string;
     clientMessageId: string;
   },
@@ -196,34 +204,43 @@ export async function sendMessage(
   await requireConversationAccess(db, input.conversationId, input.senderId);
 
   if (input.type !== 'text') {
-    if (!input.mediaId) {
-      throw new AppError('MEDIA_REQUIRED', 400, 'Media messages require an uploaded attachment.');
-    }
-    const mediaRows = await db
-      .select({
-        id: media.id,
-        ownerId: media.ownerId,
-        conversationId: media.conversationId,
-        status: media.status,
-        kind: media.kind,
-      })
-      .from(media)
-      .where(eq(media.id, input.mediaId))
-      .limit(1);
-    const mediaRow = mediaRows[0];
-    // Foreign owner, other conversation, or not-yet-confirmed upload: all the
-    // same client error (no media existence leak, no pending media messages).
-    if (
-      !mediaRow ||
-      mediaRow.ownerId !== input.senderId ||
-      mediaRow.conversationId !== input.conversationId ||
-      mediaRow.status !== 'ready'
-    ) {
-      throw new AppError(
-        'MEDIA_NOT_READY',
-        400,
-        'The attachment upload is not complete for this conversation.',
-      );
+    if (input.type === 'gif') {
+      // External GIFs (M7.1): no storage round-trip — the provider URL rides
+      // the message. The URL is validated for shape only; visibility stays
+      // gated by the conversation membership check above.
+      if (!input.externalUrl || !/^https:\/\/[a-z0-9.-]+\//i.test(input.externalUrl)) {
+        throw new AppError('MEDIA_REQUIRED', 400, 'GIF messages require a valid GIF URL.');
+      }
+    } else {
+      if (!input.mediaId) {
+        throw new AppError('MEDIA_REQUIRED', 400, 'Media messages require an uploaded attachment.');
+      }
+      const mediaRows = await db
+        .select({
+          id: media.id,
+          ownerId: media.ownerId,
+          conversationId: media.conversationId,
+          status: media.status,
+          kind: media.kind,
+        })
+        .from(media)
+        .where(eq(media.id, input.mediaId))
+        .limit(1);
+      const mediaRow = mediaRows[0];
+      // Foreign owner, other conversation, or not-yet-confirmed upload: all the
+      // same client error (no media existence leak, no pending media messages).
+      if (
+        !mediaRow ||
+        mediaRow.ownerId !== input.senderId ||
+        mediaRow.conversationId !== input.conversationId ||
+        mediaRow.status !== 'ready'
+      ) {
+        throw new AppError(
+          'MEDIA_NOT_READY',
+          400,
+          'The attachment upload is not complete for this conversation.',
+        );
+      }
     }
   } else if (input.mediaId) {
     throw new AppError('MEDIA_NOT_ALLOWED', 400, 'Text messages cannot carry an attachment.');
@@ -243,6 +260,59 @@ export async function sendMessage(
     }
   }
 
+  // M7.1 external GIFs: a READY media row (external_url, no bucket object)
+  // is created inline so the message keeps the normal media-metadata shape.
+  // Only on the created path — a retry must not re-insert (unique storageKey).
+  let mediaIdForInsert = input.mediaId ?? null;
+  if (input.type === 'gif' && input.externalUrl) {
+    const existingDuplicate = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.conversationId, input.conversationId),
+          eq(messages.senderId, input.senderId),
+          eq(messages.clientMessageId, input.clientMessageId),
+        ),
+      )
+      .limit(1);
+    if (!existingDuplicate[0]) {
+      const created = await db
+        .insert(media)
+        .values({
+          ownerId: input.senderId,
+          conversationId: input.conversationId,
+          kind: 'gif',
+          mimeType: 'image/gif',
+          sizeBytes: 1, // CHECK requires > 0; byte size lives at the provider
+          storageKey: `external/${input.senderId}/${input.clientMessageId}`,
+          status: 'ready',
+          externalUrl: input.externalUrl,
+        })
+        .onConflictDoNothing()
+        .returning({ id: media.id });
+      if (created[0]) {
+        mediaIdForInsert = created[0].id;
+      } else {
+        // Concurrent duplicate: reuse the media row another request made.
+        const reused = await db
+          .select({ id: media.id })
+          .from(media)
+          .where(eq(media.storageKey, `external/${input.senderId}/${input.clientMessageId}`))
+          .limit(1);
+        mediaIdForInsert = reused[0]?.id ?? null;
+      }
+    } else {
+      // Return the duplicate's media for serialization consistency.
+      const dup = await db
+        .select({ mediaId: messages.mediaId })
+        .from(messages)
+        .where(eq(messages.id, existingDuplicate[0].id))
+        .limit(1);
+      mediaIdForInsert = dup[0]?.mediaId ?? null;
+    }
+  }
+
   const inserted = await db
     .insert(messages)
     .values({
@@ -251,7 +321,7 @@ export async function sendMessage(
       clientMessageId: input.clientMessageId,
       type: input.type,
       body: input.body ?? null,
-      mediaId: input.mediaId ?? null,
+      mediaId: mediaIdForInsert,
       replyToId: input.replyToId ?? null,
     })
     .onConflictDoNothing({

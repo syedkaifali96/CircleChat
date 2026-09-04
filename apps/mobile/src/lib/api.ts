@@ -428,9 +428,10 @@ export async function sendMessage(
   token: string,
   conversationId: string,
   input: {
-    type?: 'text' | 'image' | 'video' | 'voice' | 'file';
+    type?: 'text' | 'image' | 'video' | 'voice' | 'file' | 'gif';
     body?: string;
     mediaId?: string;
+    externalUrl?: string;
     replyToId?: string;
     clientMessageId: string;
   },
@@ -442,6 +443,7 @@ export async function sendMessage(
       type: input.type ?? 'text',
       ...(input.body !== undefined ? { body: input.body } : {}),
       ...(input.mediaId !== undefined ? { mediaId: input.mediaId } : {}),
+      ...(input.externalUrl !== undefined ? { externalUrl: input.externalUrl } : {}),
       ...(input.replyToId ? { replyToId: input.replyToId } : {}),
       clientMessageId: input.clientMessageId,
     },
@@ -511,6 +513,10 @@ export interface MediaInfo {
   durationMs: number | null;
   width: number | null;
   height: number | null;
+  /** M7.1: external GIFs (Tenor) render directly from the provider URL. */
+  externalUrl: string | null;
+  /** M7.1: true when a 400px thumbnail exists for this image. */
+  hasThumbnail: boolean | null;
 }
 
 export interface MediaUploadIntent {
@@ -560,12 +566,28 @@ export async function confirmMediaUpload(token: string, mediaId: string): Promis
   return apiFetch(`${API_BASE_URL}/media/${mediaId}/confirm`, { method: 'POST', token });
 }
 
-/** Short-TTL presigned download URL, issued only after the D1 access check. */
-export async function fetchMediaDownloadUrl(mediaId: string): Promise<string> {
+/** Short-TTL presigned download URL, issued only after the D1 access check.
+ * variant='thumb' serves the 400px thumbnail when one exists (M7.1). */
+export async function fetchMediaDownloadUrl(
+  mediaId: string,
+  options: { variant?: 'thumb' } = {},
+): Promise<string> {
   const token = (await loadSessionToken()) ?? '';
-  const res = await apiFetch<{ url: string }>(`${API_BASE_URL}/media/${mediaId}/url`, {
+  const qs = options.variant ? `?variant=${options.variant}` : '';
+  const res = await apiFetch<{ url: string }>(`${API_BASE_URL}/media/${mediaId}/url${qs}`, {
     method: 'GET',
     token,
   });
   return res.url;
+}
+
+/** GIF search (M7.1) — proxied through the server; the Tenor key stays there. */
+export async function searchGifs(
+  token: string,
+  query: string,
+): Promise<{ results: Array<{ id: string; url: string; previewUrl: string; width: number; height: number }> }> {
+  return apiFetch(`${API_BASE_URL}/media/gif-search?q=${encodeURIComponent(query)}`, {
+    method: 'GET',
+    token,
+  });
 }

@@ -29,6 +29,20 @@
       "when": 1788456105120,
       "tag": "0003_redundant_gorgon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788545760890,
+      "tag": "0004_woozy_firebrand",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788546438995,
+      "tag": "0005_bouncy_dark_phoenix",
+      "breakpoints": true
     }
   ]
 }

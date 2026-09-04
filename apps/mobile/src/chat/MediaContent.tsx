@@ -90,16 +90,28 @@ function VoicePlayer({ mediaId }: { mediaId: string }) {
 export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaContentProps) {
   const [imageUri, setImageUri] = useState<string | null>(localUri ?? null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [fullRes, setFullRes] = useState(false);
 
   useEffect(() => {
     if (uploadStage || !message.mediaId) {
+      return;
+    }
+    // M7.1 external GIFs render straight from the provider URL — no signed
+    // download round-trip (the message itself is D1-gated).
+    const externalUrl = message.media?.externalUrl ?? null;
+    if (externalUrl) {
+      setImageUri(externalUrl);
       return;
     }
     let cancelled = false;
     setImageUri(localUri ?? null);
     void (async () => {
       try {
-        const uri = await fetchMediaDownloadUrl(message.mediaId!);
+        const uri = await fetchMediaDownloadUrl(
+          message.mediaId!,
+          // Bubbles default to the thumbnail; tap-to-expand loads full-res.
+          message.media?.hasThumbnail && !fullRes ? { variant: 'thumb' } : {},
+        );
         if (!cancelled) {
           setImageUri(uri);
         }
@@ -112,7 +124,7 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
     return () => {
       cancelled = true;
     };
-  }, [message.mediaId, uploadStage, localUri]);
+  }, [message.mediaId, message.media?.externalUrl, message.media?.hasThumbnail, fullRes, uploadStage, localUri]);
 
   if (uploadStage === 'failed') {
     return (
@@ -139,13 +151,20 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
 
   if (message.type === 'image' && imageUri) {
     const width = message.media?.width ?? null;
+    const tappable = (message.media?.hasThumbnail ?? false) || (message.media?.externalUrl ?? false);
     return (
-      <Image
-        source={{ uri: imageUri }}
-        style={width !== null && width < 120 ? styles.imageSmall : styles.image}
-        resizeMode="cover"
-        testID={`media-image-${message.id}`}
-      />
+      <Pressable
+        onPress={() => (message.media?.hasThumbnail ? setFullRes((v) => !v) : undefined)}
+        disabled={!tappable}
+        testID={`media-image-tap-${message.id}`}
+      >
+        <Image
+          source={{ uri: imageUri }}
+          style={width !== null && width < 120 ? styles.imageSmall : styles.image}
+          resizeMode="cover"
+          testID={`media-image-${message.id}`}
+        />
+      </Pressable>
     );
   }
 

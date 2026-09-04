@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -30,6 +31,7 @@ import { useAuth } from '../../../src/auth/AuthContext';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAndSendMedia } from '../../../src/lib/mediaSend';
+import { searchGifs } from '../../../src/lib/api';
 import {
   sendTypingStart,
   sendTypingStop,
@@ -89,6 +91,12 @@ export default function ConversationScreen() {
   >([]);
   const voiceRecordingRef = useRef<Audio.Recording | null>(null);
   const [voiceRecording, setVoiceRecording] = useState(false);
+  // M7.1: GIF picker — debounced search-as-you-type against the server proxy.
+  const [gifPickerVisible, setGifPickerVisible] = useState(false);
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifResults, setGifResults] = useState<Array<{ id: string; url: string; previewUrl: string; width: number; height: number }>>([]);
+  const [gifSearching, setGifSearching] = useState(false);
+  const [gifError, setGifError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -418,6 +426,56 @@ export default function ConversationScreen() {
     }
   };
 
+  // M7.1: debounced GIF search + send. GIF bytes never traverse our storage;
+  // the provider URL rides the message (visibility is D1-gated server-side).
+  const gifSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onGifQueryChange = (value: string) => {
+    setGifQuery(value);
+    setGifError(null);
+    if (gifSearchTimer.current) {
+      clearTimeout(gifSearchTimer.current);
+    }
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      setGifResults([]);
+      return;
+    }
+    gifSearchTimer.current = setTimeout(() => {
+      void (async () => {
+        setGifSearching(true);
+        try {
+          const token = (await loadSessionToken()) ?? '';
+          const { results } = await searchGifs(token, trimmed);
+          setGifResults(results);
+        } catch {
+          setGifError(
+            "Couldn't search GIFs right now — the service may not be configured or is busy.",
+          );
+        } finally {
+          setGifSearching(false);
+        }
+      })();
+    }, 400);
+  };
+
+  const sendGif = (gif: { url: string; width: number; height: number }) => {
+    setGifPickerVisible(false);
+    void (async () => {
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        const { message } = await sendMessage(token, id, {
+          type: 'gif',
+          externalUrl: gif.url,
+          clientMessageId: `gif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        });
+        setMessages((current) => [...current, message]);
+        requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      } catch {
+        setSendError("GIF couldn't be sent. Check your connection and try again.");
+      }
+    })();
+  };
+
   const openActions = (message: Message) => {
     setActionMessage(message);
     const withinWindow = Date.now() - new Date(message.createdAt).getTime() < 24 * 60 * 60 * 1000;
@@ -630,6 +688,16 @@ export default function ConversationScreen() {
             <Pressable style={styles.menuOption} onPress={() => void recordVoice()} testID="attach-voice">
               <Text style={styles.menuOptionText}>Voice message (max 2 min)</Text>
             </Pressable>
+            <Pressable
+              style={styles.menuOption}
+              onPress={() => {
+                setAttachmentMenuVisible(false);
+                setGifPickerVisible(true);
+              }}
+              testID="attach-gif"
+            >
+              <Text style={styles.menuOptionText}>Search GIFs</Text>
+            </Pressable>
             <Pressable style={styles.menuOption} disabled testID="attach-sticker">
               <Text style={[styles.menuOptionText, styles.comingSoonText]}>Stickers — coming soon</Text>
             </Pressable>
@@ -645,6 +713,45 @@ export default function ConversationScreen() {
           <Text style={styles.voiceRecordingText}>● Recording… tap to send</Text>
         </Pressable>
       ) : null}
+
+      <Modal visible={gifPickerVisible} transparent animationType="fade" onRequestClose={() => setGifPickerVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard} testID="gif-picker">
+            <Text style={styles.modalTitle}>Search GIFs</Text>
+            <TextInput
+              style={styles.editInput}
+              value={gifQuery}
+              onChangeText={onGifQueryChange}
+              placeholder="Search Tenor…"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              testID="gif-search-input"
+            />
+            {gifError ? <Text style={styles.sendError} testID="gif-error">{gifError}</Text> : null}
+            {gifSearching ? <ActivityIndicator color={colors.accent} style={{ marginTop: 12 }} /> : null}
+            {!gifSearching && gifQuery.trim().length > 0 && gifResults.length === 0 && !gifError ? (
+              <Text style={styles.headerSubtitle} testID="gif-empty">No GIFs found.</Text>
+            ) : null}
+            <FlatList
+              data={gifResults}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              columnWrapperStyle={{ gap: 8 }}
+              contentContainerStyle={{ gap: 8, paddingTop: 12 }}
+              style={{ maxHeight: 320 }}
+              renderItem={({ item }) => (
+                <Pressable onPress={() => sendGif(item)} testID={`gif-${item.id}`}>
+                  <Image source={{ uri: item.previewUrl }} style={styles.gifThumb} resizeMode="cover" />
+                </Pressable>
+              )}
+            />
+            <Pressable style={styles.textButton} onPress={() => setGifPickerVisible(false)} testID="gif-close">
+              <Text style={styles.textButtonText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
         <View style={styles.modalBackdrop}>
@@ -715,6 +822,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   voiceRecordingText: { color: colors.error, fontSize: 13, fontWeight: '700' },
+  gifThumb: { width: 150, height: 110, borderRadius: 10, backgroundColor: colors.surface },
   composerInput: {
     flex: 1,
     backgroundColor: colors.surface,

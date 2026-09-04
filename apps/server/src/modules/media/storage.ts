@@ -1,4 +1,4 @@
-import { GetObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'node:crypto';
@@ -31,6 +31,10 @@ export interface StorageGateway {
   headObject(key: string): Promise<{ sizeBytes: number } | undefined>;
   /** Reads the first `length` bytes of the object for magic-byte sniffing. */
   readObjectBytes(key: string, length: number): Promise<Buffer | undefined>;
+  /** Reads the whole object (thumbnail generation needs all bytes). */
+  getObject(key: string): Promise<Buffer | undefined>;
+  /** Server-side write — used only by thumbnail generation, never clients. */
+  putObject(key: string, contentType: string, bytes: Buffer): Promise<void>;
   createDownloadUrl(key: string, expiresInSeconds: number): Promise<string>;
 }
 
@@ -118,6 +122,23 @@ export class R2StorageGateway implements StorageGateway {
     }
   }
 
+  async getObject(key: string): Promise<Buffer | undefined> {
+    try {
+      const head = await this.client.send(new GetObjectCommand({ Bucket: this.config.bucket, Key: key }));
+      const bytes = await head.Body?.transformToByteArray();
+      return bytes ? Buffer.from(bytes) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Server-side write — used only by thumbnail generation, never clients. */
+  async putObject(key: string, contentType: string, bytes: Buffer): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.config.bucket, Key: key, ContentType: contentType, Body: bytes }),
+    );
+  }
+
   async createDownloadUrl(key: string, expiresInSeconds: number): Promise<string> {
     // Short-TTL presigned GET from the private bucket (docs/ARCHITECTURE.md §9).
     const command = new GetObjectCommand({
@@ -171,6 +192,16 @@ export class InMemoryStorageGateway implements StorageGateway {
       return undefined;
     }
     return object.subarray(0, length);
+  }
+
+  async getObject(key: string): Promise<Buffer | undefined> {
+    return this.objects.get(key);
+  }
+
+  /** Server-side write — used only by thumbnail generation, never clients. */
+  async putObject(key: string, contentType: string, bytes: Buffer): Promise<void> {
+    void contentType;
+    this.objects.set(key, bytes);
   }
 
   async createDownloadUrl(key: string, expiresInSeconds: number): Promise<string> {

@@ -277,12 +277,23 @@ Only ready media can be attached to messages — a message referencing pending
 or foreign media is rejected, so no participant ever sees unrenderable media.
 Downloads use short-TTL presigned GET URLs after an explicit access check
 (conversation media: D1 conversation rule; avatars: profile-visibility rule).
+M7.1 adds `?variant=thumb` — chat images generate a max-400px JPEG thumbnail
+(server-side, sharp) on confirm, stored as `<storage-key>-thumb` in the same
+private bucket; generation is best-effort and a failure falls back to the
+original image without failing the upload. Video thumbnails need frame
+extraction (ffmpeg or similar) and are deferred.
+
+GIF search provider: **Tenor (Google)** — chosen over Giphy for its free
+tier and the absence of attribution/branding requirements. Search is proxied
+through `GET /v1/media/gif-search` (30/min/user, rate-limited server-side);
+`TENOR_API_KEY` lives only in the server environment and never reaches the
+client. External GIF messages store the provider URL on a `kind='gif'` media
+row (`external_url`) — no re-upload through the storage pipeline; provider
+URLs are public by nature, and message visibility remains D1-gated.
 
 Storage provider: Cloudflare R2 (S3-compatible) via presigned POST/GET; the
-in-memory gateway mirrors the interface for tests. GIF files may use the
-image upload path as `image/gif`; a GIF search provider (Tenor/Giphy) and
-bundled sticker packs remain **V2** — the M7 picker covers gallery image/
-video capture and voice recording only.
+in-memory gateway mirrors the interface for tests. GIF files may also use the
+image upload path as `image/gif`. Bundled sticker packs remain V2.
 
 ---
 

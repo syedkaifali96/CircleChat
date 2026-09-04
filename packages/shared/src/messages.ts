@@ -11,8 +11,9 @@ export const messageBodySchema = z.string().trim().min(1).max(4000);
 /* ------------------------------------------------ chat media (M7) ------- */
 
 /** GIF-as-image upload rides the image kind (docs/API.md); the GIF search
- * picker/provider itself remains V2 per the product spec. */
-export const CHAT_MEDIA_KINDS = ['image', 'video', 'voice', 'file'] as const;
+ * picker/provider itself remains V2 per the product spec. External (Tenor)
+ * GIFs ride the dedicated 'gif' kind with external_url (M7.1). */
+export const CHAT_MEDIA_KINDS = ['image', 'video', 'voice', 'file', 'gif'] as const;
 export const CHAT_MEDIA_KIND = z.enum(CHAT_MEDIA_KINDS);
 
 /** Per-kind upload caps (docs/SECURITY.md §7). */
@@ -21,6 +22,8 @@ export const CHAT_MEDIA_MAX_BYTES: Record<(typeof CHAT_MEDIA_KINDS)[number], num
   video: 50 * 1024 * 1024,
   voice: 10 * 1024 * 1024,
   file: 10 * 1024 * 1024,
+  // External GIFs bypass the storage pipeline; the cap only guards uploads.
+  gif: 10 * 1024 * 1024,
 };
 
 /** Voice messages: hard server-enforced ceiling on the declared duration. */
@@ -35,6 +38,7 @@ export const CHAT_MEDIA_MIME_TYPES: Record<(typeof CHAT_MEDIA_KINDS)[number], re
   video: VIDEO_MIME_TYPES,
   voice: VOICE_MIME_TYPES,
   file: [], // generic file uploads stay out of the MVP scope
+  gif: ['image/gif'], // external URLs only; never uploaded through storage
 };
 
 const chatMediaIntentBase = z.object({
@@ -59,20 +63,28 @@ export const chatMediaUploadSchema = chatMediaIntentBase
     message: 'Duration is out of range.',
   });
 
-/** M5 send schema extended (M7): media sends reference a CONFIRMED media row. */
+/** M5 send schema extended (M7 + M7.1): media sends reference a CONFIRMED
+ * media row; GIF sends carry the provider URL (external_url). */
 export const sendMessageSchema = z
   .object({
-    type: z.enum(['text', 'image', 'video', 'voice', 'file']).default('text'),
+    type: z.enum(['text', 'image', 'video', 'voice', 'file', 'gif']).default('text'),
     body: messageBodySchema.optional(),
     mediaId: z.string().uuid().optional(),
+    externalUrl: z.string().url().max(1000).optional(),
     replyToId: z.string().uuid().optional(),
     clientMessageId: z.string().trim().min(1).max(64),
   })
   .refine((v) => (v.type === 'text' ? v.body !== undefined && v.body.length > 0 : true), {
     message: 'Text messages require a body.',
   })
-  .refine((v) => (v.type === 'text' ? v.mediaId === undefined : v.mediaId !== undefined), {
-    message: 'Media messages require a mediaId; text messages cannot carry one.',
+  .refine((v) => (v.type === 'gif' ? v.externalUrl !== undefined && v.mediaId === undefined : true), {
+    message: 'GIF messages require an externalUrl and cannot carry a mediaId.',
+  })
+  .refine((v) => (v.type === 'text' ? v.mediaId === undefined && v.externalUrl === undefined : true), {
+    message: 'Text messages cannot carry media fields.',
+  })
+  .refine((v) => (v.type !== 'text' && v.type !== 'gif' ? v.mediaId !== undefined : true), {
+    message: 'Media messages require a mediaId.',
   });
 
 export const editMessageSchema = z.object({
@@ -96,6 +108,10 @@ export const messageMediaSchema = z.object({
   durationMs: z.number().int().nullable(),
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
+  /** M7.1: set for external GIFs (Tenor) — rendered directly, no signed URL. */
+  externalUrl: z.string().nullable(),
+  /** M7.1: true when a 400px thumbnail exists for this image. */
+  hasThumbnail: z.boolean().nullable(),
 });
 
 export const messageSchema = z.object({
@@ -104,7 +120,7 @@ export const messageSchema = z.object({
   senderId: z.string().uuid(),
   senderUsername: z.string(),
   senderDisplayName: z.string(),
-  type: z.enum(['text', 'image', 'video', 'voice', 'file']),
+  type: z.enum(['text', 'image', 'video', 'voice', 'file', 'gif']),
   body: z.string().nullable(),
   mediaId: z.string().uuid().nullable(),
   /** M7: metadata from the READY media row (mime, dimensions, duration). */

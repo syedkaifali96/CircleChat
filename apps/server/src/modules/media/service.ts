@@ -3,6 +3,7 @@ import type { Database } from '../../db/client';
 import { media } from '../../db/schema';
 import { mimeFamilyMatches, sniffMimeType, UPLOAD_CAPS } from './validation';
 import { avatarStorageKey, chatMediaStorageKey, type StorageGateway } from './storage';
+import { generateThumbnail, isImageKind } from './thumbnails';
 
 /**
  * Media lifecycle service (docs/ARCHITECTURE.md §9):
@@ -57,11 +58,15 @@ export async function getMediaById(db: Database, mediaId: string) {
  * Confirm: the client has PUT the bytes. The server HEADs the object, re-checks
  * the size, sniffs magic bytes against the pinned MIME type, then marks the row
  * ready. Anything suspicious deletes the pending row.
+ *
+ * M7.1: chat images get a best-effort 400px JPEG thumbnail on confirm.
+ * Thumbnail failure is logged and ignored — the message still becomes visible
+ * with the original image as fallback (docs/ARCHITECTURE.md §9).
  */
 export async function confirmMedia(
   db: Database,
   storage: StorageGateway,
-  input: { mediaId: string; ownerId: string },
+  input: { mediaId: string; ownerId: string; log?: { warn: (obj: unknown, msg: string) => void } },
 ): Promise<'ready' | 'rejected'> {
   const row = await getMediaById(db, input.mediaId);
   if (!row || row.ownerId !== input.ownerId || row.status !== 'pending') {
@@ -83,6 +88,24 @@ export async function confirmMedia(
     return 'rejected';
   }
   await db.update(media).set({ status: 'ready' }).where(eq(media.id, row.id));
+
+  if (isImageKind(row.kind)) {
+    try {
+      const bytes = await storage.getObject(row.storageKey);
+      if (!bytes) {
+        throw new Error('object unreadable');
+      }
+      const thumbnail = await generateThumbnail(bytes);
+      const thumbnailKey = `${row.storageKey}-thumb`;
+      await storage.putObject(thumbnailKey, 'image/jpeg', thumbnail);
+      await db
+        .update(media)
+        .set({ thumbnailKey })
+        .where(eq(media.id, row.id));
+    } catch (err) {
+      input.log?.warn({ err, mediaId: row.id }, 'thumbnail generation failed; falling back to original');
+    }
+  }
   return 'ready';
 }
 

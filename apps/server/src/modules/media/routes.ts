@@ -11,7 +11,10 @@ import {
   getMediaById,
   issueMediaDownloadUrl,
 } from './service';
+import { isGifSearchConfigured, searchGifs } from './gif';
 import type { StorageGateway } from './storage';
+
+void getMediaById;
 
 /**
  * Media routes (docs/API.md): upload-intent, confirm and the authorized
@@ -38,6 +41,46 @@ export async function mediaRoutes(
 ): Promise<void> {
   const { db, storage, sharesActiveCircle } = options;
 
+  // M7.1: per-user GIF search limiter — searches proxy Tenor and cost real
+  // provider quota; abuse must not flow through (docs/SECURITY.md §6).
+  const gifSearchHits = new Map<string, number[]>();
+  const GIF_SEARCH_LIMIT = 30;
+  const GIF_SEARCH_WINDOW_MS = 60_000;
+
+  app.get('/v1/media/gif-search', { config: { auth: true } }, async (request, reply) => {
+    if (!isGifSearchConfigured()) {
+      // Documented blocker: the owner must supply TENOR_API_KEY; the API key
+      // itself never leaves the server environment.
+      await reply.code(503).send({
+        code: 'GIF_SEARCH_UNAVAILABLE',
+        message: 'GIF search is not configured on this server.',
+      });
+      return;
+    }
+    const { q } = request.query as { q?: string };
+    const query = (q ?? '').trim();
+    if (query.length < 1 || query.length > 60) {
+      throw validationFailed();
+    }
+    const requesterId = request.authUser!.userId;
+    const now = Date.now();
+    const recent = (gifSearchHits.get(requesterId) ?? []).filter((t) => now - t < GIF_SEARCH_WINDOW_MS);
+    if (recent.length >= GIF_SEARCH_LIMIT) {
+      await reply.code(429).send({ code: 'RATE_LIMITED', message: 'Too many searches. Try again shortly.' });
+      return;
+    }
+    recent.push(now);
+    gifSearchHits.set(requesterId, recent);
+
+    try {
+      const results = await searchGifs(query);
+      await reply.header('cache-control', 'no-store').send({ results });
+    } catch (err) {
+      request.log.warn({ err }, 'gif search failed');
+      await reply.code(502).send({ code: 'GIF_SEARCH_FAILED', message: 'GIF search failed. Try again.' });
+    }
+  });
+
   app.post('/v1/media/upload-intent', { config: { auth: true } }, async (request, reply) => {
     const parsed = mediaUploadIntentSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -62,6 +105,7 @@ export async function mediaRoutes(
     const outcome = await confirmMedia(db, storage, {
       mediaId: id,
       ownerId: request.authUser!.userId,
+      log: request.log,
     });
     if (outcome !== 'ready') {
       // Foreign ids, non-pending rows and failed verification are
@@ -75,6 +119,7 @@ export async function mediaRoutes(
 
   app.get('/v1/media/:id/url', { config: { auth: true } }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const { variant } = request.query as { variant?: string };
 
     // Conversation media (M7): participant/member of the bound conversation
     // or the uploader. requireConversationAccess throws the generic 404.
@@ -85,10 +130,10 @@ export async function mediaRoutes(
         requireConversationAccess(db, conversationId, requesterId).then(() => true),
     });
     if (chatMedia) {
-      const url = await issueMediaDownloadUrl(db, storage, { mediaId: id });
-      if (!url) {
-        throw notFound('Media not found.');
-      }
+      // M7.1: thumbnail variant falls back to the original when absent.
+      const key =
+        variant === 'thumb' && chatMedia.thumbnailKey ? chatMedia.thumbnailKey : chatMedia.storageKey;
+      const url = await storage.createDownloadUrl(key, 60);
       await reply.header('cache-control', 'no-store').send({ url, mediaId: id });
       return;
     }

@@ -104,6 +104,10 @@ export const media = pgTable(
     mimeType: text('mime_type').notNull(),
     sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
     storageKey: text('storage_key').notNull().unique(),
+    // M7.1: chat image thumbnails (max 400px edge, JPEG) — nullable so GIF
+    // stickers can store an external URL instead of a bucket key.
+    thumbnailKey: text('thumbnail_key'),
+    externalUrl: text('external_url'),
     status: text('status').notNull(),
     width: integer('width'),
     height: integer('height'),
@@ -115,7 +119,7 @@ export const media = pgTable(
     index('media_owner_status_idx').on(table.ownerId, table.status),
     check(
       'media_kind_ck',
-      sql`${table.kind} IN ('image', 'video', 'voice', 'file', 'avatar')`,
+      sql`${table.kind} IN ('image', 'video', 'voice', 'file', 'avatar', 'gif')`,
     ),
     check('media_size_positive_ck', sql`${table.sizeBytes} > 0`),
     check(
@@ -293,7 +297,7 @@ export const messages = pgTable(
       .where(sql`${table.deletedAt} IS NULL`),
     check(
       'messages_type_ck',
-      sql`${table.type} IN ('text', 'image', 'video', 'voice', 'file')`,
+      sql`${table.type} IN ('text', 'image', 'video', 'voice', 'file', 'gif')`,
     ),
     check(
       'messages_body_len_ck',

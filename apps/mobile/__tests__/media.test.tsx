@@ -145,11 +145,11 @@ describe('MediaContent', () => {
     mockApi.fetchMediaDownloadUrl.mockResolvedValue('https://signed/u1');
     render(
       <MediaContent
-        message={{ ...baseMessage, id: 'img-1', type: 'image', mediaId: 'med-1', body: null, media: { kind: 'image', mimeType: 'image/png', sizeBytes: 10, durationMs: null, width: 400, height: 300 } }}
+        message={{ ...baseMessage, id: 'img-1', type: 'image', mediaId: 'med-1', body: null, media: { kind: 'image', mimeType: 'image/png', sizeBytes: 10, durationMs: null, width: 400, height: 300, externalUrl: null, hasThumbnail: true } }}
       />,
     );
 
-    await waitFor(() => expect(mockApi.fetchMediaDownloadUrl).toHaveBeenCalledWith('med-1'));
+    await waitFor(() => expect(mockApi.fetchMediaDownloadUrl).toHaveBeenCalledWith('med-1', { variant: 'thumb' }));
     expect(screen.getByTestId('media-image-img-1')).toBeTruthy();
   });
 
@@ -157,7 +157,7 @@ describe('MediaContent', () => {
     mockApi.fetchMediaDownloadUrl.mockResolvedValue('https://signed/v1');
     render(
       <MediaContent
-        message={{ ...baseMessage, id: 'voice-1', type: 'voice', mediaId: 'med-v', body: null, media: { kind: 'voice', mimeType: 'audio/mp4', sizeBytes: 1200, durationMs: 5200, width: null, height: null } }}
+        message={{ ...baseMessage, id: 'voice-1', type: 'voice', mediaId: 'med-v', body: null, media: { kind: 'voice', mimeType: 'audio/mp4', sizeBytes: 1200, durationMs: 5200, width: null, height: null, externalUrl: null, hasThumbnail: false } }}
       />,
     );
 
