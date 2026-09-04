@@ -283,13 +283,20 @@ private bucket; generation is best-effort and a failure falls back to the
 original image without failing the upload. Video thumbnails need frame
 extraction (ffmpeg or similar) and are deferred.
 
-GIF search provider: **Tenor (Google)** — chosen over Giphy for its free
-tier and the absence of attribution/branding requirements. Search is proxied
-through `GET /v1/media/gif-search` (30/min/user, rate-limited server-side);
-`TENOR_API_KEY` lives only in the server environment and never reaches the
-client. External GIF messages store the provider URL on a `kind='gif'` media
-row (`external_url`) — no re-upload through the storage pipeline; provider
-URLs are public by nature, and message visibility remains D1-gated.
+GIF search provider: **GIPHY** (M7.1a — replaces Tenor, discontinued by
+Google). GIPHY's API terms explicitly prohibit proxying their API or media
+loads, so search runs **directly from the mobile client**
+(`EXPO_PUBLIC_GIPHY_API_KEY` ships in the app config; the key is public by
+GIPHY's own design — never placed in server env or committed). The server's
+only GIF role is accepting external-GIF messages (`type='gif'` + https
+`external_url` on a `kind='gif'` media row — no storage round-trip); message
+visibility remains D1-gated. Compliance rules honored: the "Powered By
+GIPHY" attribution mark is always shown with search results, results are
+rendered exactly as returned (no reordering/filtering), and no other
+provider is mixed into the same grid. Dev-tier keys are heavily
+rate-limited (~42 req/hour) — the UI surfaces 429s as "try again shortly".
+Production key: submit the app to GIPHY for review once attribution is live
+(manual owner step).
 
 Storage provider: Cloudflare R2 (S3-compatible) via presigned POST/GET; the
 in-memory gateway mirrors the interface for tests. GIF files may also use the

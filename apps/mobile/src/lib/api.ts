@@ -513,7 +513,7 @@ export interface MediaInfo {
   durationMs: number | null;
   width: number | null;
   height: number | null;
-  /** M7.1: external GIFs (Tenor) render directly from the provider URL. */
+  /** M7.1: external GIFs render directly from the provider URL. */
   externalUrl: string | null;
   /** M7.1: true when a 400px thumbnail exists for this image. */
   hasThumbnail: boolean | null;
@@ -579,15 +579,4 @@ export async function fetchMediaDownloadUrl(
     token,
   });
   return res.url;
-}
-
-/** GIF search (M7.1) — proxied through the server; the Tenor key stays there. */
-export async function searchGifs(
-  token: string,
-  query: string,
-): Promise<{ results: Array<{ id: string; url: string; previewUrl: string; width: number; height: number }> }> {
-  return apiFetch(`${API_BASE_URL}/media/gif-search?q=${encodeURIComponent(query)}`, {
-    method: 'GET',
-    token,
-  });
 }

@@ -11,7 +11,7 @@ export const messageBodySchema = z.string().trim().min(1).max(4000);
 /* ------------------------------------------------ chat media (M7) ------- */
 
 /** GIF-as-image upload rides the image kind (docs/API.md); the GIF search
- * picker/provider itself remains V2 per the product spec. External (Tenor)
+ * picker/provider remains V2 per the product spec. External
  * GIFs ride the dedicated 'gif' kind with external_url (M7.1). */
 export const CHAT_MEDIA_KINDS = ['image', 'video', 'voice', 'file', 'gif'] as const;
 export const CHAT_MEDIA_KIND = z.enum(CHAT_MEDIA_KINDS);
@@ -108,7 +108,7 @@ export const messageMediaSchema = z.object({
   durationMs: z.number().int().nullable(),
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
-  /** M7.1: set for external GIFs (Tenor) — rendered directly, no signed URL. */
+  /** M7.1: set for external GIFs — rendered directly, no signed URL. */
   externalUrl: z.string().nullable(),
   /** M7.1: true when a 400px thumbnail exists for this image. */
   hasThumbnail: z.boolean().nullable(),

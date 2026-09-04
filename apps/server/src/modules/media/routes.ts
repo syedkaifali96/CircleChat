@@ -11,7 +11,6 @@ import {
   getMediaById,
   issueMediaDownloadUrl,
 } from './service';
-import { isGifSearchConfigured, searchGifs } from './gif';
 import type { StorageGateway } from './storage';
 
 void getMediaById;
@@ -41,45 +40,11 @@ export async function mediaRoutes(
 ): Promise<void> {
   const { db, storage, sharesActiveCircle } = options;
 
-  // M7.1: per-user GIF search limiter — searches proxy Tenor and cost real
-  // provider quota; abuse must not flow through (docs/SECURITY.md §6).
-  const gifSearchHits = new Map<string, number[]>();
-  const GIF_SEARCH_LIMIT = 30;
-  const GIF_SEARCH_WINDOW_MS = 60_000;
-
-  app.get('/v1/media/gif-search', { config: { auth: true } }, async (request, reply) => {
-    if (!isGifSearchConfigured()) {
-      // Documented blocker: the owner must supply TENOR_API_KEY; the API key
-      // itself never leaves the server environment.
-      await reply.code(503).send({
-        code: 'GIF_SEARCH_UNAVAILABLE',
-        message: 'GIF search is not configured on this server.',
-      });
-      return;
-    }
-    const { q } = request.query as { q?: string };
-    const query = (q ?? '').trim();
-    if (query.length < 1 || query.length > 60) {
-      throw validationFailed();
-    }
-    const requesterId = request.authUser!.userId;
-    const now = Date.now();
-    const recent = (gifSearchHits.get(requesterId) ?? []).filter((t) => now - t < GIF_SEARCH_WINDOW_MS);
-    if (recent.length >= GIF_SEARCH_LIMIT) {
-      await reply.code(429).send({ code: 'RATE_LIMITED', message: 'Too many searches. Try again shortly.' });
-      return;
-    }
-    recent.push(now);
-    gifSearchHits.set(requesterId, recent);
-
-    try {
-      const results = await searchGifs(query);
-      await reply.header('cache-control', 'no-store').send({ results });
-    } catch (err) {
-      request.log.warn({ err }, 'gif search failed');
-      await reply.code(502).send({ code: 'GIF_SEARCH_FAILED', message: 'GIF search failed. Try again.' });
-    }
-  });
+  // NOTE (M7.1a): GIF search is a CLIENT-side GIPHY call, not a server proxy —
+  // GIPHY's API terms explicitly prohibit proxying their API or media loads.
+  // The key ships in the mobile app config (EXPO_PUBLIC_GIPHY_API_KEY); the
+  // server's only role is accepting external-GIF messages (type='gif') below
+  // and gating their visibility through the normal D1 rules.
 
   app.post('/v1/media/upload-intent', { config: { auth: true } }, async (request, reply) => {
     const parsed = mediaUploadIntentSchema.safeParse(request.body);

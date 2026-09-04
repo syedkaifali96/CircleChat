@@ -44,7 +44,7 @@ PATCH /v1/circles/:id/notification-pref {pref: all|mentions|muted} — member
 POST /v1/conversations/direct           {username} → find-or-create direct conversation; target must share an active Circle with caller
 GET  /v1/conversations                  list (circles + directs) with last message + unread
 GET  /v1/conversations/:id/messages     ?before=&limit= keyset pagination — authorized participants/members only
-POST /v1/conversations/:id/messages     {type, body?, mediaId?, externalUrl?, replyToId?, clientMessageId} — authorized participant/member + validated + idempotent; media types require a READY, conversation-bound media row owned by the sender (M7); type=gif carries a https externalUrl (M7.1, Tenor) with no storage round-trip
+POST /v1/conversations/:id/messages     {type, body?, mediaId?, externalUrl?, replyToId?, clientMessageId} — authorized participant/member + validated + idempotent; media types require a READY, conversation-bound media row owned by the sender (M7); type=gif carries a https externalUrl (M7.1a, GIPHY client-side search) with no storage round-trip
 PATCH /v1/messages/:id                  sender only, ≤24h, {body}
 DELETE /v1/messages/:id                 sender (or admin in circles) → tombstone
 PUT  /v1/messages/:id/reactions         {emoji}
@@ -55,7 +55,6 @@ PATCH /v1/conversations/:id/notification-pref {enabled?, muted?, mentions?, prev
 POST /v1/media/upload-intent            {kind, mimeType, sizeBytes, context} → {mediaId, uploadUrl}
 POST /v1/media/:id/confirm              server verifies object (size + magic bytes) → status ready
 GET  /v1/media/:id/url                  auth → short-TTL presigned GET, no-store; M7: conversation media (image/video/voice) requires the D1 conversation rule (member/participant or uploader); ?variant=thumb serves the 400px thumbnail when present (falls back to original); avatar media keeps the M3 profile-visibility rule; generic 404 on every failure
-GET  /v1/media/gif-search?q=            auth [rate-limited 30/min/user] → normalized Tenor results (M7.1); provider key is server-side only; 503 when TENOR_API_KEY is not configured
 GET  /v1/users/me/avatar-url            auth → short-TTL presigned GET for the caller's own avatar (404 when none set)
 POST /v1/conversations/:id/media/upload-url {kind: image|video|voice, mimeType, sizeBytes, durationMs?} → presigned upload; sender-authorized, per-kind caps (image 10MB, video 50MB, voice 10MB + 2-minute server-enforced duration)
 

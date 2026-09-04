@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### M7.1a — GIF search provider swapped to GIPHY
+
+- Tenor discontinued by Google (new keys stopped Jan 13 2026, full shutdown Jun 30 2026) — GIF search now uses **GIPHY**, called **directly from the mobile client** because GIPHY's API terms prohibit server-side proxying. The Tenor proxy endpoint, `TENOR_API_KEY` config and server-side rate limiter were removed; the server's only GIF role remains accepting `type='gif'` messages with a https `external_url` (provider-agnostic, D1-gated visibility).
+- Key handling: `EXPO_PUBLIC_GIPHY_API_KEY` ships in the mobile app config (public by GIPHY's own design; never committed). Dev-tier keys are ~42 req/hour — 429s surface as "Search temporarily unavailable, try again shortly". Production key requires GIPHY app review once attribution is live (manual owner step).
+- Attribution: the "Powered By GIPHY" mark renders with every search-results grid, per GIPHY's design guidelines; results are shown exactly as returned (no reordering/filtering, no provider mixing).
+- Tests: server GIF tests rewritten provider-agnostic (send/idempotency/URL validation/D1 gating — the removed proxy tests were Tenor-specific); 5 new mobile tests for the GIPHY client (normalization, direct-call assertion, 429 mapping, network errors, key handling).
+
 ### M7.1 — GIF Search + Image Thumbnails
 
 - GIF search (Tenor, M7.1a): `GET /v1/media/gif-search` proxies Tenor server-side (per-user 30/min rate limit; `TENOR_API_KEY` lives only in the server environment — never client-visible, 503 when unconfigured). External GIFs send as `type='gif'` with the provider URL stored on a `kind='gif'` media row (`external_url`) — no storage round-trip; message visibility stays D1-gated. Provider: Tenor over Giphy (free tier, no attribution/branding requirements).

@@ -31,7 +31,7 @@ import { useAuth } from '../../../src/auth/AuthContext';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAndSendMedia } from '../../../src/lib/mediaSend';
-import { searchGifs } from '../../../src/lib/api';
+import { searchGiphy } from '../../../src/lib/giphy';
 import {
   sendTypingStart,
   sendTypingStop,
@@ -444,8 +444,7 @@ export default function ConversationScreen() {
       void (async () => {
         setGifSearching(true);
         try {
-          const token = (await loadSessionToken()) ?? '';
-          const { results } = await searchGifs(token, trimmed);
+          const results = await searchGiphy(trimmed);
           setGifResults(results);
         } catch {
           setGifError(
@@ -722,7 +721,7 @@ export default function ConversationScreen() {
               style={styles.editInput}
               value={gifQuery}
               onChangeText={onGifQueryChange}
-              placeholder="Search Tenor…"
+              placeholder="Search GIFs…"
               placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -733,12 +732,20 @@ export default function ConversationScreen() {
             {!gifSearching && gifQuery.trim().length > 0 && gifResults.length === 0 && !gifError ? (
               <Text style={styles.headerSubtitle} testID="gif-empty">No GIFs found.</Text>
             ) : null}
+            {gifResults.length > 0 ? (
+              // GIPHY ToS: attribution is required whenever results are shown,
+              // and results must not be reordered/filtered or mixed with other
+              // providers — rendered exactly as returned.
+              <Text style={styles.gifAttribution} testID="gif-attribution">
+                Powered By GIPHY
+              </Text>
+            ) : null}
             <FlatList
               data={gifResults}
               keyExtractor={(item) => item.id}
               numColumns={2}
               columnWrapperStyle={{ gap: 8 }}
-              contentContainerStyle={{ gap: 8, paddingTop: 12 }}
+              contentContainerStyle={{ gap: 8, paddingTop: 8 }}
               style={{ maxHeight: 320 }}
               renderItem={({ item }) => (
                 <Pressable onPress={() => sendGif(item)} testID={`gif-${item.id}`}>
@@ -823,6 +830,7 @@ const styles = StyleSheet.create({
   },
   voiceRecordingText: { color: colors.error, fontSize: 13, fontWeight: '700' },
   gifThumb: { width: 150, height: 110, borderRadius: 10, backgroundColor: colors.surface },
+  gifAttribution: { color: colors.textMuted, fontSize: 11, fontWeight: '700', textAlign: 'right', marginTop: 8 },
   composerInput: {
     flex: 1,
     backgroundColor: colors.surface,

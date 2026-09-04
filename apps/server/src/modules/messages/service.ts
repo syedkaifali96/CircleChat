@@ -121,7 +121,7 @@ export async function serializeMessage(db: Database, row: MessageRow) {
   const deleted = row.deletedAt !== null;
   // Media metadata (M7): mime/dimensions/duration come from the media row so
   // clients can render without a second fetch; download URLs stay separate,
-  // short-lived and authorization-checked. M7.1 adds externalUrl (Tenor GIFs
+  // short-lived and authorization-checked. M7.1 adds externalUrl (external GIFs
   // render directly; no bucket object) and hasThumbnail for image bubbles.
   let mediaInfo: {
     kind: string;
