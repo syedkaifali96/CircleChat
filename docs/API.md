@@ -44,7 +44,7 @@ PATCH /v1/circles/:id/notification-pref {pref: all|mentions|muted} — member
 POST /v1/conversations/direct           {username} → find-or-create direct conversation; target must share an active Circle with caller
 GET  /v1/conversations                  list (circles + directs) with last message + unread
 GET  /v1/conversations/:id/messages     ?before=&limit= keyset pagination — authorized participants/members only
-POST /v1/conversations/:id/messages     {type, body?, mediaId?, replyToId?, clientMessageId} — authorized participant/member + validated + idempotent
+POST /v1/conversations/:id/messages     {type, body?, mediaId?, replyToId?, clientMessageId} — authorized participant/member + validated + idempotent; media types require a READY, conversation-bound media row owned by the sender (M7)
 PATCH /v1/messages/:id                  sender only, ≤24h, {body}
 DELETE /v1/messages/:id                 sender (or admin in circles) → tombstone
 PUT  /v1/messages/:id/reactions         {emoji}
@@ -53,9 +53,10 @@ POST /v1/conversations/:id/read         {lastReadMessageId}
 PATCH /v1/conversations/:id/notification-pref {enabled?, muted?, mentions?, preview?} — caller's preference for this conversation
 
 POST /v1/media/upload-intent            {kind, mimeType, sizeBytes, context} → {mediaId, uploadUrl}
-POST /v1/media/:id/confirm              server verifies object → status ready
-GET  /v1/media/:id/url                  auth → READY avatar media only (M3); viewer rule = avatar owner or >=1 shared active Circle; generic 404 on every failure; short-TTL presigned GET, no-store (M5 adds chat-media checks)
+POST /v1/media/:id/confirm              server verifies object (size + magic bytes) → status ready
+GET  /v1/media/:id/url                  auth → short-TTL presigned GET, no-store; M7: conversation media (image/video/voice) requires the D1 conversation rule (member/participant or uploader); avatar media keeps the M3 profile-visibility rule; generic 404 on every failure
 GET  /v1/users/me/avatar-url            auth → short-TTL presigned GET for the caller's own avatar (404 when none set)
+POST /v1/conversations/:id/media/upload-url {kind: image|video|voice, mimeType, sizeBytes, durationMs?} → presigned upload; sender-authorized, per-kind caps (image 10MB, video 50MB, voice 10MB + 2-minute server-enforced duration)
 
 POST /v1/conversations/:id/polls        circle conversations only {question, options[2–6], closesAt?}
 GET  /v1/conversations/:id/polls        list

@@ -2,22 +2,28 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Message } from '../lib/api';
 import { colors } from '../design/tokens';
+import { MediaContent } from './MediaContent';
 
 /**
  * Chat bubble (design.md §13–§15): outgoing purple / incoming neutral,
  * sender name for group messages, compact reply preview, reaction chips,
- * edited marker, and a tombstone view for deleted messages. Long-press opens
- * the parent-supplied action menu — no permanent row buttons.
+ * edited marker, and a tombstone view for deleted messages. Media content
+ * (M7) renders inline with upload progress/retry for outgoing sends.
+ * Long-press opens the parent-supplied action menu — no permanent buttons.
  */
 
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
+  /** Outgoing optimistic media: local preview + upload state. */
+  localUri?: string;
+  uploadStage?: 'pending' | 'uploading' | 'failed';
+  onRetry?: (message: Message) => void;
   onLongPress?: (message: Message) => void;
 }
 
-function MessageBubbleImpl({ message, isOwn, showSender, onLongPress }: MessageBubbleProps) {
+function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, onRetry, onLongPress }: MessageBubbleProps) {
   if (message.deleted) {
     return (
       <View style={[styles.row, isOwn ? styles.rowOwn : null]} testID={`message-${message.id}`}>
@@ -29,6 +35,8 @@ function MessageBubbleImpl({ message, isOwn, showSender, onLongPress }: MessageB
       </View>
     );
   }
+
+  const hasMedia = message.mediaId !== null || uploadStage !== undefined;
 
   return (
     <Pressable
@@ -53,9 +61,19 @@ function MessageBubbleImpl({ message, isOwn, showSender, onLongPress }: MessageB
             </Text>
           </View>
         ) : null}
-        <Text style={[styles.body, isOwn ? styles.ownBody : null]} testID={`message-body-${message.id}`}>
-          {message.body}
-        </Text>
+        {hasMedia ? (
+          <MediaContent
+            message={message}
+            localUri={localUri}
+            uploadStage={uploadStage}
+            onRetry={onRetry}
+          />
+        ) : null}
+        {message.body ? (
+          <Text style={[styles.body, isOwn ? styles.ownBody : null]} testID={`message-body-${message.id}`}>
+            {message.body}
+          </Text>
+        ) : null}
         <View style={styles.metaRow}>
           {message.editedAt ? <Text style={styles.metaText} testID={`edited-${message.id}`}>edited</Text> : null}
           {message.reactions.length > 0 ? (

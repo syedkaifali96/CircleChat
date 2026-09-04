@@ -216,7 +216,11 @@ PK `(message_id, user_id, emoji)` — a user may add several different emoji but
 
 ### 1.9 `media`
 
-Purpose: metadata for uploaded files; bytes live in private R2.
+Purpose: metadata for uploaded files; bytes live in private R2. M7 uses this
+table as-is for chat media — chat upload intents set `conversation_id` (the
+access scope) and per-kind caps are enforced on the intent (image 10 MB,
+video 50 MB, voice 10 MB with a 2-minute server-enforced duration ceiling on
+the declared `duration_ms`). No schema change was required.
 
 | Field | Type | Notes |
 |---|---|---|

@@ -260,20 +260,29 @@ POST /v1/conversations/:id/messages
 ## 9. Media Upload Flow
 
 ```text
-1. Client: POST /v1/media/upload-intent
-2. Server: authorize → validate kind/MIME/size
-3. Server: return presigned PUT with pinned Content-Type + content-length-range
+1. Client: POST /v1/conversations/:id/media/upload-url (M7 chat media)
+       or POST /v1/media/upload-intent (M3 avatars)
+2. Server: authorize (sender of this conversation) → validate kind/MIME/size/duration
+3. Server: return presigned POST with pinned Content-Type + content-length-range
 4. Client: PUT bytes directly to private R2
 5. Client: POST /v1/media/:id/confirm
 6. Server: HEAD + size + magic-byte verification → ready
-7. Client: send message referencing ready media
+7. Client: send message referencing ready media (idempotent clientMessageId)
 ```
 
 Upload caps remain: images 10 MB, videos 50 MB, voice 10 MB, avatars 2 MB.
+M7 adds a 2-minute server-enforced ceiling on declared voice duration.
 
-Only ready media can be attached to messages. Downloads use short-TTL presigned GET URLs after an explicit access check.
+Only ready media can be attached to messages — a message referencing pending
+or foreign media is rejected, so no participant ever sees unrenderable media.
+Downloads use short-TTL presigned GET URLs after an explicit access check
+(conversation media: D1 conversation rule; avatars: profile-visibility rule).
 
-GIF files may use the image upload path as `image/gif`; this does **not** make a GIF picker/provider an MVP feature.
+Storage provider: Cloudflare R2 (S3-compatible) via presigned POST/GET; the
+in-memory gateway mirrors the interface for tests. GIF files may use the
+image upload path as `image/gif`; a GIF search provider (Tenor/Giphy) and
+bundled sticker packs remain **V2** — the M7 picker covers gallery image/
+video capture and voice recording only.
 
 ---
 

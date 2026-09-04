@@ -1,8 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import type { Database } from '../../db/client';
 import { media } from '../../db/schema';
-import { mimeFamilyMatches, sniffMimeType } from './validation';
-import { avatarStorageKey, type StorageGateway } from './storage';
+import { mimeFamilyMatches, sniffMimeType, UPLOAD_CAPS } from './validation';
+import { avatarStorageKey, chatMediaStorageKey, type StorageGateway } from './storage';
 
 /**
  * Media lifecycle service (docs/ARCHITECTURE.md §9):
@@ -111,6 +111,75 @@ export async function findReadyAvatarById(db: Database, mediaId: string) {
     .where(and(eq(media.id, mediaId), eq(media.kind, 'avatar'), eq(media.status, 'ready')))
     .limit(1);
   return rows[0];
+}
+
+/**
+ * Chat-media intent (M7): creates the pending row bound to the conversation
+ * and returns the presigned POST. Authorization (sender of this conversation)
+ * is enforced by the caller BEFORE this runs. The declared kind/MIME/size
+ * were validated against the per-kind caps by the shared schema.
+ */
+export async function createChatMediaIntent(
+  db: Database,
+  storage: StorageGateway,
+  input: {
+    ownerId: string;
+    conversationId: string;
+    kind: string;
+    mimeType: string;
+    sizeBytes: number;
+    durationMs?: number;
+  },
+): Promise<CreatedMediaIntent> {
+  const key = chatMediaStorageKey(input.kind);
+  const rows = await db
+    .insert(media)
+    .values({
+      ownerId: input.ownerId,
+      conversationId: input.conversationId,
+      kind: input.kind,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      storageKey: key,
+      status: 'pending',
+      durationMs: input.durationMs ?? null,
+    })
+    .returning({ id: media.id });
+  const mediaId = rows[0]!.id;
+  const presigned = await storage.createUploadIntent(
+    key,
+    input.mimeType,
+    UPLOAD_CAPS[input.kind] ?? input.sizeBytes,
+    PRESIGN_UPLOAD_SECONDS,
+  );
+  return { mediaId, key, ...presigned };
+}
+
+/**
+ * Conversation-scoped media access (docs/API.md "Media authorization",
+ * docs/DATABASE.md §1.9): the requester must be an authorized member of the
+ * conversation the media belongs to — `circle_members` for circle media,
+ * `conversation_participants` for direct media — or the media's owner.
+ * Returns the media row (READY only) when access is granted.
+ */
+export async function getAccessibleChatMedia(
+  db: Database,
+  input: {
+    mediaId: string;
+    requesterId: string;
+    canAccessConversation: (conversationId: string, userId: string) => Promise<boolean>;
+  },
+) {
+  const rows = await db.select().from(media).where(eq(media.id, input.mediaId)).limit(1);
+  const row = rows[0];
+  if (!row || row.status !== 'ready' || !row.conversationId) {
+    return undefined;
+  }
+  if (row.ownerId === input.requesterId) {
+    return row;
+  }
+  const allowed = await input.canAccessConversation(row.conversationId, input.requesterId);
+  return allowed ? row : undefined;
 }
 
 /**

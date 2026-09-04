@@ -27,6 +27,9 @@ import {
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { useAuth } from '../../../src/auth/AuthContext';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadAndSendMedia } from '../../../src/lib/mediaSend';
 import {
   sendTypingStart,
   sendTypingStop,
@@ -79,6 +82,13 @@ export default function ConversationScreen() {
   // header change — the subscription lifecycle is tied to the conversation id.
   const headerRef = useRef<ChatHeader | null>(null);
   headerRef.current = header;
+  // M7: attachment menu + pending outgoing media (optimistic bubbles).
+  const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState<
+    Array<{ localId: string; localUri: string; kind: 'image' | 'video' | 'voice'; stage: 'pending' | 'uploading' | 'failed'; mimeType: string; durationMs?: number }>
+  >([]);
+  const voiceRecordingRef = useRef<Audio.Recording | null>(null);
+  const [voiceRecording, setVoiceRecording] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -298,6 +308,116 @@ export default function ConversationScreen() {
     }
   };
 
+  // ---- M7: attachment picking, voice recording and the upload pipeline ---
+  const pickMedia = async (mediaTypes: 'images' | 'videos' | 'all') => {
+    setAttachmentMenuVisible(false);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setSendError('Gallery permission denied — allow access in Settings to send media.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes:
+        mediaTypes === 'images'
+          ? ImagePicker.MediaTypeOptions.Images
+          : mediaTypes === 'videos'
+            ? ImagePicker.MediaTypeOptions.Videos
+            : ImagePicker.MediaTypeOptions.All,
+      quality: 0.8,
+    });
+    if (result.canceled || result.assets.length === 0) {
+      return;
+    }
+    const asset = result.assets[0]!;
+    const kind: 'image' | 'video' = asset.type === 'video' ? 'video' : 'image';
+    void sendMediaAsset(asset.uri, kind, asset.mimeType ?? (kind === 'video' ? 'video/mp4' : 'image/jpeg'));
+  };
+
+  const recordVoice = async () => {
+    setAttachmentMenuVisible(false);
+    
+    const permission = await Audio.requestPermissionsAsync();
+    if (!permission.granted) {
+      setSendError('Microphone permission denied — allow access in Settings to record voice.');
+      return;
+    }
+    try {
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
+      voiceRecordingRef.current = recording;
+      setVoiceRecording(true);
+    } catch {
+      setSendError('Recording failed to start. Try again.');
+    }
+  };
+
+  const stopVoiceRecording = async () => {
+    const recording = voiceRecordingRef.current;
+    if (!recording) {
+      return;
+    }
+    voiceRecordingRef.current = null;
+    setVoiceRecording(false);
+    try {
+      await recording.stopAndUnloadAsync();
+      
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const uri = recording.getURI();
+      if (!uri) {
+        return;
+      }
+      const status = await recording.getStatusAsync();
+      void sendMediaAsset(uri, 'voice', 'audio/m4a', status.durationMillis ?? undefined);
+    } catch {
+      setSendError('Voice message failed. Try again.');
+    }
+  };
+
+  const sendMediaAsset = (localUri: string, kind: 'image' | 'video' | 'voice', mimeType: string, durationMs?: number) => {
+    void (async () => {
+      const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      setUploadingMedia((current) => [...current, { localId, localUri, kind, stage: 'uploading', mimeType, durationMs }]);
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        const blobResponse = await fetch(localUri);
+        const bytes = await blobResponse.blob();
+        await uploadAndSendMedia({
+          token,
+          conversationId: id,
+          kind,
+          mimeType,
+          bytes,
+          durationMs,
+          clientMessageId: localId,
+          onProgress: () => {
+            // The pipeline only reports uploading/confirming/sending here;
+            // failures arrive as the catch below.
+            setUploadingMedia((current) =>
+              current.map((m) => (m.localId === localId ? { ...m, stage: 'uploading' as const } : m)),
+            );
+          },
+        });
+        // The confirmed message arrives via the socket (message:new) or the
+        // next history fetch; the optimistic entry is dropped on success.
+        setUploadingMedia((current) => current.filter((m) => m.localId !== localId));
+      } catch {
+        setUploadingMedia((current) =>
+          current.map((m) => (m.localId === localId ? { ...m, stage: 'failed' as const } : m)),
+        );
+      }
+    })();
+  };
+
+  const retryMedia = (localId: string) => {
+    const pending = uploadingMedia.find((m) => m.localId === localId);
+    if (pending) {
+      setUploadingMedia((current) => current.map((m) => (m.localId === localId ? { ...m, stage: 'uploading' as const } : m)));
+      sendMediaAsset(pending.localUri, pending.kind, pending.mimeType, pending.durationMs);
+    }
+  };
+
   const openActions = (message: Message) => {
     setActionMessage(message);
     const withinWindow = Date.now() - new Date(message.createdAt).getTime() < 24 * 60 * 60 * 1000;
@@ -371,6 +491,39 @@ export default function ConversationScreen() {
             onLongPress={openActions}
           />
         )}
+        ListHeaderComponent={
+          uploadingMedia.length > 0 ? (
+            <View>
+              {uploadingMedia.map((pending) => (
+                <MessageBubble
+                  key={pending.localId}
+                  message={{
+                    id: pending.localId,
+                    conversationId: id,
+                    senderId: myUserId ?? '',
+                    senderUsername: 'me',
+                    senderDisplayName: 'Me',
+                    type: pending.kind,
+                    body: null,
+                    mediaId: null,
+                    media: null,
+                    replyToId: null,
+                    replyPreview: null,
+                    editedAt: null,
+                    deleted: false,
+                    createdAt: new Date().toISOString(),
+                    reactions: [],
+                  }}
+                  isOwn
+                  showSender={false}
+                  localUri={pending.localUri}
+                  uploadStage={pending.stage}
+                  onRetry={() => retryMedia(pending.localId)}
+                />
+              ))}
+            </View>
+          ) : null
+        }
         inverted={false}
         onEndReached={() => void onLoadOlder()}
         onEndReachedThreshold={0.6}
@@ -384,7 +537,7 @@ export default function ConversationScreen() {
       ) : null}
 
       <View style={styles.composer} testID="composer">
-        <Pressable style={styles.composerPlus} disabled testID="composer-attachments">
+        <Pressable style={styles.composerPlus} onPress={() => setAttachmentMenuVisible(true)} testID="composer-attachments">
           <Text style={styles.composerPlusText}>+</Text>
         </Pressable>
         <TextInput
@@ -464,6 +617,35 @@ export default function ConversationScreen() {
         ) : null}
       </Modal>
 
+      <Modal visible={attachmentMenuVisible} transparent animationType="fade" onRequestClose={() => setAttachmentMenuVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard} testID="attachment-menu">
+            <Text style={styles.modalTitle}>Attach</Text>
+            <Pressable style={styles.menuOption} onPress={() => void pickMedia('images')} testID="attach-image">
+              <Text style={styles.menuOptionText}>Photo or GIF</Text>
+            </Pressable>
+            <Pressable style={styles.menuOption} onPress={() => void pickMedia('videos')} testID="attach-video">
+              <Text style={styles.menuOptionText}>Video</Text>
+            </Pressable>
+            <Pressable style={styles.menuOption} onPress={() => void recordVoice()} testID="attach-voice">
+              <Text style={styles.menuOptionText}>Voice message (max 2 min)</Text>
+            </Pressable>
+            <Pressable style={styles.menuOption} disabled testID="attach-sticker">
+              <Text style={[styles.menuOptionText, styles.comingSoonText]}>Stickers — coming soon</Text>
+            </Pressable>
+            <Pressable style={styles.textButton} onPress={() => setAttachmentMenuVisible(false)} testID="attachment-close">
+              <Text style={styles.textButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {voiceRecording ? (
+        <Pressable style={styles.voiceRecordingBar} onPress={() => void stopVoiceRecording()} testID="voice-stop">
+          <Text style={styles.voiceRecordingText}>● Recording… tap to send</Text>
+        </Pressable>
+      ) : null}
+
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard} testID="edit-modal">
@@ -521,6 +703,18 @@ const styles = StyleSheet.create({
     opacity: 0.5, // attachments arrive with M7 — intentionally inert
   },
   composerPlusText: { color: colors.textMuted, fontSize: 22, fontWeight: '600' },
+  comingSoonText: { color: colors.textMuted, fontStyle: 'italic' },
+  voiceRecordingBar: {
+    backgroundColor: colors.surface,
+    borderColor: colors.error,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  voiceRecordingText: { color: colors.error, fontSize: 13, fontWeight: '700' },
   composerInput: {
     flex: 1,
     backgroundColor: colors.surface,

@@ -5,6 +5,7 @@ import {
   circles,
   conversationParticipants,
   conversations,
+  media,
   messageReactions,
   messages,
   users,
@@ -118,6 +119,41 @@ export async function serializeMessage(db: Database, row: MessageRow) {
     replyPreviewFor(db, row.replyToId),
   ]);
   const deleted = row.deletedAt !== null;
+  // Media metadata (M7): mime/dimensions/duration come from the media row so
+  // clients can render without a second fetch; download URLs stay separate,
+  // short-lived and authorization-checked.
+  let mediaInfo: {
+    kind: string;
+    mimeType: string;
+    sizeBytes: number;
+    durationMs: number | null;
+    width: number | null;
+    height: number | null;
+  } | null = null;
+  if (row.mediaId && !deleted) {
+    const mediaRows = await db
+      .select({
+        kind: media.kind,
+        mimeType: media.mimeType,
+        sizeBytes: media.sizeBytes,
+        durationMs: media.durationMs,
+        width: media.width,
+        height: media.height,
+      })
+      .from(media)
+      .where(and(eq(media.id, row.mediaId), eq(media.status, 'ready')))
+      .limit(1);
+    if (mediaRows[0]) {
+      mediaInfo = {
+        kind: mediaRows[0].kind,
+        mimeType: mediaRows[0].mimeType,
+        sizeBytes: mediaRows[0].sizeBytes,
+        durationMs: mediaRows[0].durationMs,
+        width: mediaRows[0].width,
+        height: mediaRows[0].height,
+      };
+    }
+  }
   return {
     id: row.id,
     conversationId: row.conversationId,
@@ -127,6 +163,7 @@ export async function serializeMessage(db: Database, row: MessageRow) {
     type: row.type as 'text' | 'image' | 'video' | 'voice' | 'file',
     body: deleted ? null : row.body,
     mediaId: deleted ? null : row.mediaId,
+    media: mediaInfo,
     replyToId: row.replyToId,
     replyPreview,
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
@@ -137,21 +174,60 @@ export async function serializeMessage(db: Database, row: MessageRow) {
 }
 
 /**
- * Idempotent text send. Retries with the same clientMessageId return the
- * original message; the unique index arbitrates concurrent duplicates.
+ * Idempotent send (M5 text + M7 media). Retries with the same clientMessageId
+ * return the original message; the unique index arbitrates concurrent
+ * duplicates. Media messages must reference a READY media row owned by the
+ * sender and bound to this conversation — pending/foreign media is rejected,
+ * so no participant ever sees a message whose bytes are not actually there.
  */
 export async function sendMessage(
   db: Database,
   input: {
     conversationId: string;
     senderId: string;
-    body: string;
+    type: 'text' | 'image' | 'video' | 'voice' | 'file';
+    body?: string;
+    mediaId?: string;
     replyToId?: string;
     clientMessageId: string;
   },
 ): Promise<{ message: Awaited<ReturnType<typeof serializeMessage>>; created: boolean }> {
   // Membership authorization happens here; the result is only the gate.
   await requireConversationAccess(db, input.conversationId, input.senderId);
+
+  if (input.type !== 'text') {
+    if (!input.mediaId) {
+      throw new AppError('MEDIA_REQUIRED', 400, 'Media messages require an uploaded attachment.');
+    }
+    const mediaRows = await db
+      .select({
+        id: media.id,
+        ownerId: media.ownerId,
+        conversationId: media.conversationId,
+        status: media.status,
+        kind: media.kind,
+      })
+      .from(media)
+      .where(eq(media.id, input.mediaId))
+      .limit(1);
+    const mediaRow = mediaRows[0];
+    // Foreign owner, other conversation, or not-yet-confirmed upload: all the
+    // same client error (no media existence leak, no pending media messages).
+    if (
+      !mediaRow ||
+      mediaRow.ownerId !== input.senderId ||
+      mediaRow.conversationId !== input.conversationId ||
+      mediaRow.status !== 'ready'
+    ) {
+      throw new AppError(
+        'MEDIA_NOT_READY',
+        400,
+        'The attachment upload is not complete for this conversation.',
+      );
+    }
+  } else if (input.mediaId) {
+    throw new AppError('MEDIA_NOT_ALLOWED', 400, 'Text messages cannot carry an attachment.');
+  }
 
   if (input.replyToId) {
     const reply = await db
@@ -173,8 +249,9 @@ export async function sendMessage(
       conversationId: input.conversationId,
       senderId: input.senderId,
       clientMessageId: input.clientMessageId,
-      type: 'text',
-      body: input.body,
+      type: input.type,
+      body: input.body ?? null,
+      mediaId: input.mediaId ?? null,
       replyToId: input.replyToId ?? null,
     })
     .onConflictDoNothing({

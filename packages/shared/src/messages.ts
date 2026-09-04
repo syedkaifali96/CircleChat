@@ -1,22 +1,78 @@
 import { z } from 'zod';
 
 /**
- * Message schemas (M5, text-only) — docs/API.md, docs/DATABASE.md §1.7–1.8.
+ * Message schemas (M5 text + M7 media) — docs/API.md, docs/DATABASE.md §1.7–1.8.
  * Limits mirror the database CHECKs: body ≤ 4000 chars, text needs no media,
- * non-text requires media (media sending itself arrives with M7).
+ * non-text requires media (uploaded and confirmed BEFORE the message row).
  */
 
 export const messageBodySchema = z.string().trim().min(1).max(4000);
 
+/* ------------------------------------------------ chat media (M7) ------- */
+
+/** GIF-as-image upload rides the image kind (docs/API.md); the GIF search
+ * picker/provider itself remains V2 per the product spec. */
+export const CHAT_MEDIA_KINDS = ['image', 'video', 'voice', 'file'] as const;
+export const CHAT_MEDIA_KIND = z.enum(CHAT_MEDIA_KINDS);
+
+/** Per-kind upload caps (docs/SECURITY.md §7). */
+export const CHAT_MEDIA_MAX_BYTES: Record<(typeof CHAT_MEDIA_KINDS)[number], number> = {
+  image: 10 * 1024 * 1024,
+  video: 50 * 1024 * 1024,
+  voice: 10 * 1024 * 1024,
+  file: 10 * 1024 * 1024,
+};
+
+/** Voice messages: hard server-enforced ceiling on the declared duration. */
+export const VOICE_MAX_DURATION_MS = 2 * 60 * 1000;
+
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+const VIDEO_MIME_TYPES = ['video/mp4'] as const;
+const VOICE_MIME_TYPES = ['audio/aac', 'audio/m4a', 'audio/mp4'] as const;
+
+export const CHAT_MEDIA_MIME_TYPES: Record<(typeof CHAT_MEDIA_KINDS)[number], readonly string[]> = {
+  image: IMAGE_MIME_TYPES,
+  video: VIDEO_MIME_TYPES,
+  voice: VOICE_MIME_TYPES,
+  file: [], // generic file uploads stay out of the MVP scope
+};
+
+const chatMediaIntentBase = z.object({
+  kind: CHAT_MEDIA_KIND,
+  mimeType: z.string(),
+  sizeBytes: z.number().int().min(1),
+  durationMs: z.number().int().min(1).optional(),
+});
+
+/** Per-kind MIME/size/duration validation, applied server-side on the intent. */
+export const chatMediaUploadSchema = chatMediaIntentBase
+  .refine((v) => (CHAT_MEDIA_MIME_TYPES[v.kind] as readonly string[]).includes(v.mimeType), {
+    message: 'MIME type is not allowed for this media kind.',
+  })
+  .refine((v) => v.sizeBytes <= CHAT_MEDIA_MAX_BYTES[v.kind], {
+    message: 'File exceeds the size limit for this media kind.',
+  })
+  .refine((v) => v.kind !== 'voice' || (v.durationMs !== undefined && v.durationMs <= VOICE_MAX_DURATION_MS), {
+    message: 'Voice messages are limited to 2 minutes.',
+  })
+  .refine((v) => v.kind === 'voice' || v.durationMs === undefined || v.durationMs <= 30 * 60 * 1000, {
+    message: 'Duration is out of range.',
+  });
+
+/** M5 send schema extended (M7): media sends reference a CONFIRMED media row. */
 export const sendMessageSchema = z
   .object({
-    type: z.literal('text').default('text'),
+    type: z.enum(['text', 'image', 'video', 'voice', 'file']).default('text'),
     body: messageBodySchema.optional(),
+    mediaId: z.string().uuid().optional(),
     replyToId: z.string().uuid().optional(),
     clientMessageId: z.string().trim().min(1).max(64),
   })
-  .refine((value) => value.type !== 'text' || (value.body !== undefined && value.body.length > 0), {
+  .refine((v) => (v.type === 'text' ? v.body !== undefined && v.body.length > 0 : true), {
     message: 'Text messages require a body.',
+  })
+  .refine((v) => (v.type === 'text' ? v.mediaId === undefined : v.mediaId !== undefined), {
+    message: 'Media messages require a mediaId; text messages cannot carry one.',
   });
 
 export const editMessageSchema = z.object({
@@ -33,6 +89,15 @@ export const messageReactionSchema = z.object({
   username: z.string(),
 });
 
+export const messageMediaSchema = z.object({
+  kind: z.string(),
+  mimeType: z.string(),
+  sizeBytes: z.number().int(),
+  durationMs: z.number().int().nullable(),
+  width: z.number().int().nullable(),
+  height: z.number().int().nullable(),
+});
+
 export const messageSchema = z.object({
   id: z.string().uuid(),
   conversationId: z.string().uuid(),
@@ -42,6 +107,8 @@ export const messageSchema = z.object({
   type: z.enum(['text', 'image', 'video', 'voice', 'file']),
   body: z.string().nullable(),
   mediaId: z.string().uuid().nullable(),
+  /** M7: metadata from the READY media row (mime, dimensions, duration). */
+  media: messageMediaSchema.nullable(),
   replyToId: z.string().uuid().nullable(),
   /** Compact preview of the referenced message for reply UI. */
   replyPreview: z
@@ -61,3 +128,4 @@ export const messageSchema = z.object({
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type Message = z.infer<typeof messageSchema>;
+export type ChatMediaUploadInput = z.infer<typeof chatMediaUploadSchema>;

@@ -39,6 +39,11 @@ export function avatarStorageKey(): string {
   return `avatar/${randomBytes(16).toString('hex')}`;
 }
 
+/** Chat media keys are namespaced per kind, still non-guessable. */
+export function chatMediaStorageKey(kind: string): string {
+  return `chat/${kind}/${randomBytes(16).toString('hex')}`;
+}
+
 export interface R2StorageConfig {
   accountId: string;
   accessKeyId: string;

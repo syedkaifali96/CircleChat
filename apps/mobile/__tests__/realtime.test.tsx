@@ -53,6 +53,17 @@ jest.mock('../src/auth/session', () => ({
   clearSessionToken: jest.fn(),
 }));
 
+// expo-av needs the native ExponentAV module; tests mock the Audio surface.
+jest.mock('expo-av', () => ({
+  Audio: {
+    Sound: { createAsync: jest.fn().mockResolvedValue({ sound: { unloadAsync: jest.fn() }, status: {} }) },
+    setAudioModeAsync: jest.fn(),
+    requestPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
+    Recording: jest.fn(),
+    RecordingOptionsPresets: { HIGH_QUALITY: {} },
+  },
+}));
+
 jest.mock('../src/auth/AuthContext', () => ({
   useAuth: () => ({
     status: 'authenticated',
@@ -106,6 +117,7 @@ const sampleMessage = {
   type: 'text' as const,
   body: 'hello there',
   mediaId: null,
+  media: null,
   replyToId: null,
   replyPreview: null,
   editedAt: null,

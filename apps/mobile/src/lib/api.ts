@@ -1,4 +1,5 @@
 import type { PublicUser } from '@circlechat/shared';
+import { loadSessionToken } from '../auth/session';
 
 /**
  * Minimal typed API client for authentication (M2).
@@ -367,6 +368,8 @@ export interface Message {
   type: 'text' | 'image' | 'video' | 'voice' | 'file';
   body: string | null;
   mediaId: string | null;
+  /** M7: metadata from the media row (mime, dimensions, duration). */
+  media: MediaInfo | null;
   replyToId: string | null;
   replyPreview: { id: string; senderUsername: string; body: string | null; deleted: boolean } | null;
   editedAt: string | null;
@@ -424,12 +427,24 @@ export async function fetchMessages(
 export async function sendMessage(
   token: string,
   conversationId: string,
-  input: { body: string; replyToId?: string; clientMessageId: string },
+  input: {
+    type?: 'text' | 'image' | 'video' | 'voice' | 'file';
+    body?: string;
+    mediaId?: string;
+    replyToId?: string;
+    clientMessageId: string;
+  },
 ): Promise<{ message: Message; created: boolean }> {
   return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
     method: 'POST',
     token,
-    body: { type: 'text', body: input.body, clientMessageId: input.clientMessageId, ...(input.replyToId ? { replyToId: input.replyToId } : {}) },
+    body: {
+      type: input.type ?? 'text',
+      ...(input.body !== undefined ? { body: input.body } : {}),
+      ...(input.mediaId !== undefined ? { mediaId: input.mediaId } : {}),
+      ...(input.replyToId ? { replyToId: input.replyToId } : {}),
+      clientMessageId: input.clientMessageId,
+    },
   });
 }
 
@@ -483,4 +498,74 @@ export async function updateNotificationPref(
       ...(patch.preview !== undefined ? { preview: patch.preview } : {}),
     },
   });
+}
+
+/* ------------------------------------------- media messaging (M7) -------- */
+
+export type ChatMediaKind = 'image' | 'video' | 'voice' | 'file';
+
+export interface MediaInfo {
+  kind: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationMs: number | null;
+  width: number | null;
+  height: number | null;
+}
+
+export interface MediaUploadIntent {
+  mediaId: string;
+  uploadUrl: string;
+  uploadFields: Record<string, string>;
+}
+
+/**
+ * Presigned upload URL for a chat attachment. The server validates kind,
+ * MIME, size and voice duration against the per-kind caps BEFORE issuing
+ * anything — and only for members of this conversation.
+ */
+export async function requestChatMediaUploadUrl(
+  token: string,
+  conversationId: string,
+  input: { kind: ChatMediaKind; mimeType: string; sizeBytes: number; durationMs?: number },
+): Promise<MediaUploadIntent> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/media/upload-url`, {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+/** Direct PUT of the bytes to private storage (never through the API server). */
+export async function uploadBytesToStorage(
+  intent: MediaUploadIntent,
+  bytes: Blob,
+  onProgress?: (fraction: number) => void,
+): Promise<void> {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(intent.uploadFields)) {
+    form.append(key, value);
+  }
+  form.append('file', bytes);
+  // fetch has no upload progress; report coarse stages around the transfer.
+  onProgress?.(0.1);
+  const response = await fetch(intent.uploadUrl, { method: 'POST', body: form });
+  if (!response.ok) {
+    throw new ApiError('UPLOAD_FAILED', response.status, 'Upload failed. Try again.');
+  }
+  onProgress?.(1);
+}
+
+export async function confirmMediaUpload(token: string, mediaId: string): Promise<{ status: string }> {
+  return apiFetch(`${API_BASE_URL}/media/${mediaId}/confirm`, { method: 'POST', token });
+}
+
+/** Short-TTL presigned download URL, issued only after the D1 access check. */
+export async function fetchMediaDownloadUrl(mediaId: string): Promise<string> {
+  const token = (await loadSessionToken()) ?? '';
+  const res = await apiFetch<{ url: string }>(`${API_BASE_URL}/media/${mediaId}/url`, {
+    method: 'GET',
+    token,
+  });
+  return res.url;
 }

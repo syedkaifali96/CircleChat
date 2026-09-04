@@ -144,7 +144,7 @@ export async function buildApp(
     // change notifications when a Socket.IO server is attached.
     const publish = options.publish ?? (() => undefined);
     await app.register(conversationRoutes, { db, publish });
-    await app.register(messageRoutes, { db, publish });
+    await app.register(messageRoutes, { db, publish, storage });
     if (storage) {
       await app.register(profileRoutes, { db, storage });
       await app.register(mediaRoutes, {

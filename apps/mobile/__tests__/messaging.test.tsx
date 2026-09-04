@@ -78,6 +78,17 @@ jest.mock('../src/auth/session', () => ({
   clearSessionToken: jest.fn(),
 }));
 
+// expo-av needs the native ExponentAV module; tests mock the Audio surface.
+jest.mock('expo-av', () => ({
+  Audio: {
+    Sound: { createAsync: jest.fn().mockResolvedValue({ sound: { unloadAsync: jest.fn() }, status: {} }) },
+    setAudioModeAsync: jest.fn(),
+    requestPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
+    Recording: jest.fn(),
+    RecordingOptionsPresets: { HIGH_QUALITY: {} },
+  },
+}));
+
 // M6: the conversation screen subscribes to the shared socket; tests mock the
 // client so no network connection is attempted (server behavior is covered by
 // the real-socket integration tests).
@@ -116,6 +127,7 @@ const baseMessage = {
   senderDisplayName: 'Kaif',
   type: 'text' as const,
   mediaId: null,
+  media: null,
   replyToId: null,
   replyPreview: null,
   editedAt: null,

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### M7 — Media / Voice Messaging
+
+- Server (docs/API.md): `POST /v1/conversations/:id/media/upload-url` issues presigned uploads for chat attachments after sender authorization + per-kind validation (image 10 MB: jpeg/png/webp/gif, video 50 MB mp4, voice 10 MB aac/m4a/mp4 with a 2-minute server-enforced duration ceiling); `POST /v1/media/:id/confirm` unchanged (size re-check + magic-byte sniff); `GET /v1/media/:id/url` now serves conversation media under the D1 rule (conversation member/participant or uploader) alongside avatar media. `POST /v1/conversations/:id/messages` accepts media types but only references a READY, conversation-bound, sender-owned media row — pending/foreign media is rejected, and the idempotency key pattern carries over unchanged.
+- Storage: private Cloudflare R2 via the existing gateway (presigned POST with pinned Content-Type + content-length-range; short-TTL presigned GET); chat keys are non-guessable `chat/<kind>/<random>`; bytes never touch the API server. No schema migration — the M1 `media` table already had conversation binding, dimensions and duration.
+- Realtime: `message:new` for media fires only after upload confirmation and carries media metadata (kind, MIME, size, duration, dimensions) so clients render without a second fetch; tombstones still never expose media.
+- Mobile (Expo): composer `+` menu (photo/GIF, video, voice up to 2 min; stickers marked coming-soon per spec), direct-to-storage upload with optimistic pending/failed bubbles and tap-to-retry (local media retained), inline image rendering via short-TTL URLs, voice player with duration/waveform bars, attachment chips for video. Permission denials surface actionable messages. Sending media never triggers typing signals (separate composer paths).
+- Tests: 10 server tests (upload authorization, per-kind MIME/size/duration validation, confirmed-upload gate incl. realtime ordering, media idempotency, foreign/cross-conversation media rejection, member vs non-member download, direct-conversation media) + 6 mobile tests (image/voice rendering, pending/failed + retry, attachment pipeline).
+
 ### M6 — Realtime Typing + Presence
 
 - Realtime (docs/API.md Realtime): `typing:start`/`typing:stop` (client → server) with per-user/per-conversation rate limiting (~30/10s) and server-side TTL auto-expiry (~6s without refresh) broadcasting `typing:update`; presence derived from live connections — first socket broadcasts `presence:online` to authorized rooms, the LAST disconnect stamps `users.last_seen_at` and broadcasts `presence:offline`. Revoked sessions disconnect (M2 hooks) and take the user offline.
