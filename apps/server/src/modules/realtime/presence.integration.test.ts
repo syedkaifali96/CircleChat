@@ -255,6 +255,32 @@ describe('typing indicators (docs/API.md Realtime, M6)', () => {
     }
     expect(denied).toBeGreaterThan(0);
   });
+
+  it('clears the typer indicator in the room when their socket dies mid-typing', async () => {
+    // Regression (manual verification finding): a typer whose network drops
+    // without typing:stop must not leave the room's indicator hanging — the
+    // disconnect handler clears and broadcasts the stop immediately.
+    const member = await signup(`m6_kl_${suffix()}`);
+    const { owner, conversationId } = await setupCircleConversation([member.token]);
+
+    const memberSocket = await connectSocket(member.token);
+    await memberSocket.emitWithAck('join', { conversationId });
+
+    const startPromise = waitForEvent<{ userId: string; isTyping: boolean }>(memberSocket, 'typing:update');
+    const typerSocket = await connectSocket(owner.token);
+    await typerSocket.emitWithAck('typing:start', { conversationId });
+    expect((await startPromise).isTyping).toBe(true);
+
+    // Abrupt network loss: destroy the engine without a close frame and
+    // without ever sending typing:stop. (close(force?) — the arg is runtime
+    // supported but untyped in this client version.)
+    (typerSocket.io.engine.close as (force?: boolean) => void)(true);
+
+    const stopPromise = waitForEvent<{ userId: string; isTyping: boolean }>(memberSocket, 'typing:update', 12_000);
+    const stop = await stopPromise;
+    expect(stop.userId).toBe(owner.userId);
+    expect(stop.isTyping).toBe(false);
+  }, 20_000);
 });
 
 describe('presence (M6, docs/API.md Realtime)', () => {

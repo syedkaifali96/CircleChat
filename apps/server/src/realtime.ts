@@ -265,14 +265,18 @@ export function wireRealtime(
 
     // ---- Disconnect (M6): last socket stamps last_seen_at. ---------------
     socket.on('disconnect', () => {
-      // Any in-flight typing state from this socket's user expires silently.
-      for (const conversationId of presence.typingConversationsOf(userId)) {
+      // A typer whose socket died (crash, network loss, no typing:stop) must
+      // have their indicator cleared for the room immediately — never left
+      // hanging until TTL. Clearing and broadcasting happen per conversation.
+      const typingConversations = presence.typingConversationsOf(userId);
+      for (const conversationId of typingConversations) {
         presence.expireTyping(userId, conversationId);
         const timer = typingTimers.get(`${userId}:${conversationId}`);
         if (timer) {
           clearTimeout(timer);
           typingTimers.delete(`${userId}:${conversationId}`);
         }
+        broadcastTyping(conversationId, userId, false);
       }
       if (!presence.disconnect(userId)) {
         return; // other devices still online

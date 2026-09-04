@@ -20,6 +20,20 @@ module.exports = tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Manual-verification scripts run under plain Node (ESM), not the TS
+    // compiler: Node runtime globals are expected there.
+    files: ['**/scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        process: 'readonly',
+      },
+    },
+  },
+  {
     rules: {
       // AGENTS.md: no `any` unless genuinely unavoidable.
       '@typescript-eslint/no-explicit-any': 'error',
