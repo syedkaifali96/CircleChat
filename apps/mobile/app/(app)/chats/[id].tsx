@@ -27,6 +27,12 @@ import {
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { useAuth } from '../../../src/auth/AuthContext';
+import {
+  sendTypingStart,
+  sendTypingStop,
+  subscribeToConversation,
+  trackJoinedRoom,
+} from '../../../src/lib/socket';
 import { MessageBubble } from '../../../src/chat/MessageBubble';
 import { colors } from '../../../src/design/tokens';
 
@@ -63,6 +69,16 @@ export default function ConversationScreen() {
   const [actionEditTarget, setActionEditTarget] = useState<Message | null>(null);
   const myUserId = user?.id ?? null;
   const listRef = useRef<FlatList<Message>>(null);
+  // M6 realtime: typing partner + peer presence for the header.
+  const [typingUsernames, setTypingUsernames] = useState<string[]>([]);
+  const [partnerPresence, setPartnerPresence] = useState<{ online: boolean; lastSeenAt: string | null } | null>(null);
+  const typingStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [typingNow, setTypingNow] = useState(false);
+  // Ref keeps the socket handlers current without re-subscribing on every
+  // header change — the subscription lifecycle is tied to the conversation id.
+  const headerRef = useRef<ChatHeader | null>(null);
+  headerRef.current = header;
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -95,6 +111,67 @@ export default function ConversationScreen() {
     void load();
   }, [load]);
 
+  // M6 realtime subscription: typing + presence + message change events.
+  // Listeners detach on unmount; the shared socket stays for other screens.
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+    void (async () => {
+      const usernameById = new Map<string, string>();
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        const { messages: known } = await fetchMessages(token, id, { limit: 30 });
+        for (const m of known) {
+          usernameById.set(m.senderId, m.senderDisplayName);
+        }
+      } catch {
+        // Names fall back to userId when history is unavailable.
+      }
+      if (cancelled) {
+        return;
+      }
+      trackJoinedRoom(id);
+      unsubscribe = await subscribeToConversation({
+        conversationId: id,
+        onTyping: (payload) => {
+          if (payload.userId === myUserId || payload.conversationId !== id) {
+            return;
+          }
+          setTypingUsernames((current) => {
+            // The list stores display names (fallback: userId), so removal
+            // must compare against the resolved name, not the raw id.
+            const name = usernameById.get(payload.userId) ?? payload.userId;
+            const others = current.filter((u) => u !== name);
+            if (payload.isTyping) {
+              return [...others, name];
+            }
+            return others;
+          });
+        },
+        onPresence: (payload) => {
+          if (payload.userId === myUserId) {
+            return;
+          }
+          if (headerRef.current?.type === 'circle') {
+            return; // group typing is shown; single-partner presence is not
+          }
+          setPartnerPresence({ online: payload.online, lastSeenAt: payload.lastSeenAt });
+        },
+      });
+    })();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+      if (typingStopTimer.current) {
+        clearTimeout(typingStopTimer.current);
+      }
+      if (typingRefreshTimer.current) {
+        clearTimeout(typingRefreshTimer.current);
+      }
+      sendTypingStop(id);
+    };
+  }, [id, myUserId]);
+
   const onLoadOlder = useCallback(async () => {
     if (!olderCursor || loadingOlder) {
       return;
@@ -112,10 +189,41 @@ export default function ConversationScreen() {
     }
   }, [id, olderCursor, loadingOlder]);
 
+  // M6 typing signals: start on first keystroke, refresh while typing, stop
+  // after ~3s idle or on send. The server TTL (6s) backstops missed stops.
+  const onDraftChange = (value: string) => {
+    setDraft(value);
+    if (typingStopTimer.current) {
+      clearTimeout(typingStopTimer.current);
+    }
+    if (value.trim().length === 0) {
+      if (typingNow) {
+        setTypingNow(false);
+        sendTypingStop(id);
+      }
+      return;
+    }
+    if (!typingNow) {
+      setTypingNow(true);
+      sendTypingStart(id);
+    } else {
+      // Refresh keeps the server TTL from firing while the user is active.
+      sendTypingStart(id);
+    }
+    typingStopTimer.current = setTimeout(() => {
+      setTypingNow(false);
+      sendTypingStop(id);
+    }, 3000);
+  };
+
   const onSend = async () => {
     const body = draft.trim();
     if (body.length === 0 || sending) {
       return;
+    }
+    if (typingNow) {
+      setTypingNow(false);
+      sendTypingStop(id);
     }
     setSendError(null);
     setSending(true);
@@ -227,7 +335,27 @@ export default function ConversationScreen() {
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>{header.title}</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{header.subtitle}</Text>
+          {typingUsernames.length > 0 ? (
+            <Text style={styles.typingText} testID="typing-indicator" numberOfLines={1}>
+              {typingUsernames.length === 1
+                ? `${typingUsernames[0]} is typing…`
+                : 'Several people are typing…'}
+            </Text>
+          ) : header.type === 'direct' && partnerPresence ? (
+            <Text
+              style={[styles.headerSubtitle, partnerPresence.online && styles.presenceOnline]}
+              testID="presence-indicator"
+              numberOfLines={1}
+            >
+              {partnerPresence.online
+                ? 'online'
+                : partnerPresence.lastSeenAt
+                  ? `last seen ${new Date(partnerPresence.lastSeenAt).toLocaleString()}`
+                  : 'offline'}
+            </Text>
+          ) : (
+            <Text style={styles.headerSubtitle} numberOfLines={1}>{header.subtitle}</Text>
+          )}
         </View>
       </View>
 
@@ -262,7 +390,7 @@ export default function ConversationScreen() {
         <TextInput
           style={styles.composerInput}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={onDraftChange}
           placeholder="Write a message..."
           placeholderTextColor={colors.textMuted}
           multiline
@@ -369,6 +497,8 @@ const styles = StyleSheet.create({
   headerCenter: { marginLeft: 8, flex: 1 },
   headerTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   headerSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
+  typingText: { color: colors.accent, fontSize: 12, marginTop: 1, fontStyle: 'italic' },
+  presenceOnline: { color: colors.success },
   listContent: { padding: 16, paddingBottom: 8 },
   sendError: { color: colors.error, fontSize: 12, paddingHorizontal: 16, paddingVertical: 4 },
   composer: {

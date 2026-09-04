@@ -13,6 +13,7 @@ import { profileRoutes } from './modules/profile/routes';
 import { sharesActiveCircle } from './modules/profile/service';
 import { mediaRoutes } from './modules/media/routes';
 import { R2StorageGateway, readR2StorageConfig, type StorageGateway } from './modules/media/storage';
+import type { PresenceHandle } from './presence';
 import { healthRoutes } from './routes/health';
 
 /** Client-facing error body: stable machine code + generic human message. */
@@ -111,6 +112,8 @@ export async function buildApp(
     storage?: StorageGateway;
     /** M5: change-notification publisher (wired to Socket.IO in index/tests). */
     publish?: (event: string, payload: unknown) => void;
+    /** M6: presence registry shared between Socket.IO and REST. */
+    presence?: PresenceHandle;
   } = {},
 ): Promise<FastifyInstance> {
   const app = Fastify({
@@ -131,7 +134,7 @@ export async function buildApp(
     app.decorate('db', db);
     registerAuthPlugin(app, config.sessionTtlDays);
     await app.register(authRoutes, { db, ttlDays: config.sessionTtlDays });
-    await app.register(usersRoutes, { db });
+    await app.register(usersRoutes, { db, presence: options.presence });
     // Private storage: R2 when configured, in-memory only for tests.
     const storage = options.storage ?? (readR2StorageConfig() ? new R2StorageGateway(readR2StorageConfig()!) : undefined);
     // Circles never touch object storage directly; storage is optional and only

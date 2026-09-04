@@ -244,9 +244,15 @@ POST /v1/conversations/:id/messages
 
 - `clientMessageId` makes retries idempotent within `(conversation_id, sender_id, client_message_id)`.
 - Events are change notifications, not durable data.
-- Typing and presence are ephemeral.
+- Typing state is ephemeral and held **in-memory per socket-server process** (no Redis in the MVP;
+  multi-node deployments would need a shared store — post-MVP). It auto-expires server-side ~6s
+  after the last refresh, even without an explicit stop from the client.
+- Presence is derived from live connections: a user is online while ≥1 authorized socket exists.
+  The only persisted piece is `users.last_seen_at`, stamped when the user's LAST socket disconnects
+  (no `is_online` column — a persisted boolean would drift from reality on crash/restart).
 - Read state is persisted.
-- On reconnect, the client fetches missed messages through REST.
+- On reconnect, the client fetches missed messages through REST and replays its room joins
+  (the server re-checks access on every join).
 - Presence visibility: Circle members may see one another's presence; direct-chat presence is visible only to the two participants. No global presence directory.
 
 ---

@@ -376,6 +376,29 @@ export async function markConversationRead(
   };
 }
 
+/** True when the two users are the two participants of an existing direct conversation. */
+export async function sharesDirectConversationWith(
+  db: Database,
+  userA: string,
+  userB: string,
+): Promise<boolean> {
+  const other = alias(conversationParticipants, 'other');
+  const rows = await db
+    .select({ conversationId: conversations.id })
+    .from(conversationParticipants)
+    .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
+    .innerJoin(
+      other,
+      and(
+        eq(other.conversationId, conversationParticipants.conversationId),
+        eq(other.userId, userB),
+      ),
+    )
+    .where(and(eq(conversationParticipants.userId, userA), eq(conversations.type, 'direct')))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** Caller's own per-conversation notification preference (upsert). */
 export async function updateNotificationPref(
   db: Database,

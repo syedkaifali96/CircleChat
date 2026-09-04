@@ -3,15 +3,21 @@ import { eq } from 'drizzle-orm';
 import { usernameSchema } from '@circlechat/shared';
 import { users } from '../../db/schema';
 import type { Database } from '../../db/client';
+import { notFound } from '../../errors';
+import { sharesActiveCircle } from '../profile/service';
+import { sharesDirectConversationWith } from '../conversations/service';
+import type { PresenceHandle } from '../../presence';
 
 /**
- * Minimal user surface belonging to the M2 authentication scope:
- * the current authenticated user (session bootstrap) and the signup-time
- * username availability check. Profile editing arrives in M3.
+ * Minimal user surface: the current authenticated user (session bootstrap),
+ * the signup-time username availability check, and the M6 presence endpoint.
+ * Presence follows the D1 visibility rule: a viewer sees another user's
+ * online state only when they share an active Circle OR an existing direct
+ * conversation; everyone else gets a generic 404 (existence not leaked).
  */
 export async function usersRoutes(
   app: FastifyInstance,
-  options: { db: Database },
+  options: { db: Database; presence?: PresenceHandle },
 ): Promise<void> {
   const { db } = options;
   app.get('/v1/users/me', { config: { auth: true } }, async (request, reply) => {
@@ -61,4 +67,40 @@ export async function usersRoutes(
       await reply.send({ available: existing.length === 0 });
     },
   );
+
+  // M6 presence: isOnline comes from the live-connection registry; the
+  // persisted last_seen_at (M1 column) is stamped when the user's last
+  // socket disconnects. Unauthorized viewers get the generic 404 so
+  // presence state never leaks existence.
+  app.get('/v1/users/:id/presence', { config: { auth: true } }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const requesterId = request.authUser!.userId;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw notFound('User not found.');
+    }
+    const rows = await db
+      .select({ id: users.id, lastSeenAt: users.lastSeenAt })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    const target = rows[0];
+    if (!target) {
+      throw notFound('User not found.');
+    }
+    const self = target.id === requesterId;
+    const authorized =
+      self ||
+      (await sharesActiveCircle(db, requesterId, target.id)) ||
+      (await sharesDirectConversationWith(db, requesterId, target.id));
+    if (!authorized) {
+      throw notFound('User not found.');
+    }
+    await reply.header('cache-control', 'no-store').send({
+      presence: {
+        userId: target.id,
+        isOnline: options.presence?.isOnline(target.id) ?? false,
+        lastSeenAt: target.lastSeenAt ? target.lastSeenAt.toISOString() : null,
+      },
+    });
+  });
 }

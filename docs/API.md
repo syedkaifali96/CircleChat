@@ -21,6 +21,7 @@ PATCH /v1/users/me                      {displayName?, bio?}
 POST /v1/users/me/avatar                {mediaId}
 GET  /v1/users/username-available?u=    public-ish [rate-limited] → {available}
 GET  /v1/users/:username                minimal profile (display name, avatar only) — viewer rule: self or ≥1 shared active Circle; otherwise 404 (existence hidden)
+GET  /v1/users/:id/presence             {isOnline, lastSeenAt} — D1 rule: self, ≥1 shared active Circle, or an existing direct conversation; otherwise 404 (existence hidden)
 
 POST /v1/circles                        create circle (+ owner membership, conversation, default settings)
 GET  /v1/circles                        my circles + unread counts
@@ -75,15 +76,19 @@ POST /v1/notifications/read             {ids? | all}
 Connect: `wss://…` with session token in handshake auth. Server validates the session before the
 socket is admitted.
 
-- Client → server: `join {conversationId}`, `leave`, `typing {conversationId, isTyping}`
-- Server → client: `message:new`, `message:updated`, `message:deleted`, `reaction:changed`,
-  `typing`, `presence {userId, online, lastSeenAt}`, `read:update`, `circle:updated`,
-  `member:joined`, `member:left`, `poll:updated`, `notification:new`
+- Client → server: `join {conversationId}`, `leave`, `typing:start {conversationId}`,
+  `typing:stop {conversationId}`
+- Server → client: `typing:update {conversationId, userId, isTyping}`, `presence:online {userId}`,
+  `presence:offline {userId, lastSeenAt}`, `message:new`, `message:updated`, `message:deleted`,
+  `reaction:changed`, `read:update`, `circle:updated`, `member:joined`, `member:left`,
+  `poll:updated`, `notification:new`
 - Rules: membership/participant authorization is re-checked on join and on every relevant event.
-  Socket event rate limits apply. Events are change notifications — clients fetch state via REST;
-  ephemeral events (typing/presence) are never persisted.
+  Socket event rate limits apply (typing: ~30 events / 10s / user per conversation). Events are
+  change notifications — clients fetch state via REST; typing state is never persisted and
+  auto-expires server-side ~6s after the last refresh even without a `typing:stop`.
 - A session revocation must also disconnect all live sockets associated with that session. A revoked
-  session cannot continue receiving or emitting authorized realtime events.
+  session cannot continue receiving or emitting authorized realtime events. The user's last socket
+  disconnect stamps `users.last_seen_at` and broadcasts `presence:offline`.
 - Presence visibility is limited to people who are allowed to see the relevant relationship:
   Circle members may see one another's presence; direct-chat presence is visible only to the two
   participants. No global presence directory exists. Exact online/last-seen display remains subject

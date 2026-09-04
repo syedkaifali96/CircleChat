@@ -78,6 +78,18 @@ jest.mock('../src/auth/session', () => ({
   clearSessionToken: jest.fn(),
 }));
 
+// M6: the conversation screen subscribes to the shared socket; tests mock the
+// client so no network connection is attempted (server behavior is covered by
+// the real-socket integration tests).
+const mockUnsubscribe = jest.fn();
+jest.mock('../src/lib/socket', () => ({
+  subscribeToConversation: jest.fn().mockResolvedValue(() => mockUnsubscribe()),
+  sendTypingStart: jest.fn(),
+  sendTypingStop: jest.fn(),
+  trackJoinedRoom: jest.fn(),
+  resetSocket: jest.fn(),
+}));
+
 jest.mock('../src/auth/AuthContext', () => ({
   useAuth: () => ({
     status: 'authenticated',

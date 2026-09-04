@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### M6 — Realtime Typing + Presence
+
+- Realtime (docs/API.md Realtime): `typing:start`/`typing:stop` (client → server) with per-user/per-conversation rate limiting (~30/10s) and server-side TTL auto-expiry (~6s without refresh) broadcasting `typing:update`; presence derived from live connections — first socket broadcasts `presence:online` to authorized rooms, the LAST disconnect stamps `users.last_seen_at` and broadcasts `presence:offline`. Revoked sessions disconnect (M2 hooks) and take the user offline.
+- Authorization: conversation-scoped fan-out only — typing/presence events reach room members whose access was re-checked server-side; REST `GET /v1/users/:id/presence` follows the D1 rule (self, ≥1 shared active Circle, or an existing direct conversation; otherwise a generic 404 so existence never leaks).
+- Storage decision: typing is in-memory per socket-server process (ephemeral, never persisted — Redis only if multi-node arrives, post-MVP); presence needs no new migration (`is_online` is derived, `users.last_seen_at` existed since M1).
+- Mobile (Expo): shared `socket.io-client` singleton (session-token handshake, reconnect with room-join replay), chat-screen typing indicator ("X is typing…"), composer typing signals with ~3s idle auto-stop, direct-chat header online/last-seen indicator, listener cleanup on unmount.
+- Tests: 11 server tests over real Socket.IO + PostgreSQL (typing broadcast scoping, non-member rejection, TTL expiry, rate limiting, online/offline lifecycle, multi-device counting, last_seen_at persistence, REST presence authorized/unauthorized/DM cases, revocation) + 6 mobile tests (typing debounce, indicator rendering, presence header, cleanup).
+
 ### M5 — Direct + Circle Messaging
 
 - Server (docs/API.md contract): POST /v1/conversations/direct (find-or-create, both users must share ≥1 active Circle — D1; existence hidden behind generic 404; duplicates return the same conversation), GET /v1/conversations (caller-scoped circles + directs with last message preview + server-computed unread), POST /v1/conversations/:id/read (server-side read pointer; stale pointers never regress), PATCH /v1/conversations/:id/notification-pref (caller-only upsert).

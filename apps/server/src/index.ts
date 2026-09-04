@@ -3,6 +3,7 @@ import { createDatabase } from './db/client';
 import { buildApp } from './app';
 import { config } from './config';
 import { wireRealtime, conversationPublisher } from './realtime';
+import { createPresenceRegistry } from './presence';
 import { readR2StorageConfig, R2StorageGateway } from './modules/media/storage';
 
 /**
@@ -29,9 +30,12 @@ async function main(): Promise<void> {
   const io = new SocketServer({
     // Same-origin defaults, no CORS widening. Handshake auth: session token.
   });
-  const realtime = wireRealtime(io, db, config.sessionTtlDays);
+  // One presence registry shared by Socket.IO and the REST presence endpoint:
+  // a single source of truth for who is online in this process.
+  const presence = createPresenceRegistry();
+  const realtime = wireRealtime(io, db, config.sessionTtlDays, { presence });
   const publish = conversationPublisher(realtime);
-  const app = await buildApp({ db, storage, publish });
+  const app = await buildApp({ db, storage, publish, presence });
   io.attach(app.server);
   app.decorate('revokeSessionSockets', (sessionId: string) =>
     realtime.disconnectSessionSockets(sessionId),

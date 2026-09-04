@@ -47,7 +47,7 @@ Purpose: an account. Identity is username-only — no email/phone columns exist.
 | `avatar_media_id` | UUID NULL → `media.id` | profile picture |
 | `notifications_enabled` | BOOLEAN NOT NULL DEFAULT true | global push notification enable/disable |
 | `notification_preview` | BOOLEAN NOT NULL DEFAULT true | global message-preview privacy default |
-| `last_seen_at` | TIMESTAMPTZ NULL | updated at most every 60s (presence) |
+| `last_seen_at` | TIMESTAMPTZ NULL | stamped when the user's last socket disconnects (M6 presence); online state is derived from live connections, never persisted |
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
 Username is **fixed after account creation in MVP**; there is no username-change operation.
