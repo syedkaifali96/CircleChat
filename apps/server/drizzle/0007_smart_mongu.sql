@@ -1,0 +1,3 @@
+ALTER TABLE "pinboard_items" ADD COLUMN "message_id" uuid NOT NULL;--> statement-breakpoint
+ALTER TABLE "pinboard_items" ADD CONSTRAINT "pinboard_items_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "pinboard_items_circle_message_uq" ON "pinboard_items" USING btree ("circle_id","message_id");

@@ -8,6 +8,7 @@ import {
   media,
   messageReactions,
   messages,
+  pinboardItems,
   users,
 } from '../../db/schema';
 import { AppError, forbidden, notFound } from '../../errors';
@@ -465,7 +466,11 @@ export async function deleteMessage(
     throw forbidden('You can only delete your own messages.');
   }
 
-  // Tombstone: keep the row, drop the content (docs/API.md).
+  // Tombstone: keep the row, drop the content (docs/API.md). M10: pins
+  // referencing this message go with it — the pinboard must never surface a
+  // tombstoned message, and (circle, message) uniqueness must not block a
+  // future re-pin of new content.
+  await db.delete(pinboardItems).where(eq(pinboardItems.messageId, message.id));
   const updated = await db
     .update(messages)
     .set({ deletedAt: new Date(), body: null, mediaId: null })
@@ -553,6 +558,7 @@ export async function conversationChatHeader(db: Database, conversationId: strin
     const circle = rows[0]!;
     return {
       type: 'circle' as const,
+      circleId: circle.circleId,
       title: circle.name,
       avatarMediaId: circle.avatarMediaId,
       subtitle: circle.membersCount === 1 ? '1 member' : `${circle.membersCount} members`,
@@ -577,6 +583,7 @@ export async function conversationChatHeader(db: Database, conversationId: strin
   const partnerRow = partner[0]!;
   return {
     type: 'direct' as const,
+    circleId: null,
     title: partnerRow.displayName,
     avatarMediaId: partnerRow.avatarMediaId,
     subtitle: `@${partnerRow.username}`,

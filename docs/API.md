@@ -69,8 +69,8 @@ POST /v1/polls/:id/vote                 {optionIndex} — one vote per user
 DELETE /v1/polls/:id/vote               change vote while open
 POST /v1/polls/:id/close                creator/admin
 
-GET  /v1/circles/:id/pinboard           member
-POST /v1/circles/:id/pinboard           member (pin) — admin can remove any
+GET  /v1/circles/:id/pinboard           member → {items} — each pin references its live Circle message through the same tombstone-safe chat serializer (media stays metadata-only; bytes flow via authorized presigned GET)
+POST /v1/circles/:id/pinboard           member (pin) — {messageId} only; the server verifies the message is a live, non-tombstoned message of THIS Circle's own conversation (foreign/direct ids answer a generic 404). Duplicate pin of the same message → 409 PIN_EXISTS. Owner/admin may remove any pin, a member only their own — otherwise 403 FORBIDDEN. Mutations broadcast `pinboard:updated` to the conversation room (REST stays source of truth)
 DELETE /v1/circles/:id/pinboard/:itemId
 
 GET  /v1/notifications                  activity list
@@ -87,7 +87,7 @@ socket is admitted.
 - Server → client: `typing:update {conversationId, userId, isTyping}`, `presence:online {userId}`,
   `presence:offline {userId, lastSeenAt}`, `message:new`, `message:updated`, `message:deleted`,
   `reaction:changed`, `read:update`, `circle:updated`, `member:joined`, `member:left`,
-  `poll:updated`, `notification:new`
+  `poll:updated`, `notification:new`, `pinboard:updated`
 - Rules: membership/participant authorization is re-checked on join and on every relevant event.
   Socket event rate limits apply (typing: ~30 events / 10s / user per conversation). Events are
   change notifications — clients fetch state via REST; typing state is never persisted and

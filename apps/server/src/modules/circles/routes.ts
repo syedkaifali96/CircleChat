@@ -5,6 +5,7 @@ import {
   circleSettingsSchema,
   createCircleSchema,
   createInviteSchema,
+  createPinSchema,
   joinCircleSchema,
   ownershipTransferSchema,
   updateCircleSchema,
@@ -15,24 +16,31 @@ import { notFound, validationFailed } from '../../errors';
 import { findReadyAvatarById, issueMediaDownloadUrl } from '../media/service';
 import type { StorageGateway } from '../media/storage';
 import { unreadCountFor } from '../conversations/service';
+import { serializeMessage } from '../messages/service';
 import {
+  addPin,
   createCircle,
   createInvite,
   deleteCircle,
   findCircleById,
   getCallerRole,
   getCircleSettings,
+  getPinRow,
   joinCircle,
   leaveCircle,
   listMembers,
+  listPinRows,
   listMyCircles,
   removeMember,
+  removePin,
+  pinsCount,
   resolveInvitePreview,
   revokeInvite,
   transferOwnership,
   updateCircleDetails,
   updateCircleSettings,
   updateMemberRole,
+  type PinRow,
 } from './service';
 
 /** Fallback for Circles created before settings rows existed (raw-seeded rows). */
@@ -49,9 +57,14 @@ const DEFAULT_CIRCLE_SETTINGS = {
  */
 export async function circleRoutes(
   app: FastifyInstance,
-  options: { db: Database; storage?: StorageGateway },
+  options: {
+    db: Database;
+    storage?: StorageGateway;
+    /** M10: change-notification publisher for pinboard updates (M6 design). */
+    publish?: (event: string, payload: unknown) => void;
+  },
 ): Promise<void> {
-  const { db, storage } = options;
+  const { db, storage, publish } = options;
 
   const requireCircle = async (circleId: string, userId: string, minRole?: 'admin') => {
     const circle = await findCircleById(db, circleId);
@@ -305,6 +318,70 @@ export async function circleRoutes(
     });
   });
 
+  // M10 Pinboard serializer: pin metadata + the referenced message through the
+  // same tombstone-safe message serializer the chat history uses. Media stays
+  // metadata-only here — bytes flow through the existing authorized presigned
+  // GET (docs/API.md Media), never as stored URLs.
+  const serializePin = async (row: PinRow) => ({
+    id: row.id,
+    messageId: row.messageId,
+    pinnedAt: row.pinnedAt.toISOString(),
+    pinnedBy: row.pinnedBy,
+    message: await serializeMessage(db, row.message),
+  });
+
+  // M10 Pinboard (docs/API.md): any active member pins an eligible Circle
+  // message; an owner/admin may remove any pin, a member only their own.
+  app.get('/v1/circles/:id/pinboard', { config: { auth: true } }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await requireCircle(id, request.authUser!.userId);
+    const rows = await listPinRows(db, id);
+    const items = await Promise.all(rows.map(serializePin));
+    await reply.header('cache-control', 'no-store').send({ items });
+  });
+
+  app.post(
+    '/v1/circles/:id/pinboard',
+    { config: { auth: true, rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await requireCircle(id, request.authUser!.userId);
+      const parsed = createPinSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw validationFailed();
+      }
+      const { pin, conversationId } = await addPin(db, {
+        circleId: id,
+        messageId: parsed.data.messageId,
+        callerId: request.authUser!.userId,
+      });
+      const row = await getPinRow(db, id, pin.id);
+      publish?.('pinboard:updated', { circleId: id, conversationId });
+      await reply.header('cache-control', 'no-store').code(201).send({
+        item: row ? await serializePin(row) : null,
+      });
+    },
+  );
+
+  app.delete(
+    '/v1/circles/:id/pinboard/:itemId',
+    { config: { auth: true, rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const { id, itemId } = request.params as { id: string; itemId: string };
+      await requireCircle(id, request.authUser!.userId);
+      await removePin(db, { circleId: id, pinId: itemId, callerId: request.authUser!.userId });
+      // The publisher routes by conversationId; without it the removal notice
+      // would silently no-op and members would keep a stale pinboard.
+      const [conversation] = await db
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(eq(conversations.circleId, id))
+        .limit(1);
+      publish?.('pinboard:updated', { circleId: id, conversationId: conversation?.id });
+      await reply.header('cache-control', 'no-store').send({ ok: true });
+    },
+  );
+
   app.get('/v1/circles/:id/home', { config: { auth: true } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { circle, role } = await requireCircle(id, request.authUser!.userId);
@@ -315,13 +392,15 @@ export async function circleRoutes(
       .from(conversations)
       .where(eq(conversations.circleId, circle.id))
       .limit(1);
-    const [members, unreadCount] = await Promise.all([
+    const [members, unreadCount, pinRows, pins] = await Promise.all([
       listMembers(db, id),
       conversation
         ? unreadCountFor(db, conversation.id, request.authUser!.userId)
         : Promise.resolve(0),
+      listPinRows(db, id, 5),
+      pinsCount(db, id),
     ]);
-    // M10 adds pins; M11 adds polls — both stay empty until those milestones.
+    // M11 adds polls — stays empty until that milestone.
     await reply.header('cache-control', 'no-store').send({
       home: {
         circleId: circle.id,
@@ -333,7 +412,8 @@ export async function circleRoutes(
         callerRole: role,
         unreadCount,
         activePolls: [],
-        pinnedItems: [],
+        pinnedItems: await Promise.all(pinRows.map(serializePin)),
+        pinsCount: pins,
         members: members.map((member) => ({
           userId: member.userId,
           username: member.username,

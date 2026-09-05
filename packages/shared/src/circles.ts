@@ -97,3 +97,12 @@ export const invitePreviewSchema = z.object({
 export type CreateCircleInput = z.infer<typeof createCircleSchema>;
 export type UpdateCircleInput = z.infer<typeof updateCircleSchema>;
 export type CircleSettingsInput = z.infer<typeof circleSettingsSchema>;
+
+/** M10: pin an eligible Circle message to the Circle Pinboard. Only the
+ * message reference is client-supplied — circle, pinner and timestamps are
+ * derived server-side from the authenticated request (docs/API.md). */
+export const createPinSchema = z.object({
+  messageId: z.string().uuid(),
+});
+
+export type CreatePinInput = z.infer<typeof createPinSchema>;

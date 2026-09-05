@@ -49,6 +49,7 @@ What actually ships today, verified by the test suites referenced below:
 - **GIF search:** via **GIPHY**, called directly from the client per GIPHY's API terms (proxying prohibited), with the "Powered By GIPHY" attribution in the picker
 - **Push notifications:** server-authoritative Expo Push fan-out after every persisted message — per-user global toggle, per-conversation mute, message-preview privacy, multi-device support (devices = sessions), invalid-token cleanup, and notification-tap deep links; provider failures never affect messaging
 - **Circle Home:** a private dashboard per Circle — identity header (avatar, name, description, member count), members preview with roles, the primary Open Chat action carrying the server-computed unread count, and management actions (invites, role changes, settings) — served by GET /v1/circles/:id/home, active members only
+- **Pinboard:** Circle-scoped pins of existing messages (never duplicates) — pin from the chat long-press menu, preview on Circle Home, full list with unpin on the dedicated Pinboard screen; server-verified message-to-Circle eligibility, per-Circle uniqueness, and tombstone-safe rendering with media served through the existing authorized presigned pipeline
 
 ## Documentation
 
@@ -124,9 +125,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M9 complete (all suites green).**
+**M0–M10 complete (all suites green).**
 
-Latest verification: server 215/215 tests (Vitest, real PostgreSQL), mobile 75/75 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
+Latest verification: server 222/222 tests (Vitest, real PostgreSQL), mobile 89/89 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|
@@ -143,7 +144,8 @@ Latest verification: server 215/215 tests (Vitest, real PostgreSQL), mobile 75/7
 | M7.1 — Image thumbnails (sharp) + GIF search (GIPHY client-side) | ✅ Done |
 | M8 — Push notifications (Expo Push, server-authoritative fan-out, per-conversation mute, preview privacy) | ✅ Done |
 | M9 — Circle Home (identity + members preview + Open Chat with unread, single authorized payload) | ✅ Done |
-| M10+ — Pinboard, Polls, Themes, App Lock | ⬜ Not started |
+| M10 — Pinboard (message-reference pins, uniqueness, tombstone-safe, home preview + full list) | ✅ Done |
+| M11+ — Polls, Themes, App Lock | ⬜ Not started |
 
 ## Getting Started
 

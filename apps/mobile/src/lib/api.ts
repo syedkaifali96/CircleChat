@@ -199,7 +199,21 @@ export interface CircleHome {
   membersCount: number;
   callerRole: CircleRole;
   unreadCount: number;
+  /** M10: latest pins preview + total count. */
+  pinnedItems: PinItem[];
+  pinsCount: number;
   members: CircleMember[];
+}
+
+/** M10 Pinboard item: a reference to an existing Circle message plus the
+ * pinner identity. The message is the tombstone-safe chat serializer shape —
+ * deleted messages can therefore never appear here. */
+export interface PinItem {
+  id: string;
+  messageId: string;
+  pinnedAt: string;
+  pinnedBy: { userId: string; username: string; displayName: string };
+  message: Message;
 }
 
 export interface InvitePreview {
@@ -239,6 +253,22 @@ export async function fetchCircle(token: string, circleId: string): Promise<{ ci
 
 export async function fetchCircleHome(token: string, circleId: string): Promise<{ home: CircleHome }> {
   return apiFetch(`${API_BASE_URL}/circles/${circleId}/home`, { method: 'GET', token });
+}
+
+export async function fetchCirclePins(token: string, circleId: string): Promise<{ items: PinItem[] }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/pinboard`, { method: 'GET', token });
+}
+
+export async function addPin(token: string, circleId: string, messageId: string): Promise<{ item: PinItem }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/pinboard`, {
+    method: 'POST',
+    token,
+    body: { messageId },
+  });
+}
+
+export async function removePin(token: string, circleId: string, pinId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/pinboard/${pinId}`, { method: 'DELETE', token });
 }
 
 export async function updateCircle(
@@ -383,7 +413,7 @@ export interface Message {
   senderId: string;
   senderUsername: string;
   senderDisplayName: string;
-  type: 'text' | 'image' | 'video' | 'voice' | 'file';
+  type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'gif';
   body: string | null;
   mediaId: string | null;
   /** M7: metadata from the media row (mime, dimensions, duration). */
@@ -398,6 +428,8 @@ export interface Message {
 
 export interface ChatHeader {
   type: 'circle' | 'direct';
+  /** The owning Circle for circle conversations (null for directs) — M10. */
+  circleId: string | null;
   title: string;
   avatarMediaId: string | null;
   subtitle: string;

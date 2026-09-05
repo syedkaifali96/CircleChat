@@ -24,6 +24,7 @@ import {
   transferOwnership,
   type CircleHome,
   type CircleMember,
+  type Message,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { colors } from '../../../src/design/tokens';
@@ -38,6 +39,32 @@ import { colors } from '../../../src/design/tokens';
 
 function memberCountLabel(count: number): string {
   return count === 1 ? '1 member' : `${count} members`;
+}
+
+/** Circle Home shows a small pin preview; the full list lives on the
+ * dedicated Pinboard screen (M10). */
+const PIN_PREVIEW_COUNT = 3;
+
+/** One-line label for a pinned message (media stays metadata-only here —
+ * the chat renders it through the authorized media pipeline). */
+function pinPreviewLabel(message: Message): string {
+  if (message.deleted) {
+    return 'Deleted message';
+  }
+  switch (message.type) {
+    case 'image':
+      return '📷 Photo';
+    case 'video':
+      return '🎥 Video';
+    case 'voice':
+      return '🎤 Voice message';
+    case 'gif':
+      return 'GIF';
+    case 'file':
+      return '📎 Attachment';
+    default:
+      return message.body ?? 'Message';
+  }
 }
 
 function friendlyError(code: string): string {
@@ -273,6 +300,37 @@ export default function CircleHomeScreen() {
 
       {actionError ? <Text style={styles.error} testID="circle-action-error">{actionError}</Text> : null}
 
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Pinboard</Text>
+        {home.pinsCount > PIN_PREVIEW_COUNT ? (
+          <Link href={`/(app)/circles/${id}/pinboard`} style={styles.viewAllLink} testID="pinboard-view-all">
+            View all ({home.pinsCount})
+          </Link>
+        ) : null}
+      </View>
+      {home.pinsCount === 0 ? (
+        <Text style={styles.pinboardEmpty} testID="pinboard-empty">
+          Nothing pinned yet. Long-press a message in the chat and choose Pin.
+        </Text>
+      ) : (
+        home.pinnedItems.slice(0, PIN_PREVIEW_COUNT).map((pin) => (
+          <Pressable
+            key={pin.id}
+            style={({ pressed }) => [styles.pinRow, pressed && styles.buttonPressed]}
+            onPress={() => home.conversationId && router.push(`/(app)/chats/${home.conversationId}`)}
+            testID={`pinboard-item-${pin.messageId}`}
+          >
+            <Text style={styles.pinIcon}>📌</Text>
+            <View style={styles.pinInfo}>
+              <Text style={styles.pinBody} numberOfLines={2}>{pinPreviewLabel(pin.message)}</Text>
+              <Text style={styles.pinMeta}>
+                {pin.message.senderDisplayName} · pinned by {pin.pinnedBy.displayName}
+              </Text>
+            </View>
+          </Pressable>
+        ))
+      )}
+
       {isAdmin ? (
         <Pressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
@@ -412,6 +470,23 @@ const styles = StyleSheet.create({
   name: { color: colors.text, fontSize: 24, fontWeight: '700', marginTop: 14 },
   memberCount: { color: colors.textSecondary, fontSize: 13, marginTop: 4 },
   description: { color: colors.textMuted, fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28 },
+  viewAllLink: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  pinboardEmpty: { color: colors.textMuted, fontSize: 13, marginTop: 8 },
+  pinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+  },
+  pinIcon: { fontSize: 16 },
+  pinInfo: { flex: 1, marginLeft: 10 },
+  pinBody: { color: colors.text, fontSize: 14 },
+  pinMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
   settingsLink: { color: colors.accent, fontSize: 14, fontWeight: '600', marginTop: 14 },
   sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 28 },
   memberRow: {

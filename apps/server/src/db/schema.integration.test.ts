@@ -788,28 +788,52 @@ describe('polls + votes (docs/DATABASE.md §1.13–1.14)', () => {
 });
 
 describe('pinboard, notifications, prefs (docs/DATABASE.md §1.11–1.12, §1.15)', () => {
-  it('cascades pinboard items with the circle and bounds content length', async () => {
+  it('cascades pinboard items with circle and message and keeps pins unique per message', async () => {
     const circle = await insertCircle();
-    await client.query(
-      `INSERT INTO pinboard_items (circle_id, created_by, content) VALUES ($1, $2, 'trip plan')`,
-      [circle.id, circle.ownerId],
+    const conversationId = await insertCircleConversation(circle.id);
+    const messageRow = await client.query<{ id: string }>(
+      `INSERT INTO messages (conversation_id, sender_id, type, body, client_message_id) VALUES ($1, $2, 'text', 'pin me', 'schema-test-1') RETURNING id`,
+      [conversationId, circle.ownerId],
     );
+    const messageId = messageRow.rows[0]!.id;
+    await client.query(
+      `INSERT INTO pinboard_items (circle_id, message_id, created_by) VALUES ($1, $2, $3)`,
+      [circle.id, messageId, circle.ownerId],
+    );
+    // M10: the same message cannot be pinned twice in one Circle.
     await expectPgError(
       () =>
         client.query(
-          `INSERT INTO pinboard_items (circle_id, created_by, content) VALUES ($1, $2, $3)`,
-          [circle.id, circle.ownerId, 'x'.repeat(1001)],
+          `INSERT INTO pinboard_items (circle_id, message_id, created_by) VALUES ($1, $2, $3)`,
+          [circle.id, messageId, circle.ownerId],
         ),
-      CHECK_VIOLATION,
+      UNIQUE_VIOLATION,
     );
-    await client.query(`DELETE FROM circles WHERE id = $1`, [circle.id]);
-    const remaining = await client.query<{ count: string }>(
-      `SELECT count(*)::int FROM pinboard_items WHERE circle_id = $1`,
+    // Deleting the referenced message removes its pin (FK ON DELETE CASCADE).
+    await client.query(`DELETE FROM messages WHERE id = $1`, [messageId]);
+    const afterMessage = await client.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM pinboard_items WHERE circle_id = $1`,
       [circle.id],
+    );
+    expect(afterMessage.rows[0]!.count).toBe(0);
+    // Circle deletion cascades remaining pins too.
+    const circle2 = await insertCircle();
+    const conversation2 = await insertCircleConversation(circle2.id);
+    const message2 = await client.query<{ id: string }>(
+      `INSERT INTO messages (conversation_id, sender_id, type, body, client_message_id) VALUES ($1, $2, 'text', 'x', 'schema-test-2') RETURNING id`,
+      [conversation2, circle2.ownerId],
+    );
+    await client.query(
+      `INSERT INTO pinboard_items (circle_id, message_id, created_by) VALUES ($1, $2, $3)`,
+      [circle2.id, message2.rows[0]!.id, circle2.ownerId],
+    );
+    await client.query(`DELETE FROM circles WHERE id = $1`, [circle2.id]);
+    const remaining = await client.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM pinboard_items WHERE circle_id = $1`,
+      [circle2.id],
     );
     expect(remaining.rows[0]!.count).toBe(0);
   });
-
   it('keeps one notification preference per user per conversation with defaults', async () => {
     const circle = await insertCircle();
     const conversationId = await insertCircleConversation(circle.id);

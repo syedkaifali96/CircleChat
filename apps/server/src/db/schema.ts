@@ -383,6 +383,14 @@ export const pollVotes = pgTable(
 
 /* ---------------------------------------------------------- pinboard_items */
 
+/**
+ * M10 Circle Pinboard: references to EXISTING Circle messages, never copies —
+ * body/media stay in `messages` and R2, so edits/deletes never drift and
+ * tombstoned content never leaks through the pinboard. One pin per
+ * (circle, message). Rows cascade on Circle deletion or message hard-deletion;
+ * message tombstones are cleaned up in application logic when the message is
+ * deleted (docs/DATABASE.md §1.15).
+ */
 export const pinboardItems = pgTable(
   'pinboard_items',
   {
@@ -390,19 +398,17 @@ export const pinboardItems = pgTable(
     circleId: uuid('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
+    messageId: uuid('message_id')
+      .notNull()
+      .references((): AnyPgColumn => messages.id, { onDelete: 'cascade' }),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
-    content: text('content').notNull(),
     pinnedAt: timestamp('pinned_at', { withTimezone: true }).notNull().defaultNow(),
-    orderIndex: integer('order_index').notNull().default(0),
   },
   (table) => [
+    uniqueIndex('pinboard_items_circle_message_uq').on(table.circleId, table.messageId),
     index('pinboard_items_circle_idx').on(table.circleId, table.pinnedAt.desc()),
-    check(
-      'pinboard_items_content_len_ck',
-      sql`char_length(${table.content}) BETWEEN 1 AND 1000`,
-    ),
   ],
 );
 

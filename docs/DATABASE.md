@@ -341,20 +341,22 @@ open. Results are visible to Circle members as defined by the product rules.
 
 ### 1.15 `pinboard_items`
 
-Purpose: Circle-level shared pins.
+Purpose: Circle-level shared pins. A pin **references an existing Circle message** — body/media stay
+in `messages`/R2, nothing is duplicated, and tombstoned content can never surface through the pinboard (M10).
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID PK | |
 | `circle_id` | UUID NOT NULL → `circles.id` ON DELETE CASCADE | |
-| `created_by` | UUID NOT NULL → `users.id` | |
-| `content` | TEXT NOT NULL | ≤ 1000 chars |
+| `message_id` | UUID NOT NULL → `messages.id` ON DELETE CASCADE | the pinned message; the delete-message flow also removes pins eagerly so tombstones never surface and `(circle_id, message_id)` frees up for future content |
+| `created_by` | UUID NOT NULL → `users.id` | who pinned it |
 | `pinned_at` | TIMESTAMPTZ NOT NULL | |
-| `order_index` | INTEGER NOT NULL DEFAULT 0 | |
 
-Index: `(circle_id, pinned_at DESC)`.
+Indexes: `(circle_id, pinned_at DESC)` for listing; `UNIQUE (circle_id, message_id)` — the same message
+cannot be pinned twice within one Circle.
 
----
+Eligibility is enforced server-side: the message must be live (non-tombstoned) and belong to the Circle's
+own conversation — direct-chat or foreign-Circle message ids are rejected with a generic 404.
 
 ## 2. Future Tables (V2 — named now, built later)
 

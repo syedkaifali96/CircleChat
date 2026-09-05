@@ -142,10 +142,10 @@ export async function buildApp(
     const storage = options.storage ?? (readR2StorageConfig() ? new R2StorageGateway(readR2StorageConfig()!) : undefined);
     // Circles never touch object storage directly; storage is optional and only
     // used for invite-preview avatar URLs.
-    await app.register(circleRoutes, { db, storage });
+    const publish = options.publish ?? (() => undefined);
+    await app.register(circleRoutes, { db, storage, publish });
     // Messaging (M5): REST writes are the source of truth; `publish` fans out
     // change notifications when a Socket.IO server is attached.
-    const publish = options.publish ?? (() => undefined);
     await app.register(conversationRoutes, { db, publish });
     await app.register(messageRoutes, { db, publish, storage, expoPush: options.expoPush });
     if (storage) {

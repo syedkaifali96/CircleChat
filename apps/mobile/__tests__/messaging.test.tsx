@@ -3,6 +3,7 @@ import { MessageBubble } from '../src/chat/MessageBubble';
 import ChatsScreen from '../app/(app)/chats';
 import ConversationScreen from '../app/(app)/chats/[id]';
 import * as apiModule from '../src/lib/api';
+import { Alert } from 'react-native';
 
 /**
  * M5 mobile messaging tests: bubble rendering (own/incoming, sender name,
@@ -68,6 +69,8 @@ jest.mock('../src/lib/api', () => ({
   editMessage: jest.fn(),
   deleteMessage: jest.fn(),
   addReaction: jest.fn(),
+  addPin: jest.fn(),
+  removePin: jest.fn(),
   removeReaction: jest.fn(),
   markConversationRead: jest.fn().mockResolvedValue({ unreadCount: 0, lastReadMessageId: null }),
 }));
@@ -306,7 +309,7 @@ describe('ChatsScreen', () => {
 });
 
 describe('ConversationScreen', () => {
-  const header = { type: 'circle' as const, title: 'Night Owls', avatarMediaId: null, subtitle: '3 members', circleRole: 'member' };
+  const header = { type: 'circle' as const, circleId: 'c-1', title: 'Night Owls', avatarMediaId: null, subtitle: '3 members', circleRole: 'member' };
 
   function message(overrides: Partial<apiModule.Message>): apiModule.Message {
     return { ...baseMessage, id: `m-${overrides.senderId ?? 'x'}`, ...overrides } as apiModule.Message;
@@ -366,5 +369,53 @@ describe('ConversationScreen', () => {
     await waitFor(() => expect(screen.getByTestId('message-other-1')).toBeTruthy(), { timeout: 8000 });
     fireEvent(screen.getByTestId('message-other-1'), 'longPress');
     expect(screen.getByTestId('action-delete')).toBeTruthy();
+  }, 30_000);
+
+  it('circle messages offer Pin to Pinboard and it calls the pin API (M10)', async () => {
+    mockApi.fetchChatHeader.mockResolvedValue({ header });
+    mockApi.fetchMessages.mockResolvedValue({
+      messages: [message({ id: 'other-1', senderId: 'u2', senderDisplayName: 'Ayesha', body: 'pin me' })],
+      nextBeforeCursor: null,
+    });
+    mockApi.addPin.mockResolvedValue({ item: {} as apiModule.PinItem });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+
+    render(<ConversationScreen />);
+    await waitFor(() => expect(screen.getByTestId('message-other-1')).toBeTruthy(), { timeout: 8000 });
+    fireEvent(screen.getByTestId('message-other-1'), 'longPress');
+    expect(screen.getByTestId('action-pin')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('action-pin'));
+    await waitFor(() => expect(mockApi.addPin).toHaveBeenCalledWith('test-token', 'c-1', 'other-1'));
+  }, 30_000);
+
+  it('tombstoned messages offer no pin action (M10)', async () => {
+    mockApi.fetchChatHeader.mockResolvedValue({ header });
+    mockApi.fetchMessages.mockResolvedValue({
+      messages: [message({ id: 'tomb-1', senderId: 'u2', body: 'gone', deleted: true } as Partial<apiModule.Message>)],
+      nextBeforeCursor: null,
+    });
+
+    render(<ConversationScreen />);
+    await waitFor(() => expect(screen.getByTestId('message-tomb-1')).toBeTruthy(), { timeout: 8000 });
+    // Tombstones render the deleted bubble with no long-press affordance at
+    // all — the action menu (and therefore Pin) can never open for them.
+    expect(screen.getByText('Message deleted')).toBeTruthy();
+    expect(screen.queryByTestId('action-pin')).toBeNull();
+  }, 30_000);
+
+  it('direct conversations offer no pin action (M10)', async () => {
+    mockApi.fetchChatHeader.mockResolvedValue({
+      header: { type: 'direct', circleId: null, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null },
+    });
+    mockApi.fetchMessages.mockResolvedValue({
+      messages: [message({ id: 'dm-1', senderId: 'u2', senderDisplayName: 'Ayesha', body: 'dm' })],
+      nextBeforeCursor: null,
+    });
+
+    render(<ConversationScreen />);
+    await waitFor(() => expect(screen.getByTestId('message-dm-1')).toBeTruthy(), { timeout: 8000 });
+    fireEvent(screen.getByTestId('message-dm-1'), 'longPress');
+    expect(screen.queryByTestId('action-pin')).toBeNull();
   }, 30_000);
 });

@@ -971,3 +971,298 @@ describe('circle home (M9, docs/API.md GET /circles/:id/home)', () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+describe('circle pinboard (M10, docs/API.md /circles/:id/pinboard)', () => {
+  /** Circle + member + one conversation message; returns everything needed. */
+  async function setupCircleWithMessage() {
+    const owner = await signup(`m10_ow_${suffix()}`);
+    const circle = await createCircle(owner.token, `M10 Pins ${suffix()}`);
+    const home = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(owner.token),
+    });
+    const conversationId = (home.json() as { home: { conversationId: string } }).home.conversationId;
+    const sent = await app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${conversationId}/messages`,
+      headers: bearer(owner.token),
+      payload: { type: 'text', body: 'pin me', clientMessageId: `m10-${suffix()}` },
+    });
+    const messageId = (sent.json() as { message: { id: string } }).message.id;
+    return { owner, circle: circle as { id: string }, conversationId, messageId };
+  }
+
+  it('pins an eligible Circle message and lists it with pinner + message payload', async () => {
+    const { owner, circle, messageId } = await setupCircleWithMessage();
+
+    const pin = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+      payload: { messageId },
+    });
+    expect(pin.statusCode).toBe(201);
+    const item = pin.json().item as {
+      id: string;
+      messageId: string;
+      pinnedBy: { userId: string; displayName: string };
+      message: { id: string; body: string; deleted: boolean };
+    };
+    expect(item.messageId).toBe(messageId);
+    expect(item.pinnedBy.userId).toBe(owner.userId);
+    expect(item.message.body).toBe('pin me');
+    expect(item.message.deleted).toBe(false);
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().items).toHaveLength(1);
+    expect(list.json().items[0].messageId).toBe(messageId);
+  });
+
+  it('rejects duplicate pins of the same message (uniqueness, 409 PIN_EXISTS)', async () => {
+    const { owner, circle, messageId } = await setupCircleWithMessage();
+    const first = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+      payload: { messageId },
+    });
+    expect(first.statusCode).toBe(201);
+    const second = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+      payload: { messageId },
+    });
+    expect(second.statusCode).toBe(409);
+    expect(second.json().code).toBe('PIN_EXISTS');
+  });
+
+  it('member can unpin their own pin; member cannot unpin another member\u2019s pin', async () => {
+    const owner = await signup(`m10_ow2_${suffix()}`);
+    const a = await signup(`m10_a_${suffix()}`);
+    const b = await signup(`m10_b_${suffix()}`);
+    const circle = await createCircle(owner.token, `M10 Unpin ${suffix()}`);
+    for (const user of [a, b]) {
+      const code = await createInvite(owner.token, circle.id as string);
+      await app.inject({
+        method: 'POST',
+        url: '/v1/circles/join',
+        headers: bearer(user.token),
+        payload: { inviteCode: code },
+      });
+    }
+    const home = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(a.token),
+    });
+    const conversationId = (home.json() as { home: { conversationId: string } }).home.conversationId;
+    const sendFor = async (token: string, body: string) => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: bearer(token),
+        payload: { type: 'text', body, clientMessageId: `m10-${suffix()}` },
+      });
+      return (res.json() as { message: { id: string } }).message.id;
+    };
+
+    const pinA = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(a.token),
+      payload: { messageId: await sendFor(a.token, 'from a') },
+    });
+    const pinB = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(b.token),
+      payload: { messageId: await sendFor(b.token, 'from b') },
+    });
+    const pinAId = pinA.json().item.id as string;
+    const pinBId = pinB.json().item.id as string;
+
+    // B cannot remove A's pin (not admin, not creator).
+    const denied = await app.inject({
+      method: 'DELETE',
+      url: `/v1/circles/${circle.id}/pinboard/${pinAId}`,
+      headers: bearer(b.token),
+    });
+    expect(denied.statusCode).toBe(403);
+
+    // A removes their own pin.
+    const own = await app.inject({
+      method: 'DELETE',
+      url: `/v1/circles/${circle.id}/pinboard/${pinAId}`,
+      headers: bearer(a.token),
+    });
+    expect(own.statusCode).toBe(200);
+
+    // Owner/admin removes B's pin.
+    const admin = await app.inject({
+      method: 'DELETE',
+      url: `/v1/circles/${circle.id}/pinboard/${pinBId}`,
+      headers: bearer(owner.token),
+    });
+    expect(admin.statusCode).toBe(200);
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+    });
+    expect(list.json().items).toHaveLength(0);
+  });
+
+  it('non-members get a generic 404 on list, pin and unpin (existence hidden)', async () => {
+    const { owner, circle, messageId } = await setupCircleWithMessage();
+    const outsider = await signup(`m10_out_${suffix()}`);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+      payload: { messageId },
+    });
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(outsider.token),
+    });
+    expect(list.statusCode).toBe(404);
+
+    const pin = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(outsider.token),
+      payload: { messageId },
+    });
+    expect(pin.statusCode).toBe(404);
+
+    const unpin = await app.inject({
+      method: 'DELETE',
+      url: `/v1/circles/${circle.id}/pinboard/00000000-0000-4000-8000-000000000000`,
+      headers: bearer(outsider.token),
+    });
+    expect(unpin.statusCode).toBe(404);
+  });
+
+  it('removed members lose pinboard access', async () => {
+    const owner = await signup(`m10_rm_${suffix()}`);
+    const member = await signup(`m10_rmm_${suffix()}`);
+    const circle = await createCircle(owner.token, `M10 Removed ${suffix()}`);
+    const code = await createInvite(owner.token, circle.id as string);
+    await app.inject({
+      method: 'POST',
+      url: '/v1/circles/join',
+      headers: bearer(member.token),
+      payload: { inviteCode: code },
+    });
+    await app.inject({
+      method: 'DELETE',
+      url: `/v1/circles/${circle.id}/members/${member.userId}`,
+      headers: bearer(owner.token),
+    });
+    const list = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(member.token),
+    });
+    expect(list.statusCode).toBe(404);
+  });
+
+  it('rejects revoked sessions with 401', async () => {
+    const { owner, circle } = await setupCircleWithMessage();
+    await app.inject({ method: 'POST', url: '/v1/auth/logout', headers: bearer(owner.token) });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('never pins another Circle message or a direct message (404, nothing stored)', async () => {
+    const setup = await setupCircleWithMessage();
+    const { owner, circle, messageId } = setup;
+
+    // A message from the owner's OTHER Circle must not pin into this Circle.
+    const other = await createCircle(owner.token, `M10 Other ${suffix()}`);
+    const otherHome = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${other.id}/home`,
+      headers: bearer(owner.token),
+    });
+    const otherConversation = (otherHome.json() as { home: { conversationId: string } }).home
+      .conversationId;
+    const otherMessage = await app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${otherConversation}/messages`,
+      headers: bearer(owner.token),
+      payload: { type: 'text', body: 'wrong circle', clientMessageId: `m10-${suffix()}` },
+    });
+    const wrongCircleMessageId = (otherMessage.json() as { message: { id: string } }).message.id;
+
+    // A direct message between the Circle owner and a Circle member must not
+    // pin either — the DM lives in a different conversation entirely.
+    const memberUsername = `m10_dm_${suffix()}`;
+    const member = await signup(memberUsername);
+    const code = await createInvite(owner.token, circle.id);
+    const joined = await app.inject({
+      method: 'POST',
+      url: '/v1/circles/join',
+      headers: bearer(member.token),
+      payload: { inviteCode: code },
+    });
+    expect(joined.statusCode).toBe(201);
+    const dm = await app.inject({
+      method: 'POST',
+      url: '/v1/conversations/direct',
+      headers: bearer(owner.token),
+      payload: { username: memberUsername },
+    });
+    expect([200, 201]).toContain(dm.statusCode); // find-or-create: 201 first time
+    const dmConversationId = dm.json().conversationId as string;
+    const dmMessage = await app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${dmConversationId}/messages`,
+      headers: bearer(owner.token),
+      payload: { type: 'text', body: 'private dm', clientMessageId: `m10-${suffix()}` },
+    });
+    const dmMessageId = (dmMessage.json() as { message: { id: string } }).message.id;
+
+    // Pin the legitimate Circle message first.
+    const legit = await app.inject({
+      method: 'POST',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+      payload: { messageId },
+    });
+    expect(legit.statusCode).toBe(201);
+
+    for (const foreignId of [wrongCircleMessageId, dmMessageId]) {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/v1/circles/${circle.id}/pinboard`,
+        headers: bearer(owner.token),
+        payload: { messageId: foreignId },
+      });
+      expect(res.statusCode).toBe(404);
+    }
+    // Only the legitimate Circle message is pinned; nothing foreign stored.
+    const list = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/pinboard`,
+      headers: bearer(owner.token),
+    });
+    const items = list.json().items as Array<{ messageId: string }>;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.messageId).toBe(messageId);
+  });
+});

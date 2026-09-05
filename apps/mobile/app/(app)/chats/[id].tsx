@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  ApiError,
   addReaction,
   deleteMessage,
   editMessage,
@@ -27,6 +28,7 @@ import {
   type Message,
   fetchNotificationPref,
   updateNotificationPref,
+  addPin,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { useAuth } from '../../../src/auth/AuthContext';
@@ -303,6 +305,29 @@ export default function ConversationScreen() {
         // Reactions are best-effort in the UI; the server state stays correct.
       } finally {
         setReacting(false);
+      }
+    })();
+  };
+
+  // M10: pin a Circle message to the Circle Pinboard. The server re-checks
+  // membership + that the message belongs to this Circle's conversation.
+  const onPin = (message: Message) => {
+    setActionMessage(null);
+    void (async () => {
+      if (!header?.circleId) {
+        return;
+      }
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        await addPin(token, header.circleId, message.id);
+        Alert.alert('Pinned', 'Added to the Circle Pinboard.');
+      } catch (err) {
+        Alert.alert(
+          'Pin failed',
+          err instanceof ApiError && err.code === 'PIN_EXISTS'
+            ? 'This message is already on the Pinboard.'
+            : 'Could not pin this message. Try again.',
+        );
       }
     })();
   };
@@ -684,6 +709,11 @@ export default function ConversationScreen() {
                     <Text style={styles.menuOptionText}>Save edit</Text>
                   </Pressable>
                 </>
+              ) : null}
+              {header.type === 'circle' && header.circleId && !actionMessage.deleted ? (
+                <Pressable style={styles.menuOption} onPress={() => onPin(actionMessage)} testID="action-pin">
+                  <Text style={styles.menuOptionText}>Pin to Pinboard</Text>
+                </Pressable>
               ) : null}
               <Pressable
                 style={styles.menuOption}

@@ -1,15 +1,17 @@
 import { randomBytes } from 'node:crypto';
 import { createHash } from 'node:crypto';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client';
 import {
   circleMembers,
   circleSettings,
   circles,
   conversations,
+  messages,
+  pinboardItems,
   users,
 } from '../../db/schema';
-import { AppError, notFound } from '../../errors';
+import { AppError, forbidden, notFound } from '../../errors';
 
 /**
  * Circle service (M4) — docs/DATABASE.md §1.2–1.4, §3 and docs/API.md.
@@ -466,4 +468,165 @@ export async function usersSharingAnyCircle(
     .from(circleMembers)
     .where(inArray(circleMembers.circleId, circleIds));
   return [...new Set(rows.map((row) => row.userId))];
+}
+
+/* ------------------------------------------------------- pinboard (M10) --- */
+
+/**
+ * Pinboard (M10) — docs/API.md, docs/DATABASE.md §1.15. Pins REFERENCE
+ * existing Circle messages; body/media stay in `messages`/R2, so nothing is
+ * duplicated and tombstoned content can never leak through the pinboard.
+ */
+
+export interface PinRow {
+  id: string;
+  messageId: string;
+  pinnedAt: Date;
+  message: {
+    id: string;
+    conversationId: string;
+    senderId: string;
+    type: string;
+    body: string | null;
+    mediaId: string | null;
+    replyToId: string | null;
+    editedAt: Date | null;
+    deletedAt: Date | null;
+    createdAt: Date;
+  };
+  pinnedBy: { userId: string; username: string; displayName: string };
+}
+
+/** Pins of one Circle, newest first, joined to their live (non-tombstoned)
+ * message and the pinner identity. Tombstones are filtered here AND removed
+ * eagerly in deleteMessage — both layers keep the pinboard consistent. */
+function pinRowQuery(db: Database) {
+  return db
+    .select({
+      id: pinboardItems.id,
+      messageId: messages.id,
+      pinnedAt: pinboardItems.pinnedAt,
+      message: {
+        id: messages.id,
+        conversationId: messages.conversationId,
+        senderId: messages.senderId,
+        type: messages.type,
+        body: messages.body,
+        mediaId: messages.mediaId,
+        replyToId: messages.replyToId,
+        editedAt: messages.editedAt,
+        deletedAt: messages.deletedAt,
+        createdAt: messages.createdAt,
+      },
+      pinnedBy: {
+        userId: users.id,
+        username: users.username,
+        displayName: users.displayName,
+      },
+    })
+    .from(pinboardItems)
+    .innerJoin(messages, and(eq(messages.id, pinboardItems.messageId), isNull(messages.deletedAt)))
+    .innerJoin(users, eq(users.id, pinboardItems.createdBy))
+    .$dynamic();
+}
+
+/** Pins of one Circle, newest first, joined to their live (non-tombstoned)
+ * message and the pinner identity. Tombstones are filtered here AND removed
+ * eagerly in deleteMessage — both layers keep the pinboard consistent. */
+export async function listPinRows(
+  db: Database,
+  circleId: string,
+  limit?: number,
+): Promise<PinRow[]> {
+  const query = pinRowQuery(db)
+    .where(eq(pinboardItems.circleId, circleId))
+    .orderBy(desc(pinboardItems.pinnedAt));
+  return limit ? query.limit(limit) : query;
+}
+
+/** One pin row of this Circle (by pin id) with the same join as the list. */
+export async function getPinRow(
+  db: Database,
+  circleId: string,
+  pinId: string,
+): Promise<PinRow | undefined> {
+  const rows = await pinRowQuery(db)
+    .where(and(eq(pinboardItems.circleId, circleId), eq(pinboardItems.id, pinId)))
+    .limit(1);
+  return rows[0];
+}
+
+export async function pinsCount(db: Database, circleId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pinboardItems)
+    .where(eq(pinboardItems.circleId, circleId));
+  return rows[0]?.count ?? 0;
+}
+
+/**
+ * Pins an eligible message. Eligibility is fully server-side: the message
+ * must exist, must not be tombstoned, and must belong to THIS Circle's own
+ * conversation — a direct-chat or another Circle's message is rejected with
+ * the generic 404 so foreign message ids are never distinguishable.
+ */
+export async function addPin(
+  db: Database,
+  input: { circleId: string; messageId: string; callerId: string },
+): Promise<{ pin: { id: string; messageId: string; pinnedAt: Date }; conversationId: string }> {
+  const messageRows = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.id, input.messageId))
+    .limit(1);
+  const message = messageRows[0];
+  if (!message || message.deletedAt) {
+    throw notFound('Message not found.');
+  }
+  const conversationRows = await db
+    .select({ id: conversations.id, type: conversations.type, circleId: conversations.circleId })
+    .from(conversations)
+    .where(eq(conversations.id, message.conversationId))
+    .limit(1);
+  const conversation = conversationRows[0];
+  if (!conversation || conversation.type !== 'circle' || conversation.circleId !== input.circleId) {
+    throw notFound('Message not found.');
+  }
+  const inserted = await db
+    .insert(pinboardItems)
+    .values({ circleId: input.circleId, messageId: message.id, createdBy: input.callerId })
+    .onConflictDoNothing()
+    .returning({ id: pinboardItems.id, messageId: pinboardItems.messageId, pinnedAt: pinboardItems.pinnedAt });
+  if (!inserted[0]) {
+    // (circle_id, message_id) uniqueness: the same message cannot be pinned twice.
+    throw new AppError('PIN_EXISTS', 409, 'This message is already pinned.');
+  }
+  return { pin: inserted[0], conversationId: conversation.id };
+}
+
+/**
+ * Removes a pin. Per docs/API.md the policy mirrors M5 message deletion: any
+ * active member may pin; an owner/admin may remove ANY pin, a member only
+ * their own. Knowing a pin id from another Circle never helps — the pin must
+ * belong to the caller's Circle before any of this applies.
+ */
+export async function removePin(
+  db: Database,
+  input: { circleId: string; pinId: string; callerId: string },
+): Promise<void> {
+  const rows = await db
+    .select({ id: pinboardItems.id, createdBy: pinboardItems.createdBy })
+    .from(pinboardItems)
+    .where(and(eq(pinboardItems.id, input.pinId), eq(pinboardItems.circleId, input.circleId)))
+    .limit(1);
+  const pin = rows[0];
+  if (!pin) {
+    throw notFound('Pin not found.');
+  }
+  const role = await getCallerRole(db, input.circleId, input.callerId);
+  const isAdmin = role === 'owner' || role === 'admin';
+  if (!isAdmin && pin.createdBy !== input.callerId) {
+    throw forbidden('You can only remove your own pins.');
+  }
+  await db.delete(pinboardItems).where(eq(pinboardItems.id, pin.id));
 }

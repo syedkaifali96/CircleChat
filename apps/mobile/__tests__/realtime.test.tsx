@@ -107,7 +107,7 @@ let typingHandler: TypingHandler | null = null;
 let presenceHandler: PresenceHandler | null = null;
 let unsubscribeCalls = 0;
 
-const header = { type: 'direct' as const, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null };
+const header = { type: 'direct' as const, circleId: null, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null };
 const sampleMessage = {
   id: 'm-1',
   conversationId: 'conv-1',

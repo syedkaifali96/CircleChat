@@ -265,8 +265,8 @@ describe('CircleHomeScreen (M9)', () => {
     membersCount: 2,
     callerRole: 'owner' as const,
     unreadCount: 4,
-    activePolls: [],
-    pinnedItems: [],
+        pinnedItems: [],
+    pinsCount: 0,
     members: [
       { userId: 'u-1', username: 'kaif', displayName: 'Kaif', role: 'owner' as const, joinedAt: '2026-01-01T00:00:00.000Z' },
       { userId: 'u-2', username: 'ayesha', displayName: 'Ayesha', role: 'member' as const, joinedAt: '2026-01-02T00:00:00.000Z' },
@@ -326,5 +326,82 @@ describe('CircleHomeScreen (M9)', () => {
     mockApi.fetchCircleHome.mockResolvedValue({ home: homePayload });
     fireEvent.press(screen.getByTestId('circle-retry'));
     await waitFor(() => expect(screen.getByTestId('circle-screen')).toBeTruthy());
+  });
+});
+
+describe('CircleHomeScreen — Pinboard (M10)', () => {
+  const pinnedHome = (overrides: Partial<apiModule.CircleHome> = {}): { home: apiModule.CircleHome } => ({
+    home: {
+      circleId: 'c-1',
+      conversationId: 'conv-1',
+      name: 'Night Owls',
+      description: null,
+      avatarMediaId: null,
+      membersCount: 2,
+      callerRole: 'owner',
+      unreadCount: 0,
+            pinnedItems: [],
+      pinsCount: 0,
+      members: [],
+      ...overrides,
+    },
+  });
+
+  const pin = (id: string, messageId: string, body: string, pinnedByDisplay: string): apiModule.PinItem => ({
+    id,
+    messageId,
+    pinnedAt: '2026-01-03T00:00:00.000Z',
+    pinnedBy: { userId: 'u-2', username: 'ayesha', displayName: pinnedByDisplay },
+    message: {
+      id: messageId,
+      conversationId: 'conv-1',
+      senderId: 'u-2',
+      senderUsername: 'ayesha',
+      senderDisplayName: 'Ayesha',
+      type: 'text',
+      body,
+      mediaId: null,
+      media: null,
+      replyToId: null,
+      editedAt: null,
+      deleted: false,
+      createdAt: '2026-01-02T00:00:00.000Z',
+    } as apiModule.Message,
+  });
+
+  it('renders the Pinboard preview with pinned items and pinner metadata', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue(
+      pinnedHome({
+        pinsCount: 2,
+        pinnedItems: [pin('p-1', 'm-1', 'trip plan', 'Ayesha'), pin('p-2', 'm-2', 'wifi password', 'Ayesha')],
+      }),
+    );
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('pinboard-item-m-1')).toBeTruthy());
+    expect(screen.getByText('trip plan')).toBeTruthy();
+    expect(screen.getByText('wifi password')).toBeTruthy();
+    expect(screen.getAllByText('Ayesha · pinned by Ayesha')).toHaveLength(2);
+    // Only a preview — the full list lives on the Pinboard screen.
+    expect(screen.queryByTestId('pinboard-view-all')).toBeNull();
+  });
+
+  it('shows the Pinboard empty state and no preview when nothing is pinned', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue(pinnedHome());
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('circle-screen')).toBeTruthy());
+    expect(screen.getByTestId('pinboard-empty')).toBeTruthy();
+    expect(screen.queryByTestId(/pinboard-item-/)).toBeNull();
+    expect(screen.queryByTestId('pinboard-view-all')).toBeNull();
+  });
+
+  it('shows the View all link when the Circle has more pins than the preview', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue(pinnedHome({ pinsCount: 7, pinnedItems: [pin('p-1', 'm-1', 'x', 'Ayesha')] }));
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('pinboard-view-all')).toBeTruthy());
+    // Preview is capped at three items even when more exist.
+    expect(screen.getAllByTestId(/^pinboard-item-/)).toHaveLength(1);
   });
 });

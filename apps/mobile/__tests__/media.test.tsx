@@ -108,7 +108,7 @@ jest.mock('../src/lib/socket', () => ({
 const mockApi = apiModule as unknown as jest.Mocked<typeof apiModule>;
 const mockMediaSend = mediaSendModule as jest.Mocked<typeof mediaSendModule>;
 
-const header = { type: 'direct' as const, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null };
+const header = { type: 'direct' as const, circleId: null, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null };
 const baseMessage = {
   conversationId: 'conv-1',
   senderId: 'u2',
