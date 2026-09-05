@@ -325,6 +325,9 @@ muted state, mentions where applicable, and message-preview privacy.
 
 Push delivery is best-effort (implemented M8): it runs strictly after persistence and realtime
 fan-out, and any provider failure is logged and swallowed — messaging never depends on it.
+Without `EXPO_ACCESS_TOKEN` the server runs a no-op gateway, so local dev and tests need no
+Expo account, and clients in push-less environments degrade to an "unavailable" state instead
+of failing.
 Push devices are sessions: Expo tokens live on `sessions.push_token`, registering a token moves
 it off the user's other sessions, and revoked sessions are never notified.
 

@@ -125,7 +125,7 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 **M0–M8 complete (all suites green).**
 
-Latest verification: server 210/210 tests (Vitest, real PostgreSQL), mobile 69/69 tests (Jest + RNTL), typecheck 0 errors, lint clean.
+Latest verification: server 210/210 tests (Vitest, real PostgreSQL), mobile 70/70 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|

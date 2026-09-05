@@ -149,6 +149,10 @@ M8 implements push delivery end to end (Expo Push):
   devices keep working.
 - **Push is best-effort.** Expo provider failures are logged and swallowed — message persistence
   and realtime delivery are never affected, and the send request still succeeds.
+- **Push-less environments degrade gracefully.** Without `EXPO_ACCESS_TOKEN` the server runs a
+  no-op gateway (local dev/tests); clients in environments without remote push support (e.g.
+  Expo Go on Android since SDK 53) report permission state `unavailable` and work fully without
+  pushes — a missing push provider never breaks messaging.
 - **Tap routing.** The payload's `data.conversationId` deep-links to the conversation screen on
   tap; access is re-verified server-side on open (stale/unauthorized ids land on the generic
   error state). Payloads never contain credentials, tokens, or recovery codes.
