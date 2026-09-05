@@ -36,11 +36,18 @@ export async function getPermissionStatus(): Promise<PushPermissionStatus> {
     // Push requires a physical device; emulators report unavailable.
     return 'unavailable';
   }
-  const current = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
-  if (current.granted) {
-    return 'granted';
+  try {
+    const current = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
+    if (current.granted) {
+      return 'granted';
+    }
+    return current.status === 'denied' ? 'denied' : 'unavailable';
+  } catch {
+    // Environments without push support (Expo Go Android removed remote push
+    // in SDK 53) THROW from these APIs — the app must degrade to 'unavailable'
+    // and keep working fully without pushes, never crash the render tree.
+    return 'unavailable';
   }
-  return current.status === 'denied' ? 'denied' : 'unavailable';
 }
 
 /**
@@ -53,23 +60,24 @@ export async function registerForPushNotifications(token: string): Promise<PushP
   if (!Device.isDevice) {
     return 'unavailable';
   }
-  const current = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
-  let granted = current.granted;
-  if (!granted) {
-    const request = (await Notifications.requestPermissionsAsync()) as unknown as PermissionResult;
-    granted = request.granted;
-  }
-  if (!granted) {
-    const after = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
-    return after.status === 'denied' ? 'denied' : 'unavailable';
-  }
   try {
+    const current = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
+    let granted = current.granted;
+    if (!granted) {
+      const request = (await Notifications.requestPermissionsAsync()) as unknown as PermissionResult;
+      granted = request.granted;
+    }
+    if (!granted) {
+      const after = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
+      return after.status === 'denied' ? 'denied' : 'unavailable';
+    }
     const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
     await registerPushTokenForSession(token, pushToken);
     return 'granted';
   } catch {
-    // Token acquisition/registration is best-effort (e.g. no projectId in
-    // dev builds). The app works fully without pushes.
+    // Permission/Token failures AND environments without any push support
+    // (Expo Go Android SDK 53+) land here — push is best-effort by contract,
+    // so report 'unavailable' and keep the app fully functional.
     return 'unavailable';
   }
 }

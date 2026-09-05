@@ -175,6 +175,23 @@ describe('push permission states (M8)', () => {
     await expect(registerForPushNotifications('session-token')).resolves.toBe('unavailable');
   });
 
+  it('degrades to unavailable when push APIs throw entirely (Expo Go Android SDK 53+)', async () => {
+    // Real-device E2E finding: Expo Go Android removed remote push in SDK 53 —
+    // these APIs THROW instead of returning a status. The app must keep
+    // working (push is best-effort), never crash the render tree.
+    const removedError = new Error(
+      'expo-notifications: Android Push notifications (remote notifications) functionality ' +
+        'provided by expo-notifications was removed from Expo Go with the release of SDK 53.',
+    );
+    expoNotifications.getPermissionsAsync.mockRejectedValue(removedError);
+    expoNotifications.requestPermissionsAsync.mockRejectedValue(removedError);
+
+    await expect(getPermissionStatus()).resolves.toBe('unavailable');
+    await expect(registerForPushNotifications('session-token')).resolves.toBe('unavailable');
+    expect(expoNotifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
+    expect(mockApi.registerPushTokenForSession).not.toHaveBeenCalled();
+  });
+
   it('unregisters best-effort without throwing on API failure', async () => {
     mockApi.unregisterPushTokenForSession.mockRejectedValue(new Error('network down'));
     await expect(unregisterPushNotifications('session-token')).resolves.toBeUndefined();
