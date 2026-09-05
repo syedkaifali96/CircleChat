@@ -203,6 +203,8 @@ picker/provider in MVP; the picker remains V2.
 Never collected: phone number, email, contacts, precise location, advertising IDs and unnecessary behavioral analytics.
 
 Push payloads contain no message body when previews are disabled. Media is never placed directly in push payloads.
+Expo push tokens are stored per session (`sessions.push_token`, M8); registering or clearing one requires the
+authenticated caller's own session, tokens ride no read API, and revoked sessions are never notified.
 Logs contain no passwords, raw tokens, recovery codes or message bodies.
 
 ---

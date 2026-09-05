@@ -9,6 +9,7 @@ import type { Database } from '../../db/client';
 import { validationFailed } from '../../errors';
 import {
   findOrCreateDirectConversation,
+  getNotificationPref,
   listConversationsFor,
   markConversationRead,
   requireConversationAccess,
@@ -67,6 +68,16 @@ export async function conversationRoutes(
       lastReadMessageId: result.lastReadMessageId,
     });
     await reply.header('cache-control', 'no-store').send(result);
+  });
+
+  app.get('/v1/conversations/:id/notification-pref', { config: { auth: true } }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await requireConversationAccess(db, id, request.authUser!.userId);
+    const pref = await getNotificationPref(db, {
+      conversationId: id,
+      userId: request.authUser!.userId,
+    });
+    await reply.header('cache-control', 'no-store').send({ pref });
   });
 
   app.patch('/v1/conversations/:id/notification-pref', { config: { auth: true } }, async (request, reply) => {

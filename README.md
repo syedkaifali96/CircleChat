@@ -47,6 +47,7 @@ What actually ships today, verified by the test suites referenced below:
 - **Realtime:** typing indicators (server-side TTL expiry) and online/offline presence with last-seen timestamps
 - **Media messaging:** images, video, voice messages (2-minute server-enforced limit) via presigned uploads to private R2 with magic-byte verification; image thumbnails (400px) served alongside originals
 - **GIF search:** via **GIPHY**, called directly from the client per GIPHY's API terms (proxying prohibited), with the "Powered By GIPHY" attribution in the picker
+- **Push notifications:** server-authoritative Expo Push fan-out after every persisted message — per-user global toggle, per-conversation mute, message-preview privacy, multi-device support (devices = sessions), invalid-token cleanup, and notification-tap deep links; provider failures never affect messaging
 
 ## Documentation
 
@@ -122,9 +123,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M7.1 complete (all suites green).**
+**M0–M8 complete (all suites green).**
 
-Latest verification: server 195/195 tests (Vitest, real PostgreSQL), mobile 50/50 tests (Jest + RNTL), typecheck 0 errors, lint clean.
+Latest verification: server 210/210 tests (Vitest, real PostgreSQL), mobile 69/69 tests (Jest + RNTL), typecheck 0 errors, lint clean.
 
 | Milestone | Status |
 |---|---|
@@ -139,7 +140,7 @@ Latest verification: server 195/195 tests (Vitest, real PostgreSQL), mobile 50/5
 | M6 — Realtime typing + presence (TTL expiry, last-seen, multi-device) | ✅ Done |
 | M7 — Media messaging (presigned uploads, images/video/voice, confirmed-upload gate) | ✅ Done |
 | M7.1 — Image thumbnails (sharp) + GIF search (GIPHY client-side) | ✅ Done |
-| M8 — Push notifications | ⬜ Next |
+| M8 — Push notifications (Expo Push, server-authoritative fan-out, per-conversation mute, preview privacy) | ✅ Done |
 | M9+ — Circle Home, Pinboard, Polls, App Lock | ⬜ Not started |
 
 ## Getting Started

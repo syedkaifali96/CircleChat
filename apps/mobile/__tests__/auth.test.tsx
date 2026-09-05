@@ -24,6 +24,7 @@ jest.mock('../src/lib/api', () => ({
   signup: jest.fn(),
   fetchCurrentUser: jest.fn(),
   logout: jest.fn(),
+  unregisterPushTokenForSession: jest.fn().mockResolvedValue({ ok: true }),
 }));
 
 jest.mock('../src/auth/session', () => ({
@@ -144,6 +145,8 @@ describe('signIn / signOut flows', () => {
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('authenticated'));
 
     await capturedSignOut!();
+    // M8: the device's push token is dropped before the session is revoked.
+    expect(mockApi.unregisterPushTokenForSession).toHaveBeenCalledWith('live-token');
     expect(mockApi.logout).toHaveBeenCalledWith('live-token');
     expect(mockSession.clearSessionToken).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('unauthenticated'));

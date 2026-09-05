@@ -5,6 +5,7 @@ import { config } from './config';
 import { wireRealtime, conversationPublisher } from './realtime';
 import { createPresenceRegistry } from './presence';
 import { readR2StorageConfig, R2StorageGateway } from './modules/media/storage';
+import { HttpExpoPushGateway } from './modules/notifications/expo';
 
 /**
  * CircleChat server entrypoint.
@@ -35,7 +36,12 @@ async function main(): Promise<void> {
   const presence = createPresenceRegistry();
   const realtime = wireRealtime(io, db, config.sessionTtlDays, { presence });
   const publish = conversationPublisher(realtime);
-  const app = await buildApp({ db, storage, publish, presence });
+  // M8: real Expo Push gateway when configured; buildApp falls back to the
+  // no-op gateway for local dev/tests, where push delivery is irrelevant.
+  const expoPush = config.expoAccessToken
+    ? new HttpExpoPushGateway(config.expoAccessToken)
+    : undefined;
+  const app = await buildApp({ db, storage, publish, presence, expoPush });
   io.attach(app.server);
   app.decorate('revokeSessionSockets', (sessionId: string) =>
     realtime.disconnectSessionSockets(sessionId),

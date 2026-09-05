@@ -3,12 +3,14 @@ import {
   changePasswordSchema,
   loginSchema,
   publicUserSchema,
+  pushTokenSchema,
   recoveryResetSchema,
   signupSchema,
 } from '@circlechat/shared';
 import { users } from '../../db/schema';
 import type { Database } from '../../db/client';
 import { invalidCredentials, rateLimited, usernameTaken, validationFailed } from '../../errors';
+import { setSessionPushToken } from '../notifications/service';
 import { generateRecoveryCode, hashSecret, normalizeRecoveryCode, verifySecret } from './crypto';
 import { clearFailures, isBlocked, recordFailure } from './guard';
 import {
@@ -260,5 +262,36 @@ export async function authRoutes(app: FastifyInstance, options: AuthRoutesOption
     }
     request.log.info({ revokedSessions: revokedIds.length }, 'revoke-other-sessions');
     await reply.send({ ok: true, revokedSessions: revokedIds.length });
+  });
+
+  // M8 push token (Expo Push): bound to the CURRENT session (device = session,
+  // docs/DATABASE.md §1.10). Registering a token moves it off any other
+  // session owned by the user (one token = one device); clearing stops pushes
+  // to this device. Rate-limited: token churn must not become write-amp abuse.
+  app.put(
+    '/v1/auth/push-token',
+    { config: { auth: true, rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = pushTokenSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw validationFailed();
+      }
+      await setSessionPushToken(db, {
+        sessionId: request.authUser!.sessionId,
+        userId: request.authUser!.userId,
+        pushToken: parsed.data.pushToken,
+      });
+      request.log.info('push token registered');
+      await reply.send({ ok: true });
+    },
+  );
+
+  app.delete('/v1/auth/push-token', { config: { auth: true } }, async (request, reply) => {
+    await setSessionPushToken(db, {
+      sessionId: request.authUser!.sessionId,
+      userId: request.authUser!.userId,
+      pushToken: null,
+    });
+    await reply.send({ ok: true });
   });
 }

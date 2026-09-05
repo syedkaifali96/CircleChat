@@ -323,6 +323,11 @@ Expo Push
 Server-side notification construction must honor global notification enable/disable, per-conversation enabled/disabled,
 muted state, mentions where applicable, and message-preview privacy.
 
+Push delivery is best-effort (implemented M8): it runs strictly after persistence and realtime
+fan-out, and any provider failure is logged and swallowed — messaging never depends on it.
+Push devices are sessions: Expo tokens live on `sessions.push_token`, registering a token moves
+it off the user's other sessions, and revoked sessions are never notified.
+
 ---
 
 ## 11. App-Lock Architecture (local only)

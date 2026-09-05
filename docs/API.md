@@ -16,6 +16,10 @@ POST /v1/auth/logout                     revoke current session
 GET  /v1/auth/sessions                   list devices/sessions
 DELETE /v1/auth/sessions/:id            revoke one session (own)
 DELETE /v1/auth/sessions                revoke all other sessions
+PUT  /v1/auth/push-token                {pushToken} → registers the Expo push token on the CURRENT session (moves it off any other session of the caller — one token = one device) [rate-limited]
+DELETE /v1/auth/push-token              clears the current session's push token
+GET  /v1/users/me/notification-settings {notificationsEnabled, notificationPreview} — caller's global push settings
+PATCH /v1/users/me/notification-settings {notificationsEnabled?, notificationPreview?} [rate-limited]
 GET  /v1/users/me                       profile
 PATCH /v1/users/me                      {displayName?, bio?}
 POST /v1/users/me/avatar                {mediaId}
@@ -50,6 +54,7 @@ DELETE /v1/messages/:id                 sender (or admin in circles) → tombsto
 PUT  /v1/messages/:id/reactions         {emoji}
 DELETE /v1/messages/:id/reactions/:emoji
 POST /v1/conversations/:id/read         {lastReadMessageId}
+GET  /v1/conversations/:id/notification-pref    caller's preference for this conversation (defaults when unset)
 PATCH /v1/conversations/:id/notification-pref {enabled?, muted?, mentions?, preview?} — caller's preference for this conversation
 
 POST /v1/media/upload-intent            {kind, mimeType, sizeBytes, context} → {mediaId, uploadUrl}
@@ -130,6 +135,23 @@ The model supports:
 
 A push is omitted or made silent according to the recipient's preferences. If previews are disabled,
 message content is not included in the push payload.
+
+M8 implements push delivery end to end (Expo Push):
+
+- **Server-authoritative payloads.** After a message is persisted and realtime has fanned out,
+  the server determines recipients (sender excluded), evaluates each recipient's eligibility
+  (global setting, per-conversation mute/enable), applies preview privacy, and constructs the
+  payload (title: Circle name or sender display name; body: preview or "New message"; data:
+  `conversationId`, `messageId`, `type` only). The client never chooses recipients or content.
+- **Devices are sessions.** A push token is registered per session (`PUT /v1/auth/push-token`);
+  registering a token moves it off any other session of the same user, revoked sessions never
+  receive pushes, and `DeviceNotRegistered` tickets clear the token automatically so healthy
+  devices keep working.
+- **Push is best-effort.** Expo provider failures are logged and swallowed — message persistence
+  and realtime delivery are never affected, and the send request still succeeds.
+- **Tap routing.** The payload's `data.conversationId` deep-links to the conversation screen on
+  tap; access is re-verified server-side on open (stale/unauthorized ids land on the generic
+  error state). Payloads never contain credentials, tokens, or recovery codes.
 
 ## Media Upload Security
 

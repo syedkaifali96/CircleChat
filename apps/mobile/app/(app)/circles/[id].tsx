@@ -250,6 +250,9 @@ export default function CircleHomeScreen() {
             Circle settings
           </Link>
         ) : null}
+        <Link href="/(app)/notification-settings" style={styles.settingsLink} testID="circle-notifications-link">
+          Notification settings
+        </Link>
       </View>
 
       {actionError ? <Text style={styles.error} testID="circle-action-error">{actionError}</Text> : null}

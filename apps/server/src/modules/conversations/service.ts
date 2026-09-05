@@ -399,6 +399,29 @@ export async function sharesDirectConversationWith(
   return rows.length > 0;
 }
 
+/** The caller's own per-conversation notification preference (defaults when unset). */
+export async function getNotificationPref(
+  db: Database,
+  input: { conversationId: string; userId: string },
+): Promise<{ enabled: boolean; muted: boolean; mentions: boolean; preview: boolean }> {
+  const existing = await db
+    .select()
+    .from(conversationNotificationPrefs)
+    .where(
+      and(
+        eq(conversationNotificationPrefs.conversationId, input.conversationId),
+        eq(conversationNotificationPrefs.userId, input.userId),
+      ),
+    )
+    .limit(1);
+  return {
+    enabled: existing[0]?.enabled ?? true,
+    muted: existing[0]?.muted ?? false,
+    mentions: existing[0]?.mentions ?? true,
+    preview: existing[0]?.preview ?? true,
+  };
+}
+
 /** Caller's own per-conversation notification preference (upsert). */
 export async function updateNotificationPref(
   db: Database,

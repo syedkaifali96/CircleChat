@@ -485,6 +485,16 @@ export async function markConversationRead(
   });
 }
 
+export async function fetchNotificationPref(
+  token: string,
+  conversationId: string,
+): Promise<{ pref: { enabled: boolean; muted: boolean; mentions: boolean; preview: boolean } }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/notification-pref`, {
+    method: 'GET',
+    token,
+  });
+}
+
 export async function updateNotificationPref(
   token: string,
   conversationId: string,
@@ -498,6 +508,47 @@ export async function updateNotificationPref(
       ...(patch.muted !== undefined ? { muted: patch.muted } : {}),
       ...(patch.mentions !== undefined ? { mentions: patch.mentions } : {}),
       ...(patch.preview !== undefined ? { preview: patch.preview } : {}),
+    },
+  });
+}
+
+/* ---------------------------------------- notifications (M8) ------------- */
+
+/** Registers the Expo push token on the caller's CURRENT session (device). */
+export async function registerPushTokenForSession(token: string, pushToken: string): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/auth/push-token`, {
+    method: 'PUT',
+    token,
+    body: { pushToken },
+  });
+}
+
+/** Clears the caller's current session push token. */
+export async function unregisterPushTokenForSession(token: string): Promise<{ ok: boolean }> {
+  return apiFetch(`${API_BASE_URL}/auth/push-token`, { method: 'DELETE', token });
+}
+
+export interface NotificationSettings {
+  notificationsEnabled: boolean;
+  notificationPreview: boolean;
+}
+
+export async function fetchNotificationSettings(
+  token: string,
+): Promise<{ settings: NotificationSettings }> {
+  return apiFetch(`${API_BASE_URL}/users/me/notification-settings`, { method: 'GET', token });
+}
+
+export async function updateNotificationSettings(
+  token: string,
+  patch: { notificationsEnabled?: boolean; notificationPreview?: boolean },
+): Promise<{ settings: NotificationSettings }> {
+  return apiFetch(`${API_BASE_URL}/users/me/notification-settings`, {
+    method: 'PATCH',
+    token,
+    body: {
+      ...(patch.notificationsEnabled !== undefined ? { notificationsEnabled: patch.notificationsEnabled } : {}),
+      ...(patch.notificationPreview !== undefined ? { notificationPreview: patch.notificationPreview } : {}),
     },
   });
 }

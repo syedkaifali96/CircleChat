@@ -25,6 +25,8 @@ import {
   sendMessage,
   type ChatHeader,
   type Message,
+  fetchNotificationPref,
+  updateNotificationPref,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { useAuth } from '../../../src/auth/AuthContext';
@@ -80,6 +82,8 @@ export default function ConversationScreen() {
   const typingStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [typingNow, setTypingNow] = useState(false);
+  // M8: per-conversation mute for this chat (server-persisted via prefs API).
+  const [muted, setMuted] = useState(false);
   // Ref keeps the socket handlers current without re-subscribing on every
   // header change — the subscription lifecycle is tied to the conversation id.
   const headerRef = useRef<ChatHeader | null>(null);
@@ -189,6 +193,32 @@ export default function ConversationScreen() {
       sendTypingStop(id);
     };
   }, [id, myUserId]);
+
+  // M8: toggle this conversation's push mute (server stores the preference).
+  const onToggleMute = () => {
+    void (async () => {
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        const { pref } = await updateNotificationPref(token, id, { muted: !muted });
+        setMuted(pref.muted);
+      } catch {
+        // Keep the previous state; the server rejection is authoritative.
+      }
+    })();
+  };
+
+  // Load the current mute state when the chat opens.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const token = (await loadSessionToken()) ?? '';
+        const { pref } = await fetchNotificationPref(token, id);
+        setMuted(pref.muted);
+      } catch {
+        // Default to unmuted when the pref cannot be read.
+      }
+    })();
+  }, [id]);
 
   const onLoadOlder = useCallback(async () => {
     if (!olderCursor || loadingOlder) {
@@ -534,6 +564,13 @@ export default function ConversationScreen() {
             <Text style={styles.headerSubtitle} numberOfLines={1}>{header.subtitle}</Text>
           )}
         </View>
+        <Pressable
+          onPress={() => void onToggleMute()}
+          hitSlop={8}
+          testID="mute-toggle"
+        >
+          <Text style={[styles.muteIcon, muted && styles.muteIconActive]}>{muted ? '🔇' : '🔔'}</Text>
+        </Pressable>
       </View>
 
       <FlatList
@@ -795,6 +832,8 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
   typingText: { color: colors.accent, fontSize: 12, marginTop: 1, fontStyle: 'italic' },
   presenceOnline: { color: colors.success },
+  muteIcon: { color: colors.textMuted, fontSize: 18, paddingHorizontal: 4 },
+  muteIconActive: { color: colors.accent },
   listContent: { padding: 16, paddingBottom: 8 },
   sendError: { color: colors.error, fontSize: 12, paddingHorizontal: 16, paddingVertical: 4 },
   composer: {

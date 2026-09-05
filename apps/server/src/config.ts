@@ -15,6 +15,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).optional(),
   // docs/SECURITY.md §3: 30-day sliding session lifetime.
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  // M8: Expo Push API token (secret). Optional — when absent the server runs
+  // pushes through the no-op gateway so local dev and tests need no account.
+  EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
 });
 
 export interface AppConfig {
@@ -23,6 +26,7 @@ export interface AppConfig {
   readonly logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
   readonly databaseUrl: string | undefined;
   readonly sessionTtlDays: number;
+  readonly expoAccessToken: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -39,6 +43,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logLevel: parsed.data.LOG_LEVEL,
     databaseUrl: parsed.data.DATABASE_URL,
     sessionTtlDays: parsed.data.SESSION_TTL_DAYS,
+    expoAccessToken: parsed.data.EXPO_ACCESS_TOKEN,
   });
 }
 

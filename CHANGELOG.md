@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### M8 — Notifications
+
+- Server (docs/API.md Notifications): server-authoritative Expo Push fan-out on every persisted message — after persistence and realtime, the server resolves recipients (sender excluded), evaluates eligibility per recipient (global `users.notifications_enabled`, per-conversation `conversation_notification_prefs` mute/enable), applies preview privacy (global + per-conversation; off → "New message"), and constructs the payload (title = Circle name or sender display name; data = `conversationId`/`messageId`/`type` only). Push failure is logged and swallowed: message persistence, realtime and the 201 response are never affected.
+- Devices are sessions: `PUT/DELETE /v1/auth/push-token` registers/clears the Expo token on the CURRENT session (`sessions.push_token`, M1 column); registering a token moves it off any other session of the same user (one token = one device); revoked sessions never receive pushes; Expo `DeviceNotRegistered` tickets auto-clear the dead token so healthy devices keep working. `GET/PATCH /v1/users/me/notification-settings` (global enable + preview, rate-limited) and `GET/PATCH /v1/conversations/:id/notification-pref` (per-conversation mute/enable/preview) expose preferences.
+- Configuration: `EXPO_ACCESS_TOKEN` (Zod-validated, optional) — absent (local dev/tests) the no-op gateway silently drops pushes; `.env.example` updated.
+- Mobile: `src/lib/notifications.ts` (OS permission states granted/denied/unavailable — never spams re-requests; Expo token acquisition; best-effort registration/unregistration), `src/lib/PushManager.tsx` mounted in the root layout (registers once per session while authenticated, clears on logout via `unregisterPushTokenForSession`, routes notification taps to the conversation screen where access is re-verified server-side), notification settings screen (global toggle, preview privacy, device-permission state, optimistic updates with revert on failure) reachable from the Circle home menu, and a 🔔/🔇 mute toggle in the chat header.
+- Tests: 14 server tests over real PostgreSQL (token registration/auth/duplicates/rate-limit churn, direct + circle fan-out, sender exclusion, muted/global-off/preview-privacy suppression, revoked-session exclusion, member removal, provider-down still 201, DeviceNotRegistered cleanup, settings endpoints) + 19 mobile tests (permission states, registration paths, tap routing incl. stale cold-start, PushManager lifecycle, settings screen toggles/failure revert).
+- No new migrations — M1 schema already carried `users.notifications_*`, `sessions.push_token`, `conversation_notification_prefs`, and `notifications`.
+
 ### M7.1a — GIF search provider swapped to GIPHY
 
 - Tenor discontinued by Google (new keys stopped Jan 13 2026, full shutdown Jun 30 2026) — GIF search now uses **GIPHY**, called **directly from the mobile client** because GIPHY's API terms prohibit server-side proxying. The Tenor proxy endpoint, `TENOR_API_KEY` config and server-side rate limiter were removed; the server's only GIF role remains accepting `type='gif'` messages with a https `external_url` (provider-agnostic, D1-gated visibility).

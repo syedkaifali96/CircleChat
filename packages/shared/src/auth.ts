@@ -58,3 +58,28 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type RecoveryResetInput = z.infer<typeof recoveryResetSchema>;
 export type PublicUser = z.infer<typeof publicUserSchema>;
+
+/** M8: Expo push token registration (docs/API.md, docs/SECURITY.md §3).
+ * Tokens are opaque Expo identifiers — validated for shape/length only. */
+export const pushTokenSchema = z.object({
+  pushToken: z
+    .string()
+    .trim()
+    .min(8)
+    .max(200)
+    .regex(/^Expo|^[A-Za-z0-9:_-]+$/, 'Invalid push token format.'),
+});
+
+/** M8: caller's own global notification settings. */
+export const notificationSettingsSchema = z
+  .object({
+    notificationsEnabled: z.boolean().optional(),
+    notificationPreview: z.boolean().optional(),
+  })
+  .refine(
+    (v) => v.notificationsEnabled !== undefined || v.notificationPreview !== undefined,
+    { message: 'Nothing to update.' },
+  );
+
+export type PushTokenInput = z.infer<typeof pushTokenSchema>;
+export type NotificationSettingsInput = z.infer<typeof notificationSettingsSchema>;

@@ -12,6 +12,8 @@ import { notFound, validationFailed } from '../../errors';
 import { createChatMediaIntent } from '../media/service';
 import type { StorageGateway } from '../media/storage';
 import { requireConversationAccess as requireConversationAccessFn } from '../conversations/service';
+import { notifyNewMessage } from '../notifications/service';
+import { createExpoPushGateway, type ExpoPushGateway } from '../notifications/expo';
 import {
   addReaction,
   conversationChatHeader,
@@ -37,9 +39,10 @@ export async function messageRoutes(
     db: Database;
     publish?: (event: string, payload: unknown) => void;
     storage?: StorageGateway;
+    expoPush?: ExpoPushGateway;
   },
 ): Promise<void> {
-  const { db, publish, storage } = options;
+  const { db, publish, storage, expoPush } = options;
 
   app.get('/v1/conversations/:id/messages', { config: { auth: true } }, async (request, reply) => {
     const query = conversationMessagesQuerySchema.safeParse(request.query);
@@ -74,6 +77,17 @@ export async function messageRoutes(
     });
     if (result.created) {
       publish?.('message:new', { conversationId: id, message: result.message });
+      // M8 push fan-out: strictly AFTER persistence + realtime. Never throws;
+      // push delivery is a nicety, the persisted message is the truth.
+      await notifyNewMessage(db, expoPush ?? createExpoPushGateway(), {
+        conversationId: id,
+        messageId: result.message.id,
+        senderId: request.authUser!.userId,
+        senderDisplayName: result.message.senderDisplayName,
+        messageType: result.message.type,
+        messageBody: result.message.body,
+        log: request.log,
+      });
     }
     await reply.code(result.created ? 201 : 200).send({ message: result.message, created: result.created });
   });

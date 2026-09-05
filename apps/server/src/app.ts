@@ -14,6 +14,7 @@ import { sharesActiveCircle } from './modules/profile/service';
 import { mediaRoutes } from './modules/media/routes';
 import { R2StorageGateway, readR2StorageConfig, type StorageGateway } from './modules/media/storage';
 import type { PresenceHandle } from './presence';
+import { type ExpoPushGateway } from './modules/notifications/expo';
 import { healthRoutes } from './routes/health';
 
 /** Client-facing error body: stable machine code + generic human message. */
@@ -114,6 +115,8 @@ export async function buildApp(
     publish?: (event: string, payload: unknown) => void;
     /** M6: presence registry shared between Socket.IO and REST. */
     presence?: PresenceHandle;
+    /** M8: Expo Push gateway (defaults from env; injectable for tests). */
+    expoPush?: ExpoPushGateway;
   } = {},
 ): Promise<FastifyInstance> {
   const app = Fastify({
@@ -144,7 +147,7 @@ export async function buildApp(
     // change notifications when a Socket.IO server is attached.
     const publish = options.publish ?? (() => undefined);
     await app.register(conversationRoutes, { db, publish });
-    await app.register(messageRoutes, { db, publish, storage });
+    await app.register(messageRoutes, { db, publish, storage, expoPush: options.expoPush });
     if (storage) {
       await app.register(profileRoutes, { db, storage });
       await app.register(mediaRoutes, {

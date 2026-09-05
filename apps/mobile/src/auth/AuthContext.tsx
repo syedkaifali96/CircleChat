@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { PublicUser } from '@circlechat/shared';
-import { fetchCurrentUser, logout as apiLogout, login as apiLogin, signup as apiSignup } from '../lib/api';
+import { fetchCurrentUser, logout as apiLogout, login as apiLogin, signup as apiSignup, unregisterPushTokenForSession } from '../lib/api';
 import { clearSessionToken, loadSessionToken, saveSessionToken } from './session';
 
 /**
@@ -69,6 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const token = await loadSessionToken();
     if (token) {
+      // M8: drop this device's push token first so no push lands after logout.
+      await unregisterPushTokenForSession(token).catch(() => undefined);
       try {
         await apiLogout(token);
       } catch {
