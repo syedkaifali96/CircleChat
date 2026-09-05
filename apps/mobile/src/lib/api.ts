@@ -188,6 +188,20 @@ export interface CircleSummary {
   members: CircleMember[];
 }
 
+/** M9 Circle Home payload (docs/API.md GET /circles/:id/home) — identity,
+ * members preview, the Circle conversation and server-computed unread. */
+export interface CircleHome {
+  circleId: string;
+  conversationId: string | null;
+  name: string;
+  description: string | null;
+  avatarMediaId: string | null;
+  membersCount: number;
+  callerRole: CircleRole;
+  unreadCount: number;
+  members: CircleMember[];
+}
+
 export interface InvitePreview {
   name: string;
   memberCount: number;
@@ -221,6 +235,10 @@ export async function createCircle(
 
 export async function fetchCircle(token: string, circleId: string): Promise<{ circle: CircleSummary }> {
   return apiFetch(`${API_BASE_URL}/circles/${circleId}`, { method: 'GET', token });
+}
+
+export async function fetchCircleHome(token: string, circleId: string): Promise<{ home: CircleHome }> {
+  return apiFetch(`${API_BASE_URL}/circles/${circleId}/home`, { method: 'GET', token });
 }
 
 export async function updateCircle(

@@ -16,23 +16,24 @@ import { useFocusEffect } from 'expo-router';
 import {
   ApiError,
   createInvite,
-  fetchCircle,
+  fetchCircleHome,
   leaveCircle,
   removeMember,
   revokeInvite,
   updateMemberRole,
   transferOwnership,
+  type CircleHome,
   type CircleMember,
-  type CircleSummary,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { colors } from '../../../src/design/tokens';
 
 /**
- * Circle Home (M4): the Circle's identity and members — messaging, polls and
- * pins arrive with M5+. Owner/admin actions (invite management, removal,
- * role changes, ownership transfer) live here and stay role-gated by the
- * server; the UI only mirrors what the API already enforces.
+ * Circle Home (M9): the Circle's private home — identity, members preview and
+ * the primary "Open Chat" action into the Circle conversation (M5), with the
+ * server-computed unread count. Owner/admin actions (invite management,
+ * removal, role changes, ownership transfer) live here and stay role-gated by
+ * the server; the UI only mirrors what the API already enforces.
  */
 
 function memberCountLabel(count: number): string {
@@ -59,7 +60,7 @@ function friendlyError(code: string): string {
 export default function CircleHomeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [circle, setCircle] = useState<CircleSummary | null>(null);
+  const [home, setHome] = useState<CircleHome | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -72,8 +73,8 @@ export default function CircleHomeScreen() {
     setLoadError(false);
     try {
       const token = (await loadSessionToken()) ?? '';
-      const { circle: found } = await fetchCircle(token, id);
-      setCircle(found);
+      const { home: found } = await fetchCircleHome(token, id);
+      setHome(found);
     } catch {
       setLoadError(true);
     } finally {
@@ -215,7 +216,7 @@ export default function CircleHomeScreen() {
     );
   }
 
-  if (loadError || !circle) {
+  if (loadError || !home) {
     return (
       <View style={styles.centered} testID="circle-error">
         <Text style={styles.stateTitle}>Something went wrong.</Text>
@@ -227,9 +228,9 @@ export default function CircleHomeScreen() {
     );
   }
 
-  const isOwner = circle.callerRole === 'owner';
-  const isAdmin = isOwner || circle.callerRole === 'admin';
-  const capacityLeft = 5 - circle.membersCount;
+  const isOwner = home.callerRole === 'owner';
+  const isAdmin = isOwner || home.callerRole === 'admin';
+  const capacityLeft = 5 - home.membersCount;
 
   return (
     <ScrollView
@@ -240,11 +241,11 @@ export default function CircleHomeScreen() {
     >
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{circle.name.charAt(0).toUpperCase()}</Text>
+          <Text style={styles.avatarText}>{home.name.charAt(0).toUpperCase()}</Text>
         </View>
-        <Text style={styles.name}>{circle.name}</Text>
-        <Text style={styles.memberCount} testID="circle-member-count">{memberCountLabel(circle.membersCount)}</Text>
-        {circle.description ? <Text style={styles.description}>"{circle.description}"</Text> : null}
+        <Text style={styles.name}>{home.name}</Text>
+        <Text style={styles.memberCount} testID="circle-member-count">{memberCountLabel(home.membersCount)}</Text>
+        {home.description ? <Text style={styles.description}>"{home.description}"</Text> : null}
         {isAdmin ? (
           <Link href={`/(app)/circles/${id}/settings`} style={styles.settingsLink} testID="circle-settings-link">
             Circle settings
@@ -254,6 +255,21 @@ export default function CircleHomeScreen() {
           Notification settings
         </Link>
       </View>
+
+      {home.conversationId ? (
+        <Pressable
+          style={({ pressed }) => [styles.openChatButton, pressed && styles.buttonPressed]}
+          onPress={() => router.push(`/(app)/chats/${home.conversationId}`)}
+          testID="circle-open-chat"
+        >
+          <Text style={styles.openChatText}>Open Chat</Text>
+          {home.unreadCount > 0 ? (
+            <View style={styles.unreadBadge} testID="circle-unread">
+              <Text style={styles.unreadBadgeText}>{home.unreadCount > 99 ? '99+' : String(home.unreadCount)}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
 
       {actionError ? <Text style={styles.error} testID="circle-action-error">{actionError}</Text> : null}
 
@@ -274,7 +290,7 @@ export default function CircleHomeScreen() {
       ) : null}
 
       <Text style={styles.sectionTitle}>Members</Text>
-      {circle.members.map((member) => (
+      {home.members.map((member) => (
         <Pressable
           key={member.userId}
           style={({ pressed }) => [styles.memberRow, pressed && styles.buttonPressed]}
@@ -299,15 +315,13 @@ export default function CircleHomeScreen() {
         </Pressable>
       ) : null}
 
-      <Text style={styles.comingSoon}>Chat, polls and the pinboard arrive with the next milestones.</Text>
-
       <Modal visible={inviteModalVisible} transparent animationType="fade" onRequestClose={() => setInviteModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard} testID="invite-modal">
             <Text style={styles.modalTitle}>Invite people</Text>
             {capacityLeft > 0 ? (
               <Text style={styles.modalSubtitle}>
-                {memberCountLabel(circle.membersCount)} · you can invite {capacityLeft} more. Multi-use while active.
+                {memberCountLabel(home.membersCount)} · you can invite {capacityLeft} more. Multi-use while active.
               </Text>
             ) : (
               <Text style={styles.modalSubtitle}>The Circle is full (5 of 5 members).</Text>
@@ -463,7 +477,26 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   leaveText: { color: colors.error, fontSize: 14, fontWeight: '600' },
-  comingSoon: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 24 },
+  openChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 15,
+    marginTop: 22,
+  },
+  openChatText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  unreadBadge: {
+    minWidth: 22,
+    borderRadius: 11,
+    backgroundColor: colors.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  unreadBadgeText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   error: { color: colors.error, fontSize: 13, marginTop: 12, textAlign: 'center' },
   stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
   stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },

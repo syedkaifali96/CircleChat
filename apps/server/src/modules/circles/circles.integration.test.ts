@@ -795,3 +795,179 @@ describe('settings + home + delete (docs/API.md)', () => {
     expect(gone.statusCode).toBe(404);
   });
 });
+
+describe('circle home (M9, docs/API.md GET /circles/:id/home)', () => {
+  it('returns identity, members, conversation and caller role for an active member', async () => {
+    const owner = await signup(`m9_ow_${suffix()}`);
+    const member = await signup(`m9_me_${suffix()}`);
+    const circle = await createCircle(owner.token, `M9 Home ${suffix()}`);
+    const code = await createInvite(owner.token, circle.id as string);
+    await app.inject({
+      method: 'POST',
+      url: '/v1/circles/join',
+      headers: bearer(member.token),
+      payload: { inviteCode: code },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(member.token),
+    });
+    expect(res.statusCode).toBe(200);
+    const home = res.json().home as {
+      circleId: string;
+      conversationId: string | null;
+      name: string;
+      membersCount: number;
+      callerRole: string;
+      unreadCount: number;
+      activePolls: unknown[];
+      pinnedItems: unknown[];
+      members: Array<{ userId: string; username: string; displayName: string; role: string }>;
+    };
+    expect(home.circleId).toBe(circle.id);
+    expect(home.name).toContain('M9 Home');
+    expect(home.membersCount).toBe(2);
+    expect(home.conversationId).toEqual(expect.any(String));
+    expect(home.callerRole).toBe('member');
+    expect(home.unreadCount).toBe(0); // nothing sent yet
+    expect(home.activePolls).toEqual([]); // M10/M11 stay untouched
+    expect(home.pinnedItems).toEqual([]);
+    // Member preview: both members, minimal fields, no private leakage.
+    expect(home.members).toHaveLength(2);
+    expect(home.members.map((m) => m.role).sort()).toEqual(['member', 'owner']);
+    for (const m of home.members) {
+      expect(Object.keys(m).sort()).toEqual(['displayName', 'joinedAt', 'role', 'userId', 'username']);
+    }
+    // The caller must appear among the members with their role.
+    const caller = home.members.find((m) => m.role === 'member');
+    expect(caller).toBeDefined();
+  });
+
+  it('computes unreadCount from the read pointer (own messages excluded)', async () => {
+    const owner = await signup(`m9_un_${suffix()}`);
+    const member = await signup(`m9_unm_${suffix()}`);
+    const circle = await createCircle(owner.token, `M9 Unread ${suffix()}`);
+    const code = await createInvite(owner.token, circle.id as string);
+    await app.inject({
+      method: 'POST',
+      url: '/v1/circles/join',
+      headers: bearer(member.token),
+      payload: { inviteCode: code },
+    });
+
+    const firstHome = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(owner.token),
+    });
+    const conversationId = (firstHome.json() as { home: { conversationId: string } }).home.conversationId;
+
+    // Member sends two messages; owner reads neither → unread 2.
+    for (let i = 0; i < 2; i++) {
+      const sent = await app.inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: bearer(member.token),
+        payload: { type: 'text', body: `hello ${i}`, clientMessageId: `m9-${suffix()}-${i}` },
+      });
+      expect(sent.statusCode).toBe(201);
+    }
+    let res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(owner.token),
+    });
+    expect(res.json().home.unreadCount).toBe(2);
+
+    // Owner's own messages never count toward their unread.
+    await app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${conversationId}/messages`,
+      headers: bearer(owner.token),
+      payload: { type: 'text', body: 'mine', clientMessageId: `m9-${suffix()}-own` },
+    });
+    res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(owner.token),
+    });
+    expect(res.json().home.unreadCount).toBe(2);
+
+    // Marking read drops the counter to zero.
+    const history = await app.inject({
+      method: 'GET',
+      url: `/v1/conversations/${conversationId}/messages`,
+      headers: bearer(owner.token),
+    });
+    const newestId = (history.json() as { messages: Array<{ id: string }> }).messages[0]!.id;
+    await app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${conversationId}/read`,
+      headers: bearer(owner.token),
+      payload: { lastReadMessageId: newestId },
+    });
+    res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(owner.token),
+    });
+    expect(res.json().home.unreadCount).toBe(0);
+  });
+
+  it('denies non-members with a generic 404', async () => {
+    const owner = await signup(`m9_no_${suffix()}`);
+    const outsider = await signup(`m9_out_${suffix()}`);
+    const circle = await createCircle(owner.token, `M9 Private ${suffix()}`);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(outsider.token),
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('denies members after they are removed from the Circle', async () => {
+    const owner = await signup(`m9_rm_${suffix()}`);
+    const member = await signup(`m9_rmm_${suffix()}`);
+    const circle = await createCircle(owner.token, `M9 Removed ${suffix()}`);
+    const code = await createInvite(owner.token, circle.id as string);
+    const joined = await app.inject({
+      method: 'POST',
+      url: '/v1/circles/join',
+      headers: bearer(member.token),
+      payload: { inviteCode: code },
+    });
+    expect(joined.statusCode).toBe(201);
+    // The joined member is removed by userId (signup returns it directly).
+    await app.inject({
+      method: 'DELETE',
+      url: `/v1/circles/${circle.id}/members/${member.userId}`,
+      headers: bearer(owner.token),
+    });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(member.token),
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('rejects revoked sessions with 401', async () => {
+    const owner = await signup(`m9_rev_${suffix()}`);
+    const circle = await createCircle(owner.token, `M9 Revoked ${suffix()}`);
+    await app.inject({
+      method: 'POST',
+      url: '/v1/auth/logout',
+      headers: bearer(owner.token),
+    });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/home`,
+      headers: bearer(owner.token),
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});

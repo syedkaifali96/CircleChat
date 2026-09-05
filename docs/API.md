@@ -42,7 +42,7 @@ PATCH /v1/circles/:id/members/:userId   change role — owner only
 POST /v1/circles/:id/ownership-transfer {newOwnerUserId} — owner only; atomic transfer
 GET  /v1/circles/:id/settings           member
 PATCH /v1/circles/:id/settings          owner/admin (theme, accent, background)
-GET  /v1/circles/:id/home               Circle Home payload (unread, active polls, pins, member count)
+GET  /v1/circles/:id/home               Circle Home payload (unread, active polls, pins, member count, members preview, caller role, conversation id) — active member only (non-members get a generic 404)
 PATCH /v1/circles/:id/notification-pref {pref: all|mentions|muted} — member
 
 POST /v1/conversations/direct           {username} → find-or-create direct conversation; target must share an active Circle with caller

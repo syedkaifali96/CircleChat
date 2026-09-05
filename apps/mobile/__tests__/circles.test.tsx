@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import HomeScreen from '../app/(app)/home';
 import CreateCircleScreen from '../app/(app)/circles/create';
 import JoinCircleScreen from '../app/(app)/circles/join';
+import CircleHomeScreen from '../app/(app)/circles/[id]';
 import * as apiModule from '../src/lib/api';
 
 /**
@@ -9,12 +10,15 @@ import * as apiModule from '../src/lib/api';
  * state, create flow validates and posts, and the join flow previews a valid
  * code then surfaces friendly errors for invalid/expired/full codes. Network
  * and secure storage are mocked; server authorization stays authoritative.
+ * M9 adds the Circle Home screen (identity, members preview, Open Chat).
  */
 
 const replaceMock = jest.fn();
+const pushMock = jest.fn();
 
 declare global {
   var __circlesReplaceMock: jest.Mock | undefined; // hoisted expo-router mock bridge
+  var __circlesPushMock: jest.Mock | undefined; // hoisted expo-router mock bridge
 }jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest factory must be CJS
   const { Text: RNText, Pressable: RNPressable } = require('react-native');
@@ -25,8 +29,20 @@ declare global {
       </RNPressable>
     ),
     Redirect: ({ href }: { href: string }) => <RNText testID="redirect">{href}</RNText>,
-    useRouter: () => ({ replace: (...args: unknown[]) => globalThis.__circlesReplaceMock?.(...args), back: jest.fn(), push: jest.fn() }),
-    useFocusEffect: (callback: () => void) => callback(),
+    useRouter: () => ({
+      replace: (...args: unknown[]) => globalThis.__circlesReplaceMock?.(...args),
+      push: (...args: unknown[]) => globalThis.__circlesPushMock?.(...args),
+      back: jest.fn(),
+    }),
+    useFocusEffect: (callback: () => void) => {
+      // Focus effects fire AFTER mount (like real expo-router) — running the
+      // callback synchronously during render would loop setState calls.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest factory must be CJS
+      const { useEffect } = require('react');
+      useEffect(() => {
+        callback();
+      }, [callback]);
+    },
     useLocalSearchParams: () => ({ id: 'c-1' }),
   };
 });
@@ -48,6 +64,7 @@ jest.mock('../src/lib/api', () => ({
   listCircles: jest.fn(),
   createCircle: jest.fn(),
   fetchCircle: jest.fn(),
+  fetchCircleHome: jest.fn(),
   fetchInvitePreview: jest.fn(),
   joinCircle: jest.fn(),
 }));
@@ -102,10 +119,12 @@ const sampleCircles = [
 beforeEach(() => {
   jest.clearAllMocks();
   (globalThis as { __circlesReplaceMock?: jest.Mock }).__circlesReplaceMock = replaceMock;
+  (globalThis as { __circlesPushMock?: jest.Mock }).__circlesPushMock = pushMock;
 });
 
 afterEach(() => {
   delete (globalThis as { __circlesReplaceMock?: jest.Mock }).__circlesReplaceMock;
+  delete (globalThis as { __circlesPushMock?: jest.Mock }).__circlesPushMock;
 });
 
 describe('HomeScreen circles (M4)', () => {
@@ -233,5 +252,79 @@ describe('JoinCircleScreen', () => {
     const confirm = screen.getByTestId('join-confirm');
     expect(confirm.props.accessibilityState?.disabled ?? confirm.props.disabled).toBe(true);
     expect(mockApi.joinCircle).not.toHaveBeenCalled();
+  });
+});
+
+describe('CircleHomeScreen (M9)', () => {
+  const homePayload = {
+    circleId: 'c-1',
+    conversationId: 'conv-1',
+    name: 'Night Owls',
+    description: 'Late night talks',
+    avatarMediaId: null,
+    membersCount: 2,
+    callerRole: 'owner' as const,
+    unreadCount: 4,
+    activePolls: [],
+    pinnedItems: [],
+    members: [
+      { userId: 'u-1', username: 'kaif', displayName: 'Kaif', role: 'owner' as const, joinedAt: '2026-01-01T00:00:00.000Z' },
+      { userId: 'u-2', username: 'ayesha', displayName: 'Ayesha', role: 'member' as const, joinedAt: '2026-01-02T00:00:00.000Z' },
+    ],
+  };
+
+  it('renders Circle identity, unread badge and members preview from the home payload', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue({ home: homePayload });
+
+    render(<CircleHomeScreen />);
+
+    await waitFor(() => expect(screen.getByTestId('circle-screen')).toBeTruthy());
+    expect(screen.getByText('Night Owls')).toBeTruthy();
+    expect(screen.getByTestId('circle-member-count').props.children).toBe('2 members');
+    expect(screen.getByText('"Late night talks"')).toBeTruthy();
+    // Members preview: display names are visible for the ≤5 member Circle.
+    expect(screen.getByText('Kaif')).toBeTruthy();
+    expect(screen.getByText('Ayesha')).toBeTruthy();
+    // Server-computed unread renders as a badge on the Open Chat action.
+    expect(screen.getByTestId('circle-unread')).toBeTruthy();
+    expect(screen.getByText('4')).toBeTruthy();
+    expect(mockApi.fetchCircleHome).toHaveBeenCalledWith('test-token', 'c-1');
+  });
+
+  it('Open Chat navigates to the Circle conversation (M5 authorization stays server-side)', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue({ home: homePayload });
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('circle-open-chat')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('circle-open-chat'));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/(app)/chats/conv-1'));
+  });
+
+  it('hides the Open Chat action when no conversation exists yet', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue({ home: { ...homePayload, conversationId: null } });
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('circle-screen')).toBeTruthy());
+    expect(screen.queryByTestId('circle-open-chat')).toBeNull();
+    expect(screen.queryByTestId('circle-unread')).toBeNull();
+  });
+
+  it('shows a loading state while the home payload loads', async () => {
+    mockApi.fetchCircleHome.mockImplementation(() => new Promise(() => undefined));
+
+    render(<CircleHomeScreen />);
+    expect(screen.getByTestId('circle-loading')).toBeTruthy();
+  });
+
+  it('shows an error state with retry when the Circle is inaccessible', async () => {
+    mockApi.fetchCircleHome.mockRejectedValueOnce(new apiModule.ApiError('NOT_FOUND', 404, 'nope'));
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('circle-error')).toBeTruthy());
+
+    // Retry recovers once the server responds.
+    mockApi.fetchCircleHome.mockResolvedValue({ home: homePayload });
+    fireEvent.press(screen.getByTestId('circle-retry'));
+    await waitFor(() => expect(screen.getByTestId('circle-screen')).toBeTruthy());
   });
 });

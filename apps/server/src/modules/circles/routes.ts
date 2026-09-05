@@ -14,6 +14,7 @@ import { conversations } from '../../db/schema';
 import { notFound, validationFailed } from '../../errors';
 import { findReadyAvatarById, issueMediaDownloadUrl } from '../media/service';
 import type { StorageGateway } from '../media/storage';
+import { unreadCountFor } from '../conversations/service';
 import {
   createCircle,
   createInvite,
@@ -307,26 +308,39 @@ export async function circleRoutes(
   app.get('/v1/circles/:id/home', { config: { auth: true } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { circle, role } = await requireCircle(id, request.authUser!.userId);
-    // One conversation per Circle (docs/DATABASE.md §1.5); the chat screen
-    // opens through it (M5).
-    const conversation = await db
+    // One conversation per Circle (docs/DATABASE.md §1.5); "Open Chat" routes
+    // through it (M5). Members ride along so Circle Home is a single fetch (M9).
+    const [conversation] = await db
       .select({ id: conversations.id })
       .from(conversations)
       .where(eq(conversations.circleId, circle.id))
       .limit(1);
-    // M5 adds messaging; polls/pins populate in M11/M10.
+    const [members, unreadCount] = await Promise.all([
+      listMembers(db, id),
+      conversation
+        ? unreadCountFor(db, conversation.id, request.authUser!.userId)
+        : Promise.resolve(0),
+    ]);
+    // M10 adds pins; M11 adds polls — both stay empty until those milestones.
     await reply.header('cache-control', 'no-store').send({
       home: {
         circleId: circle.id,
-        conversationId: conversation[0]?.id ?? null,
+        conversationId: conversation?.id ?? null,
         name: circle.name,
         description: circle.description,
         avatarMediaId: circle.avatarMediaId,
         membersCount: circle.membersCount,
         callerRole: role,
-        unreadCount: 0,
+        unreadCount,
         activePolls: [],
         pinnedItems: [],
+        members: members.map((member) => ({
+          userId: member.userId,
+          username: member.username,
+          displayName: member.displayName,
+          role: member.role,
+          joinedAt: member.joinedAt.toISOString(),
+        })),
       },
     });
   });

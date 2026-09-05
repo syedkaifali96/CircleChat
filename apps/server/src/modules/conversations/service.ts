@@ -166,7 +166,7 @@ export async function findOrCreateDirectConversation(
 }
 
 /** Server-computed unread count: messages after the caller's read pointer. */
-async function unreadCountFor(
+export async function unreadCountFor(
   db: Database,
   conversationId: string,
   userId: string,

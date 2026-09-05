@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### M9 — Circle Home
+
+- Server: `GET /v1/circles/:id/home` (documented since M4, now real) returns the Circle Home payload in one authorized fetch — identity (name, description, avatar), `membersCount`, the Circle's `conversationId`, caller role, the members preview (`userId`/`username`/`displayName`/`role`/`joinedAt`, ≤5 rows), and a server-computed `unreadCount` reusing the M5 read-pointer logic. Authorization is unchanged: the M4 membership guard answers non-members, removed members and deleted Circles with the same generic 404; responses stay `no-store`. `activePolls`/`pinnedItems` remain empty placeholders for M10/M11. No schema changes.
+- Mobile: the Circle screen (`circles/[id]`) now renders the Home dashboard — hero identity header, the primary **Open Chat** action routing into the Circle conversation with an unread badge (99+ capped), members preview with role badges, and the existing management features (invites, member roles, ownership transfer, leave, settings, notification-settings link). Stale M4-era "chat arrives later" copy removed; loading/error/retry states retained.
+- Tests: 5 server tests over real PostgreSQL (member payload correctness incl. conversation + members + role, unread computed from the read pointer with own messages excluded, non-member 404, removed-member 404, revoked-session 401) + 5 mobile tests (identity/members/unread render, Open Chat navigation, missing-conversation fallback, loading state, error + retry).
+
 ### M8 — Notifications
 
 - Server (docs/API.md Notifications): server-authoritative Expo Push fan-out on every persisted message — after persistence and realtime, the server resolves recipients (sender excluded), evaluates eligibility per recipient (global `users.notifications_enabled`, per-conversation `conversation_notification_prefs` mute/enable), applies preview privacy (global + per-conversation; off → "New message"), and constructs the payload (title = Circle name or sender display name; data = `conversationId`/`messageId`/`type` only). Push failure is logged and swallowed: message persistence, realtime and the 201 response are never affected.
