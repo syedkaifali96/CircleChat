@@ -104,6 +104,8 @@ const sampleCircles = [
     membersCount: 3,
     callerRole: 'owner' as const,
     unreadCount: 0,
+    activePolls: [],
+    activePollsCount: 0,
   },
   {
     id: 'c-2',
@@ -113,6 +115,8 @@ const sampleCircles = [
     membersCount: 5,
     callerRole: 'member' as const,
     unreadCount: 0,
+    activePolls: [],
+    activePollsCount: 0,
   },
 ];
 
@@ -265,6 +269,8 @@ describe('CircleHomeScreen (M9)', () => {
     membersCount: 2,
     callerRole: 'owner' as const,
     unreadCount: 4,
+    activePolls: [],
+    activePollsCount: 0,
         pinnedItems: [],
     pinsCount: 0,
     members: [
@@ -340,6 +346,8 @@ describe('CircleHomeScreen — Pinboard (M10)', () => {
       membersCount: 2,
       callerRole: 'owner',
       unreadCount: 0,
+    activePolls: [],
+    activePollsCount: 0,
             pinnedItems: [],
       pinsCount: 0,
       members: [],
@@ -403,5 +411,58 @@ describe('CircleHomeScreen — Pinboard (M10)', () => {
     await waitFor(() => expect(screen.getByTestId('pinboard-view-all')).toBeTruthy());
     // Preview is capped at three items even when more exist.
     expect(screen.getAllByTestId(/^pinboard-item-/)).toHaveLength(1);
+  });
+});
+
+describe('CircleHomeScreen — Polls (M11)', () => {
+  const pollHome = (overrides: Partial<apiModule.CircleHome> = {}): { home: apiModule.CircleHome } => ({
+    home: {
+      circleId: 'c-1',
+      conversationId: 'conv-1',
+      name: 'Night Owls',
+      description: null,
+      avatarMediaId: null,
+      membersCount: 2,
+      callerRole: 'owner',
+      unreadCount: 0,
+      activePolls: [],
+      activePollsCount: 0,
+      pinnedItems: [],
+      pinsCount: 0,
+      members: [],
+      ...overrides,
+    },
+  });
+
+  const activePoll: apiModule.Poll = {
+    id: 'poll-1',
+    conversationId: 'conv-1',
+    question: 'Where should we go?',
+    options: ['Beach', 'Cinema'],
+    votes: [1, 0],
+    totalVotes: 1,
+    myVote: 0,
+    closed: false,
+    closesAt: null,
+    createdAt: '2026-01-02T00:00:00.000Z',
+    createdBy: { userId: 'u-2', username: 'ayesha', displayName: 'Ayesha' },
+  };
+
+  it('renders an active poll preview with vote state', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue(pollHome({ activePolls: [activePoll], activePollsCount: 1 }));
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId(`poll-preview-${activePoll.id}`)).toBeTruthy());
+    expect(screen.getByText('Where should we go?')).toBeTruthy();
+    expect(screen.getByText('Where should we go? · 1 vote · You voted Beach')).toBeTruthy();
+  });
+
+  it('shows the polls empty state when there are no active polls', async () => {
+    mockApi.fetchCircleHome.mockResolvedValue(pollHome());
+
+    render(<CircleHomeScreen />);
+    await waitFor(() => expect(screen.getByTestId('circle-screen')).toBeTruthy());
+    expect(screen.getByTestId('polls-empty')).toBeTruthy();
+    expect(screen.queryByTestId('polls-view-all')).toBeNull();
   });
 });

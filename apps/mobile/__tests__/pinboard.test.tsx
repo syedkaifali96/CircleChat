@@ -111,6 +111,8 @@ const homePayload = {
   membersCount: 2,
   callerRole: 'owner' as const,
   unreadCount: 0,
+    activePolls: [],
+    activePollsCount: 0,
     pinnedItems: [],
   pinsCount: 0,
   members: [],

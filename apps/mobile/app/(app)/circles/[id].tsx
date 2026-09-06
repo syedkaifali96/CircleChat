@@ -25,6 +25,7 @@ import {
   type CircleHome,
   type CircleMember,
   type Message,
+  type Poll,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { colors } from '../../../src/design/tokens';
@@ -65,6 +66,12 @@ function pinPreviewLabel(message: Message): string {
     default:
       return message.body ?? 'Message';
   }
+}
+
+/** One-line poll preview: question + where the caller's vote stands. */
+function pollPreviewLabel(poll: Poll): string {
+  const voted = poll.myVote !== null ? `You voted ${poll.options[poll.myVote]}` : 'Tap to vote';
+  return `${poll.question} · ${poll.totalVotes} ${poll.totalVotes === 1 ? 'vote' : 'votes'} · ${voted}`;
 }
 
 function friendlyError(code: string): string {
@@ -331,6 +338,34 @@ export default function CircleHomeScreen() {
         ))
       )}
 
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Polls</Text>
+        {home.activePollsCount > 0 ? (
+          <Link href={`/(app)/circles/${id}/polls`} style={styles.viewAllLink} testID="polls-view-all">
+            View all ({home.activePollsCount})
+          </Link>
+        ) : null}
+      </View>
+      {home.activePolls.length === 0 ? (
+        <Text style={styles.pinboardEmpty} testID="polls-empty">
+          No active polls. Start one from the Polls screen.
+        </Text>
+      ) : (
+        home.activePolls.slice(0, 2).map((poll) => (
+          <Pressable
+            key={poll.id}
+            style={({ pressed }) => [styles.pinRow, pressed && styles.buttonPressed]}
+            onPress={() => router.push(`/(app)/circles/${id}/polls`)}
+            testID={`poll-preview-${poll.id}`}
+          >
+            <Text style={styles.pinIcon}>🗳️</Text>
+            <View style={styles.pinInfo}>
+              <Text style={styles.pinBody} numberOfLines={2}>{poll.question}</Text>
+              <Text style={styles.pinMeta}>{pollPreviewLabel(poll)}</Text>
+            </View>
+          </Pressable>
+        ))
+      )}
       {isAdmin ? (
         <Pressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}

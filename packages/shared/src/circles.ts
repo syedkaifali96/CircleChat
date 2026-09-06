@@ -106,3 +106,29 @@ export const createPinSchema = z.object({
 });
 
 export type CreatePinInput = z.infer<typeof createPinSchema>;
+
+/* ------------------------------------------------------------ polls (M11) */
+
+/** M11: create a poll on a Circle conversation (docs/DATABASE.md §1.13 —
+ * single-choice, 2–6 options of ≤80 chars, question ≤300 chars). Only the
+ * question/option labels are client-controlled; circle, creator, ids and
+ * timestamps are derived server-side. */
+export const createPollSchema = z.object({
+  question: z.string().trim().min(1).max(300),
+  options: z
+    .array(z.string().trim().min(1).max(80))
+    .min(2)
+    .max(6)
+    .refine((labels) => new Set(labels).size === labels.length, {
+      message: 'Options must be distinct.',
+    }),
+  closesAt: z.string().datetime().optional(),
+});
+
+export const pollVoteSchema = z.object({
+  /** Index into the poll's options array (MVP polls are single-choice). */
+  optionIndex: z.number().int().min(0).max(5),
+});
+
+export type CreatePollInput = z.infer<typeof createPollSchema>;
+export type PollVoteInput = z.infer<typeof pollVoteSchema>;

@@ -16,6 +16,7 @@ import { notFound, validationFailed } from '../../errors';
 import { findReadyAvatarById, issueMediaDownloadUrl } from '../media/service';
 import type { StorageGateway } from '../media/storage';
 import { unreadCountFor } from '../conversations/service';
+import { activePollsForHome } from '../polls/service';
 import { serializeMessage } from '../messages/service';
 import {
   addPin,
@@ -392,15 +393,18 @@ export async function circleRoutes(
       .from(conversations)
       .where(eq(conversations.circleId, circle.id))
       .limit(1);
-    const [members, unreadCount, pinRows, pins] = await Promise.all([
+    const [members, unreadCount, pinRows, pins, pollStats] = await Promise.all([
       listMembers(db, id),
       conversation
         ? unreadCountFor(db, conversation.id, request.authUser!.userId)
         : Promise.resolve(0),
       listPinRows(db, id, 5),
       pinsCount(db, id),
+      // M11: active (unclosed) polls preview + total active count.
+      conversation
+        ? activePollsForHome(db, conversation.id, request.authUser!.userId)
+        : Promise.resolve({ activePolls: [], activePollsCount: 0 }),
     ]);
-    // M11 adds polls — stays empty until that milestone.
     await reply.header('cache-control', 'no-store').send({
       home: {
         circleId: circle.id,
@@ -411,7 +415,8 @@ export async function circleRoutes(
         membersCount: circle.membersCount,
         callerRole: role,
         unreadCount,
-        activePolls: [],
+        activePolls: pollStats.activePolls,
+        activePollsCount: pollStats.activePollsCount,
         pinnedItems: await Promise.all(pinRows.map(serializePin)),
         pinsCount: pins,
         members: members.map((member) => ({

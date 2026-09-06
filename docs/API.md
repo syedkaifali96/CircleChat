@@ -42,7 +42,7 @@ PATCH /v1/circles/:id/members/:userId   change role — owner only
 POST /v1/circles/:id/ownership-transfer {newOwnerUserId} — owner only; atomic transfer
 GET  /v1/circles/:id/settings           member
 PATCH /v1/circles/:id/settings          owner/admin (theme, accent, background)
-GET  /v1/circles/:id/home               Circle Home payload (unread, active polls, pins, member count, members preview, caller role, conversation id) — active member only (non-members get a generic 404)
+GET  /v1/circles/:id/home               Circle Home payload (unread, active polls preview + activePollsCount, pins, member count, members preview, caller role, conversation id) — active member only (non-members get a generic 404)
 PATCH /v1/circles/:id/notification-pref {pref: all|mentions|muted} — member
 
 POST /v1/conversations/direct           {username} → find-or-create direct conversation; target must share an active Circle with caller
@@ -63,11 +63,11 @@ GET  /v1/media/:id/url                  auth → short-TTL presigned GET, no-sto
 GET  /v1/users/me/avatar-url            auth → short-TTL presigned GET for the caller's own avatar (404 when none set)
 POST /v1/conversations/:id/media/upload-url {kind: image|video|voice, mimeType, sizeBytes, durationMs?} → presigned upload; sender-authorized, per-kind caps (image 10MB, video 50MB, voice 10MB + 2-minute server-enforced duration)
 
-POST /v1/conversations/:id/polls        circle conversations only {question, options[2–6], closesAt?}
-GET  /v1/conversations/:id/polls        list
-POST /v1/polls/:id/vote                 {optionIndex} — one vote per user
-DELETE /v1/polls/:id/vote               change vote while open
-POST /v1/polls/:id/close                creator/admin
+POST /v1/conversations/:id/polls        circle conversations only (DMs → 403) {question ≤300, options[2–6 distinct, ≤80 chars], closesAt? future ISO} → 201 poll with per-option counts; rate-limited 10/min
+GET  /v1/conversations/:id/polls        member → {polls} newest-first, each with votes per option, totalVotes, myVote, closed
+POST /v1/polls/:id/vote                 {optionIndex within options} — single choice; membership re-checked from the poll (foreign Circles → generic 404); closed → 409 POLL_CLOSED; duplicate → 409 VOTE_EXISTS (PK-enforced, concurrency-safe); rate-limited 30/min; broadcasts `poll:updated`
+DELETE /v1/polls/:id/vote               change vote while open (idempotent remove); closed → 409 POLL_CLOSED; broadcasts `poll:updated`
+POST /v1/polls/:id/close                creator or Circle owner/admin (else 403); already closed → 409 POLL_CLOSED; broadcasts `poll:updated`
 
 GET  /v1/circles/:id/pinboard           member → {items} — each pin references its live Circle message through the same tombstone-safe chat serializer (media stays metadata-only; bytes flow via authorized presigned GET)
 POST /v1/circles/:id/pinboard           member (pin) — {messageId} only; the server verifies the message is a live, non-tombstoned message of THIS Circle's own conversation (foreign/direct ids answer a generic 404). Duplicate pin of the same message → 409 PIN_EXISTS. Owner/admin may remove any pin, a member only their own — otherwise 403 FORBIDDEN. Mutations broadcast `pinboard:updated` to the conversation room (REST stays source of truth)

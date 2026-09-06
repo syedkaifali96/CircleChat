@@ -9,6 +9,7 @@ import { usersRoutes } from './modules/users/routes';
 import { circleRoutes } from './modules/circles/routes';
 import { conversationRoutes } from './modules/conversations/routes';
 import { messageRoutes } from './modules/messages/routes';
+import { pollRoutes } from './modules/polls/routes';
 import { profileRoutes } from './modules/profile/routes';
 import { sharesActiveCircle } from './modules/profile/service';
 import { mediaRoutes } from './modules/media/routes';
@@ -148,6 +149,8 @@ export async function buildApp(
     // change notifications when a Socket.IO server is attached.
     await app.register(conversationRoutes, { db, publish });
     await app.register(messageRoutes, { db, publish, storage, expoPush: options.expoPush });
+    // Polls (M11): Circle-scoped via the conversation; same publish fan-out.
+    await app.register(pollRoutes, { db, publish });
     if (storage) {
       await app.register(profileRoutes, { db, storage });
       await app.register(mediaRoutes, {

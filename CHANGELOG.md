@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### M11 — Polls
+
+- Server (docs/API.md): `POST/GET /v1/conversations/:id/polls` + `POST/DELETE /v1/polls/:id/vote` + `POST /v1/polls/:id/close` — authorization rides the conversation (`requireConversationAccess`: Circle members only, non-members/removed members/deleted Circles get the generic 404; DM creation → 403 because polls are Circle-only). Creation validates question ≤300 chars, 2–6 distinct options of ≤80 chars and a future `closesAt` (shared `createPollSchema`); option counts are additionally DB-CHECKed. Voting is single-choice with one vote per user guaranteed by the `poll_votes` composite PK — concurrent duplicate votes collapse at the database level and surface as `409 VOTE_EXISTS`; closed polls (deadline passed or closed early by creator/owner/admin) answer `409 POLL_CLOSED`; vote change is the documented delete + re-vote flow. Mutations broadcast `poll:updated` via the existing M6 publisher — REST stays the source of truth. Mutations rate-limited (create 10/min, vote/close 30/min); responses `no-store`.
+- Circle Home: the M9 `activePolls: []` placeholder is now real — an active-polls preview (latest 2 with question, vote count and the caller's standing) plus `activePollsCount`, with closed polls excluded.
+- Mobile: dedicated `circles/[id]/polls` screen (Active/Closed sections, single-choice option rows with result bars and the caller's selection, take-back-vote, close-poll for creator/owner/admin, empty/loading/error+retry states) and `circles/[id]/polls/create` (question + dynamic 2–6 option inputs with client validation mirrored by the server, success navigates back). `Poll` type + fetch/vote/unvote/close/create API functions added to the client.
+- Tests: 14 new server tests over real PostgreSQL (creation + validation bounds + DM 403 + non-member 404, listing order + denied matrix, vote/counts/myVote/duplicate 409, closed-by-close and closed-by-deadline 409, out-of-range option 400, vote change, cross-Circle isolation, concurrent duplicate votes collapsing to one row, close authorization, home activePolls with live results and closed exclusion) + 13 new mobile tests (polls screen render/vote/vote-switch/POLL_CLOSED error/empty/loading/error+retry, create screen validation/success/add-remove options/server error, Circle Home poll preview + empty state).
+- No schema migration — the M1 `polls`/`poll_votes` tables already matched the documented design (`allow_multiple` was never added).
+
+### M10 — Pinboard
 ### M10 — Pinboard
 
 - Mobile: Circle Home gains a Pinboard section (3-item preview with sender/pinner metadata, empty-state hint, View all (n) link) and a dedicated `circles/[id]/pinboard` screen (full list, per-pin unpin mirrored to the server policy — own pins or owner/admin, empty/loading/error+retry states, tap opens the Circle chat where media renders through the authorized pipeline). Chat messages gain "Pin to Pinboard" in the existing long-press action menu (Circle conversations only, tombstones excluded); PIN_EXISTS surfaces a friendly already-pinned message.

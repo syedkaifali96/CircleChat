@@ -50,6 +50,7 @@ What actually ships today, verified by the test suites referenced below:
 - **Push notifications:** server-authoritative Expo Push fan-out after every persisted message — per-user global toggle, per-conversation mute, message-preview privacy, multi-device support (devices = sessions), invalid-token cleanup, and notification-tap deep links; provider failures never affect messaging
 - **Circle Home:** a private dashboard per Circle — identity header (avatar, name, description, member count), members preview with roles, the primary Open Chat action carrying the server-computed unread count, and management actions (invites, role changes, settings) — served by GET /v1/circles/:id/home, active members only
 - **Pinboard:** Circle-scoped pins of existing messages (never duplicates) — pin from the chat long-press menu, preview on Circle Home, full list with unpin on the dedicated Pinboard screen; server-verified message-to-Circle eligibility, per-Circle uniqueness, and tombstone-safe rendering with media served through the existing authorized presigned pipeline
+- **Polls:** single-choice Circle polls (2–6 options) created from the Circle, voted inline with live per-option results and the caller's selection, closed polls stay readable — surfaced as an active-polls preview on Circle Home with a dedicated Polls screen; one vote per member enforced by the database PK, change-vote via the documented delete+re-vote flow
 
 ## Documentation
 
@@ -125,9 +126,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M10 complete (all suites green).**
+**M0–M11 complete (all suites green).**
 
-Latest verification: server 222/222 tests (Vitest, real PostgreSQL), mobile 89/89 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
+Latest verification: server 236/236 tests (Vitest, real PostgreSQL), mobile 102/102 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|
@@ -145,7 +146,8 @@ Latest verification: server 222/222 tests (Vitest, real PostgreSQL), mobile 89/8
 | M8 — Push notifications (Expo Push, server-authoritative fan-out, per-conversation mute, preview privacy) | ✅ Done |
 | M9 — Circle Home (identity + members preview + Open Chat with unread, single authorized payload) | ✅ Done |
 | M10 — Pinboard (message-reference pins, uniqueness, tombstone-safe, home preview + full list) | ✅ Done |
-| M11+ — Polls, Themes, App Lock | ⬜ Not started |
+| M11 — Polls (single-choice, Circle-scoped, home preview + dedicated screen, PK-enforced one vote) | ✅ Done |
+| M12+ — Themes, App Lock | ⬜ Not started |
 
 ## Getting Started
 

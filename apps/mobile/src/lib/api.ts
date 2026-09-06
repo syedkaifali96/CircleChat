@@ -199,10 +199,30 @@ export interface CircleHome {
   membersCount: number;
   callerRole: CircleRole;
   unreadCount: number;
+  /** M11: active (unclosed) polls preview + total active count. */
+  activePolls: Poll[];
+  activePollsCount: number;
   /** M10: latest pins preview + total count. */
   pinnedItems: PinItem[];
   pinsCount: number;
   members: CircleMember[];
+}
+
+/** M11 Poll: single-choice Circle poll with per-option vote counts and the
+ * caller's own selection (docs/API.md). "closed" covers both an early close
+ * and a passed closesAt deadline. */
+export interface Poll {
+  id: string;
+  conversationId: string;
+  question: string;
+  options: string[];
+  votes: number[];
+  totalVotes: number;
+  myVote: number | null;
+  closed: boolean;
+  closesAt: string | null;
+  createdAt: string;
+  createdBy: { userId: string; username: string; displayName: string };
 }
 
 /** M10 Pinboard item: a reference to an existing Circle message plus the
@@ -253,6 +273,36 @@ export async function fetchCircle(token: string, circleId: string): Promise<{ ci
 
 export async function fetchCircleHome(token: string, circleId: string): Promise<{ home: CircleHome }> {
   return apiFetch(`${API_BASE_URL}/circles/${circleId}/home`, { method: 'GET', token });
+}
+
+/* --------------------------------------------- polls (M11) -------------- */
+
+export async function fetchPolls(token: string, conversationId: string): Promise<{ polls: Poll[] }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/polls`, { method: 'GET', token });
+}
+
+export async function createPoll(
+  token: string,
+  conversationId: string,
+  input: { question: string; options: string[]; closesAt?: string },
+): Promise<{ poll: Poll }> {
+  return apiFetch(`${API_BASE_URL}/conversations/${conversationId}/polls`, {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function votePoll(token: string, pollId: string, optionIndex: number): Promise<{ poll: Poll }> {
+  return apiFetch(`${API_BASE_URL}/polls/${pollId}/vote`, { method: 'POST', token, body: { optionIndex } });
+}
+
+export async function removePollVote(token: string, pollId: string): Promise<{ poll: Poll }> {
+  return apiFetch(`${API_BASE_URL}/polls/${pollId}/vote`, { method: 'DELETE', token });
+}
+
+export async function closePoll(token: string, pollId: string): Promise<{ poll: Poll }> {
+  return apiFetch(`${API_BASE_URL}/polls/${pollId}/close`, { method: 'POST', token });
 }
 
 export async function fetchCirclePins(token: string, circleId: string): Promise<{ items: PinItem[] }> {

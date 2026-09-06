@@ -322,8 +322,9 @@ Purpose: simple Circle polls; direct conversations cannot have polls.
 | `created_at` | TIMESTAMPTZ NOT NULL | |
 
 `allow_multiple` is intentionally removed. MVP polls are single-choice only.
-Constraint: `jsonb_array_length(options) BETWEEN 2 AND 6`; each option length is validated by the
-application and/or reviewed trigger as appropriate.
+Constraint: `jsonb_array_length(options) BETWEEN 2 AND 6` (DB CHECK); option labels (1–80 chars) and
+distinctness are validated by the application at creation (docs/API.md). A poll is closed when
+`closes_at` is set and in the past — early close writes `now()` into the same column.
 
 ### 1.14 `poll_votes`
 
