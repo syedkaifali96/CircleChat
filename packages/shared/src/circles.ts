@@ -42,11 +42,19 @@ export const ownershipTransferSchema = z.object({
   newOwnerUserId: z.string().uuid(),
 });
 
+/** M12 personalization: app-defined Circle theme presets and bundled chat
+ * background keys are STABLE identifiers — the client never ships arbitrary
+ * style blobs (docs/DATABASE.md §1.4 "app-defined presets"). */
+export const THEME_PRESETS = ['dark_purple', 'midnight', 'orchid', 'ember'] as const;
+export const BACKGROUND_KEYS = ['none', 'aurora', 'dusk', 'velvet'] as const;
+export type ThemePreset = (typeof THEME_PRESETS)[number];
+export type BackgroundKey = (typeof BACKGROUND_KEYS)[number];
+
 export const circleSettingsSchema = z
   .object({
-    themePreset: z.string().trim().min(1).max(40).optional(),
+    themePreset: z.enum(THEME_PRESETS).optional(),
     accentColor: accentColorSchema.nullable().optional(),
-    backgroundKey: z.string().trim().min(1).max(60).nullable().optional(),
+    backgroundKey: z.enum(BACKGROUND_KEYS).nullable().optional(),
   })
   .refine(
     (value) =>

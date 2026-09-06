@@ -1,4 +1,4 @@
-import type { PublicUser } from '@circlechat/shared';
+import type { BackgroundKey, PublicUser, ThemePreset } from '@circlechat/shared';
 import { loadSessionToken } from '../auth/session';
 
 /**
@@ -244,9 +244,9 @@ export interface InvitePreview {
 }
 
 export interface CircleSettings {
-  themePreset: string;
+  themePreset: ThemePreset;
   accentColor: string | null;
-  backgroundKey: string | null;
+  backgroundKey: BackgroundKey | null;
 }
 
 export async function listCircles(token: string): Promise<{ circles: CircleListItem[] }> {
@@ -422,7 +422,7 @@ export async function fetchCircleSettings(
 export async function updateCircleSettings(
   token: string,
   circleId: string,
-  patch: { themePreset?: string; accentColor?: string | null; backgroundKey?: string | null },
+  patch: { themePreset?: ThemePreset; accentColor?: string | null; backgroundKey?: BackgroundKey | null },
 ): Promise<{ settings: CircleSettings }> {
   return apiFetch(`${API_BASE_URL}/circles/${circleId}/settings`, {
     method: 'PATCH',

@@ -31,6 +31,8 @@ import {
   addPin,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
+import { useCircleTheme, themedBackdrop } from '../../../src/design/CircleTheme';
+import { CircleThemeGate } from '../../../src/design/useCircleSettings';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
@@ -56,6 +58,81 @@ const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
 
 function makeClientMessageId(): string {
   return `m5_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** M12: full-screen Circle backdrop — the preset-tinted base plus the
+ * bundled chat background (dimmed + scrimmed, design.md §24 readability
+ * rule) when one is set. Sits inside the CircleThemeGate so it consumes the
+ * live theme context. */
+function ThemedSurface() {
+  const { colors: themed, backgroundKey } = useCircleTheme();
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: themed.background }]} pointerEvents="none">
+      {themedBackdrop(backgroundKey)}
+    </View>
+  );
+}
+
+/** Header chrome (hairline) recolored by the Circle theme — a wrapper so the
+ * existing header JSX keeps its structure. */
+function ThemedHeaderBar({ children }: { children: React.ReactNode }) {
+  const themed = useCircleTheme().colors;
+  return (
+    <View style={[styles.headerBar, { borderBottomColor: themed.border }]} testID="conversation-header">
+      {children}
+    </View>
+  );
+}
+
+/** Message-action / attachment / GIF / edit sheets recolored by the theme. */
+function ThemedModalCard({ testID, children }: { testID: string; children: React.ReactNode }) {
+  const themed = useCircleTheme().colors;
+  return (
+    <View style={[styles.modalCard, { backgroundColor: themed.surface, borderColor: themed.border }]} testID={testID}>
+      {children}
+    </View>
+  );
+}
+
+/** The composer (input + send) recolored by the Circle theme. */
+function ThemedComposer({
+  draft,
+  onDraftChange,
+  onSend,
+  sending,
+  onAttachments,
+}: {
+  draft: string;
+  onDraftChange: (value: string) => void;
+  onSend: () => void;
+  sending: boolean;
+  onAttachments: () => void;
+}) {
+  const themed = useCircleTheme().colors;
+  return (
+    <View style={[styles.composer, { borderTopColor: themed.border }]} testID="composer">
+      <Pressable style={[styles.composerPlus, { backgroundColor: themed.surface, borderColor: themed.border }]} onPress={onAttachments} testID="composer-attachments">
+        <Text style={styles.composerPlusText}>+</Text>
+      </Pressable>
+      <TextInput
+        style={[styles.composerInput, { backgroundColor: themed.surface, borderColor: themed.border }]}
+        value={draft}
+        onChangeText={onDraftChange}
+        placeholder="Write a message..."
+        placeholderTextColor={themed.textMuted}
+        multiline
+        editable={!sending}
+        testID="composer-input"
+      />
+      <Pressable style={[styles.composerSend, { backgroundColor: themed.primary }]} onPress={onSend} disabled={sending || draft.trim().length === 0} testID="composer-send">
+        {sending ? (
+          <ActivityIndicator color={colors.text} size="small" />
+        ) : (
+          <Text style={styles.composerSendText}>Send</Text>
+        )}
+      </Pressable>
+    </View>
+  );
 }
 
 export default function ConversationScreen() {
@@ -556,12 +633,17 @@ export default function ConversationScreen() {
     );
   }
 
+  // M12: the chat inherits the Circle's personalization (theme preset +
+  // accent). Defaults apply for direct chats, which have no Circle settings.
   return (
+    <CircleThemeGate circleId={header.circleId ?? ''}>
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'android' ? undefined : 'padding'}
     >
-      <View style={styles.headerBar} testID="conversation-header">
+      {/* M12: themed Circle backdrop sits behind the whole conversation. */}
+      <ThemedSurface />
+      <ThemedHeaderBar>
         <Pressable onPress={() => router.back()} hitSlop={12} testID="conversation-back">
           <Text style={styles.backText}>‹</Text>
         </Pressable>
@@ -596,7 +678,7 @@ export default function ConversationScreen() {
         >
           <Text style={[styles.muteIcon, muted && styles.muteIconActive]}>{muted ? '🔇' : '🔔'}</Text>
         </Pressable>
-      </View>
+      </ThemedHeaderBar>
 
       <FlatList
         ref={listRef}
@@ -655,33 +737,18 @@ export default function ConversationScreen() {
         <Text style={styles.sendError} testID="conversation-send-error">{sendError}</Text>
       ) : null}
 
-      <View style={styles.composer} testID="composer">
-        <Pressable style={styles.composerPlus} onPress={() => setAttachmentMenuVisible(true)} testID="composer-attachments">
-          <Text style={styles.composerPlusText}>+</Text>
-        </Pressable>
-        <TextInput
-          style={styles.composerInput}
-          value={draft}
-          onChangeText={onDraftChange}
-          placeholder="Write a message..."
-          placeholderTextColor={colors.textMuted}
-          multiline
-          editable={!sending}
-          testID="composer-input"
-        />
-        <Pressable style={styles.composerSend} onPress={() => void onSend()} disabled={sending || draft.trim().length === 0} testID="composer-send">
-          {sending ? (
-            <ActivityIndicator color={colors.text} size="small" />
-          ) : (
-            <Text style={styles.composerSendText}>Send</Text>
-          )}
-        </Pressable>
-      </View>
+      <ThemedComposer
+        draft={draft}
+        onDraftChange={onDraftChange}
+        onSend={() => void onSend()}
+        sending={sending}
+        onAttachments={() => setAttachmentMenuVisible(true)}
+      />
 
       <Modal visible={actionMessage !== null} transparent animationType="fade" onRequestClose={() => setActionMessage(null)}>
         {actionMessage ? (
           <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard} testID="message-actions">
+            <ThemedModalCard testID="message-actions">
               <View style={styles.reactionRow}>
                 {QUICK_REACTIONS.map((emoji) => (
                   <Pressable
@@ -736,14 +803,14 @@ export default function ConversationScreen() {
               <Pressable style={styles.textButton} onPress={() => setActionMessage(null)} testID="actions-close">
                 <Text style={styles.textButtonText}>Close</Text>
               </Pressable>
-            </View>
+            </ThemedModalCard>
           </View>
         ) : null}
       </Modal>
 
       <Modal visible={attachmentMenuVisible} transparent animationType="fade" onRequestClose={() => setAttachmentMenuVisible(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} testID="attachment-menu">
+          <ThemedModalCard testID="attachment-menu">
             <Text style={styles.modalTitle}>Attach</Text>
             <Pressable style={styles.menuOption} onPress={() => void pickMedia('images')} testID="attach-image">
               <Text style={styles.menuOptionText}>Photo or GIF</Text>
@@ -770,7 +837,7 @@ export default function ConversationScreen() {
             <Pressable style={styles.textButton} onPress={() => setAttachmentMenuVisible(false)} testID="attachment-close">
               <Text style={styles.textButtonText}>Cancel</Text>
             </Pressable>
-          </View>
+          </ThemedModalCard>
         </View>
       </Modal>
 
@@ -782,7 +849,7 @@ export default function ConversationScreen() {
 
       <Modal visible={gifPickerVisible} transparent animationType="fade" onRequestClose={() => setGifPickerVisible(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} testID="gif-picker">
+          <ThemedModalCard testID="gif-picker">
             <Text style={styles.modalTitle}>Search GIFs</Text>
             <TextInput
               style={styles.editInput}
@@ -823,13 +890,13 @@ export default function ConversationScreen() {
             <Pressable style={styles.textButton} onPress={() => setGifPickerVisible(false)} testID="gif-close">
               <Text style={styles.textButtonText}>Close</Text>
             </Pressable>
-          </View>
+          </ThemedModalCard>
         </View>
       </Modal>
 
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} testID="edit-modal">
+          <ThemedModalCard testID="edit-modal">
             <Text style={styles.modalTitle}>Edit message</Text>
             <TextInput style={styles.editInput} value={editDraft} onChangeText={setEditDraft} multiline maxLength={4000} testID="edit-modal-input" />
             <Pressable style={styles.primaryButton} onPress={() => void onSaveEdit()} testID="edit-modal-save">
@@ -838,10 +905,11 @@ export default function ConversationScreen() {
             <Pressable style={styles.textButton} onPress={() => setEditing(false)} testID="edit-modal-cancel">
               <Text style={styles.textButtonText}>Cancel</Text>
             </Pressable>
-          </View>
+          </ThemedModalCard>
         </View>
       </Modal>
     </KeyboardAvoidingView>
+    </CircleThemeGate>
   );
 }
 

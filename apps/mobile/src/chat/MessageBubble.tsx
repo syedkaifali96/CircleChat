@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Message } from '../lib/api';
 import { colors } from '../design/tokens';
+import { useCircleTheme } from '../design/CircleTheme';
 import { MediaContent } from './MediaContent';
 
 /**
@@ -10,6 +11,9 @@ import { MediaContent } from './MediaContent';
  * edited marker, and a tombstone view for deleted messages. Media content
  * (M7) renders inline with upload progress/retry for outgoing sends.
  * Long-press opens the parent-supplied action menu — no permanent buttons.
+ *
+ * M12: bubble fills and accent details resolve through the Circle theme —
+ * direct chats (no Circle settings) get the default brand roles unchanged.
  */
 
 interface MessageBubbleProps {
@@ -24,10 +28,12 @@ interface MessageBubbleProps {
 }
 
 function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, onRetry, onLongPress }: MessageBubbleProps) {
+  const themed = useCircleTheme().colors;
+
   if (message.deleted) {
     return (
       <View style={[styles.row, isOwn ? styles.rowOwn : null]} testID={`message-${message.id}`}>
-        <View style={[styles.bubble, styles.deletedBubble]}>
+        <View style={[styles.bubble, styles.deletedBubble, { backgroundColor: themed.surface, borderColor: themed.border }]}>
           <Text style={styles.deletedText} testID={`message-body-${message.id}`}>
             Message deleted
           </Text>
@@ -45,15 +51,22 @@ function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, 
       accessibilityLabel={`Message from ${message.senderDisplayName}`}
       testID={`message-${message.id}`}
     >
-      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.incomingBubble]}>
+      <View
+        style={[
+          styles.bubble,
+          isOwn
+            ? [styles.ownBubble, { backgroundColor: themed.bubbleOwn }]
+            : [styles.incomingBubble, { backgroundColor: themed.bubbleOther, borderColor: themed.border }],
+        ]}
+      >
         {showSender && !isOwn ? (
-          <Text style={styles.senderName} testID={`message-sender-${message.id}`}>
+          <Text style={[styles.senderName, { color: themed.accent }]} testID={`message-sender-${message.id}`}>
             {message.senderDisplayName}
           </Text>
         ) : null}
         {message.replyPreview ? (
-          <View style={styles.replyPreview} testID={`reply-preview-${message.id}`}>
-            <Text style={styles.replyPreviewSender} numberOfLines={1}>
+          <View style={[styles.replyPreview, { borderLeftColor: themed.accent }]} testID={`reply-preview-${message.id}`}>
+            <Text style={[styles.replyPreviewSender, { color: themed.accent }]} numberOfLines={1}>
               {message.replyPreview.deleted ? 'Deleted message' : `@${message.replyPreview.senderUsername}`}
             </Text>
             <Text style={styles.replyPreviewBody} numberOfLines={2}>
@@ -79,7 +92,10 @@ function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, 
           {message.reactions.length > 0 ? (
             <View style={styles.reactions} testID={`reactions-${message.id}`}>
               {message.reactions.map((reaction) => (
-                <Text key={`${reaction.userId}-${reaction.emoji}`} style={styles.reactionChip}>
+                <Text
+                  key={`${reaction.userId}-${reaction.emoji}`}
+                  style={[styles.reactionChip, { backgroundColor: themed.background, borderColor: themed.border }]}
+                >
                   {reaction.emoji}
                 </Text>
               ))}

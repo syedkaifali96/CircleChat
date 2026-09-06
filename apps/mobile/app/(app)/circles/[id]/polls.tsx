@@ -10,6 +10,8 @@ import {
   type Poll,
 } from '../../../../src/lib/api';
 import { loadSessionToken } from '../../../../src/auth/session';
+import { CircleThemeGate } from '../../../../src/design/useCircleSettings';
+import { useCircleTheme } from '../../../../src/design/CircleTheme';
 import { colors } from '../../../../src/design/tokens';
 
 /**
@@ -18,6 +20,11 @@ import { colors } from '../../../../src/design/tokens';
  * caller's selection highlighted, and closed polls stay readable but frozen.
  * REST is the source of truth; changing a vote is the documented delete +
  * re-vote flow. All authorization is server-side; the UI mirrors responses.
+ *
+ * M12: the screen renders inside the Circle's personalization — the theme
+ * gate wraps the themed body so hooks resolve the live context. Accent
+ * recolors selection states (my-vote border, links, actions); primary
+ * recolors the result bars.
  */
 
 function votePercentage(votes: number, total: number): `${number}%` {
@@ -35,6 +42,15 @@ function closedLabel(poll: Poll): string {
 
 export default function PollsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  return (
+    <CircleThemeGate circleId={id}>
+      <PollsScreenThemed circleId={id} />
+    </CircleThemeGate>
+  );
+}
+
+function PollsScreenThemed({ circleId: id }: { circleId: string }) {
+  const themed = useCircleTheme();
   const [polls, setPolls] = useState<Poll[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -111,15 +127,15 @@ export default function PollsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered} testID="polls-loading">
-        <ActivityIndicator color={colors.accent} />
+      <View style={[styles.centered, { backgroundColor: themed.colors.background }]} testID="polls-loading">
+        <ActivityIndicator color={themed.colors.accent} />
       </View>
     );
   }
 
   if (loadError || !polls) {
     return (
-      <View style={styles.centered} testID="polls-error">
+      <View style={[styles.centered, { backgroundColor: themed.colors.background }]} testID="polls-error">
         <Text style={styles.stateTitle}>Something went wrong.</Text>
         <Text style={styles.stateText}>Couldn't load the polls.</Text>
         <Pressable style={styles.secondaryButton} onPress={() => void load()} testID="polls-retry">
@@ -148,7 +164,7 @@ export default function PollsScreen() {
             key={`${poll.id}-${index}`}
             style={({ pressed }) => [
               styles.optionRow,
-              isMyVote && styles.optionMine,
+              isMyVote ? { borderColor: themed.colors.accent } : null,
               votable && pressed && styles.buttonPressed,
             ]}
             onPress={() => onOptionPress(poll, index)}
@@ -163,7 +179,7 @@ export default function PollsScreen() {
               {poll.votes[index]}
             </Text>
             <View style={styles.barTrack}>
-              <View style={[styles.barFill, { width: barWidth }]} />
+              <View style={[styles.barFill, { width: barWidth, backgroundColor: themed.colors.primary }]} />
             </View>
           </Pressable>
         );
@@ -176,7 +192,7 @@ export default function PollsScreen() {
             disabled={busyPollId === poll.id}
             testID={`poll-unvote-${poll.id}`}
           >
-            <Text style={styles.textActionText}>Take back vote</Text>
+            <Text style={[styles.textActionText, { color: themed.colors.accent }]}>Take back vote</Text>
           </Pressable>
         ) : null}
         {!poll.closed ? (
@@ -186,7 +202,7 @@ export default function PollsScreen() {
             disabled={busyPollId === poll.id}
             testID={`poll-close-${poll.id}`}
           >
-            <Text style={styles.textActionText}>Close poll</Text>
+            <Text style={[styles.textActionText, { color: themed.colors.accent }]}>Close poll</Text>
           </Pressable>
         ) : null}
       </View>
@@ -194,15 +210,16 @@ export default function PollsScreen() {
   );
 
   return (
+    <View style={{ flex: 1, backgroundColor: themed.colors.background }}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       testID="polls-screen"
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.accent} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={themed.colors.accent} />}
     >
       <View style={styles.headerRow}>
         <Text style={styles.title}>Polls</Text>
-        <Link href={`/(app)/circles/${id}/polls/create`} style={styles.createLink} testID="polls-create-link">
+        <Link href={`/(app)/circles/${id}/polls/create`} style={[styles.createLink, { color: themed.colors.accent }]} testID="polls-create-link">
           New poll
         </Link>
       </View>
@@ -222,16 +239,17 @@ export default function PollsScreen() {
       {closedPolls.length > 0 ? <Text style={styles.sectionLabel}>Closed</Text> : null}
       {closedPolls.map(renderPoll)}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 24, paddingTop: 64, paddingBottom: 40 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: colors.text, fontSize: 26, fontWeight: '700' },
-  createLink: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+  createLink: { fontSize: 14, fontWeight: '700' },
   sectionLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginTop: 22 },
   pollCard: {
     backgroundColor: colors.surface,
@@ -250,7 +268,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 10,
   },
-  optionMine: { borderColor: colors.accent },
   optionLabel: { color: colors.text, fontSize: 14, fontWeight: '600' },
   optionVotes: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   barTrack: {

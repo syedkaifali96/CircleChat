@@ -113,9 +113,9 @@ Purpose: Circle customization and behavior.
 | Field | Type | Notes |
 |---|---|---|
 | `circle_id` | UUID PK, FK → `circles.id` ON DELETE CASCADE | 1:1 |
-| `theme_preset` | TEXT NOT NULL DEFAULT 'dark_purple' | app-defined presets |
+| `theme_preset` | TEXT NOT NULL DEFAULT 'dark_purple' | app-defined presets: `dark_purple` / `midnight` / `orchid` / `ember` |
 | `accent_color` | TEXT NULL | validated `#RRGGBB`, nullable |
-| `background_key` | TEXT NULL | reference to bundled background asset |
+| `background_key` | TEXT NULL | reference to a bundled background asset: `aurora` / `dusk` / `velvet` (`none` is the API spelling of NULL) |
 | `updated_at` | TIMESTAMPTZ NOT NULL | |
 
 `status_text` is intentionally removed. Circle description lives on `circles.description`.

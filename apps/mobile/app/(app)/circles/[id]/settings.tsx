@@ -17,16 +17,45 @@ import {
   ApiError,
   deleteCircle,
   fetchCircle,
+  fetchCircleSettings,
   updateCircle,
+  updateCircleSettings,
 } from '../../../../src/lib/api';
 import { loadSessionToken } from '../../../../src/auth/session';
 import { colors } from '../../../../src/design/tokens';
+import {
+  BACKGROUND_LABELS,
+  CIRCLE_THEMES,
+  THEME_LABELS,
+} from '../../../../src/design/CircleTheme';
+import {
+  BACKGROUND_KEYS,
+  THEME_PRESETS,
+  type BackgroundKey,
+  type ThemePreset,
+} from '@circlechat/shared';
 
 /**
  * Circle settings (design.md §23 "Circle Settings"): rename/description for
  * owner/admin, plus the destructive actions — delete (owner only) — visually
  * separated. The server re-checks the caller's role on every request.
+ *
+ * M12 personalization (design.md §24): theme preset, accent color, and the
+ * bundled chat background live here too — owner/admin only, mirroring the
+ * server-side role guard on PATCH /circles/:id/settings. The pickers submit
+ * stable app-defined identifiers; contrast is guaranteed by the preset
+ * palettes (no free-form color input).
  */
+
+/** Approved accent swatches — a finite, contrast-checked palette drawn from
+ * the documented brand colors and preset accents. */
+const ACCENT_SWATCHES: { label: string; value: string | null }[] = [
+  { label: 'Default', value: null },
+  { label: 'Lavender', value: '#A78BFA' },
+  { label: 'Light Violet', value: '#C4B5FD' },
+  { label: 'Amber', value: '#FBBF24' },
+  { label: 'Emerald', value: '#34D399' },
+];
 
 export default function CircleSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,15 +68,23 @@ export default function CircleSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // M12 personalization state (owner/admin only; server re-checks the role).
+  const [settings, setSettings] = useState<{ themePreset: ThemePreset; accentColor: string | null; backgroundKey: BackgroundKey | null } | null>(null);
+  const [savingTheme, setSavingTheme] = useState<string | null>(null);
+  const [themeError, setThemeError] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(false);
     try {
       const token = (await loadSessionToken()) ?? '';
-      const { circle: found } = await fetchCircle(token, id);
+      const [{ circle: found }, { settings: foundSettings }] = await Promise.all([
+        fetchCircle(token, id),
+        fetchCircleSettings(token, id),
+      ]);
       setCircle(found);
       setName(found.name);
       setDescription(found.description ?? '');
+      setSettings(foundSettings);
     } catch {
       setLoadError(true);
     } finally {
@@ -84,6 +121,29 @@ export default function CircleSettingsScreen() {
       setError(err instanceof ApiError && err.code === 'VALIDATION_FAILED' ? 'Check the name (1–40) and description (≤200).' : "Couldn't save. Try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** PATCH one personalization field; the response is the new state. */
+  const onPatchSettings = async (
+    field: string,
+    patch: { themePreset?: ThemePreset; accentColor?: string | null; backgroundKey?: BackgroundKey | null },
+  ) => {
+    setThemeError(false);
+    setSavingTheme(field);
+    const previous = settings;
+    // Optimistic update with revert on failure (mirrors the settings-screen
+    // toggle pattern from M8).
+    setSettings((current) => (current ? { ...current, ...patch } : current));
+    try {
+      const token = (await loadSessionToken()) ?? '';
+      const { settings: updated } = await updateCircleSettings(token, id, patch);
+      setSettings(updated);
+    } catch {
+      setSettings(previous);
+      setThemeError(true);
+    } finally {
+      setSavingTheme(null);
     }
   };
 
@@ -130,6 +190,11 @@ export default function CircleSettingsScreen() {
     );
   }
 
+  const isAdmin = circle.callerRole === 'owner' || circle.callerRole === 'admin';
+  // The API's null and the `none` key both mean "no background" — the server
+  // normalizes `none` to null on write.
+  const selectedBackground = settings?.backgroundKey ?? 'none';
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'android' ? undefined : 'padding'}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="circle-settings-screen">
@@ -175,6 +240,74 @@ export default function CircleSettingsScreen() {
         >
           {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.primaryButtonText}>Save changes</Text>}
         </Pressable>
+
+        {isAdmin && settings ? (
+          <View style={styles.personalization} testID="personalization-section">
+            <Text style={styles.personalizationTitle}>Personalization</Text>
+
+            <Text style={styles.label}>Theme</Text>
+            {THEME_PRESETS.map((preset) => (
+              <Pressable
+                key={preset}
+                style={({ pressed }) => [
+                  styles.presetRow,
+                  settings.themePreset === preset && styles.presetRowActive,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => void onPatchSettings(`theme:${preset}`, { themePreset: preset })}
+                disabled={savingTheme !== null}
+                accessibilityLabel={`Theme ${THEME_LABELS[preset]}`}
+                testID={`theme-option-${preset}`}
+              >
+                <View style={[styles.presetSwatch, { backgroundColor: CIRCLE_THEMES[preset].background, borderColor: CIRCLE_THEMES[preset].primary }]} />
+                <Text style={styles.presetLabel}>{THEME_LABELS[preset]}</Text>
+                {settings.themePreset === preset ? <Text style={styles.presetCheck} testID={`theme-selected-${preset}`}>✓</Text> : null}
+                {savingTheme === `theme:${preset}` ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+              </Pressable>
+            ))}
+
+            <Text style={styles.label}>Accent color</Text>
+            <View style={styles.swatchRow} testID="accent-swatches">
+              {ACCENT_SWATCHES.map((swatch) => (
+                <Pressable
+                  key={swatch.label}
+                  style={[
+                    styles.accentSwatch,
+                    swatch.value
+                      ? { backgroundColor: swatch.value }
+                      : styles.accentSwatchDefault,
+                    settings.accentColor === swatch.value && styles.accentSwatchActive,
+                  ]}
+                  onPress={() => void onPatchSettings('accent', { accentColor: swatch.value })}
+                  disabled={savingTheme !== null}
+                  accessibilityLabel={`Accent ${swatch.label}`}
+                  testID={`accent-option-${swatch.label.toLowerCase()}`}
+                />
+              ))}
+            </View>
+
+            <Text style={styles.label}>Chat background</Text>
+            {BACKGROUND_KEYS.map((key) => (
+              <Pressable
+                key={key}
+                style={({ pressed }) => [
+                  styles.presetRow,
+                  selectedBackground === key && styles.presetRowActive,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => void onPatchSettings('background', { backgroundKey: key })}
+                disabled={savingTheme !== null}
+                accessibilityLabel={`Background ${BACKGROUND_LABELS[key]}`}
+                testID={`background-option-${key}`}
+              >
+                <Text style={styles.presetLabel}>{BACKGROUND_LABELS[key]}</Text>
+                {selectedBackground === key ? <Text style={styles.presetCheck} testID={`background-selected-${key}`}>✓</Text> : null}
+              </Pressable>
+            ))}
+
+            {themeError ? <Text style={styles.error} testID="personalization-error">Couldn't save. Try again.</Text> : null}
+          </View>
+        ) : null}
 
         {circle.callerRole === 'owner' ? (
           <View style={styles.dangerZone} testID="circle-danger-zone">
@@ -229,6 +362,29 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  personalization: { marginTop: 36, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16 },
+  personalizationTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  presetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+  },
+  presetRowActive: { borderColor: colors.accent },
+  presetSwatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 2 },
+  presetLabel: { color: colors.text, fontSize: 14, fontWeight: '600', flex: 1 },
+  presetCheck: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+  swatchRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  accentSwatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: colors.border },
+  accentSwatchDefault: {
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+  },
+  accentSwatchActive: { borderColor: colors.text },
   dangerZone: { marginTop: 40, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16 },
   dangerTitle: { color: colors.warning, fontSize: 13, fontWeight: '700', textTransform: 'uppercase' },
   deleteButton: {

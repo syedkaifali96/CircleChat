@@ -28,6 +28,8 @@ import {
   type Poll,
 } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
+import { CircleThemeGate } from '../../../src/design/useCircleSettings';
+import { useCircleTheme, themedBackdrop } from '../../../src/design/CircleTheme';
 import { colors } from '../../../src/design/tokens';
 
 /**
@@ -93,6 +95,18 @@ function friendlyError(code: string): string {
 
 export default function CircleHomeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // M12: the whole Home tree renders inside the Circle's personalization
+  // (theme preset + accent). The gate sits ABOVE the themed body so hooks
+  // resolve the live context — Home stays the hero, theming only recolors it.
+  return (
+    <CircleThemeGate circleId={id}>
+      <CircleHomeThemed circleId={id} />
+    </CircleThemeGate>
+  );
+}
+
+function CircleHomeThemed({ circleId: id }: { circleId: string }) {
+  const themed = useCircleTheme();
   const router = useRouter();
   const [home, setHome] = useState<CircleHome | null>(null);
   const [loading, setLoading] = useState(true);
@@ -244,15 +258,15 @@ export default function CircleHomeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered} testID="circle-loading">
-        <ActivityIndicator color={colors.accent} />
+      <View style={[styles.centered, { backgroundColor: themed.colors.background }]} testID="circle-loading">
+        <ActivityIndicator color={themed.colors.accent} />
       </View>
     );
   }
 
   if (loadError || !home) {
     return (
-      <View style={styles.centered} testID="circle-error">
+      <View style={[styles.centered, { backgroundColor: themed.colors.background }]} testID="circle-error">
         <Text style={styles.stateTitle}>Something went wrong.</Text>
         <Text style={styles.stateText}>Couldn't load this Circle.</Text>
         <Pressable style={styles.secondaryButton} onPress={() => void load()} testID="circle-retry">
@@ -266,33 +280,38 @@ export default function CircleHomeScreen() {
   const isAdmin = isOwner || home.callerRole === 'admin';
   const capacityLeft = 5 - home.membersCount;
 
+  // M12: themed backdrop (preset background + bundled chat background when
+  // set) sits behind the Home content.
+  const backdrop = themedBackdrop(themed.backgroundKey);
   return (
+    <View style={{ flex: 1 }}>
+      {backdrop}
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       testID="circle-screen"
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.accent} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={themed.colors.accent} />}
     >
       <View style={styles.header}>
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, { backgroundColor: themed.colors.primary }]}>
           <Text style={styles.avatarText}>{home.name.charAt(0).toUpperCase()}</Text>
         </View>
         <Text style={styles.name}>{home.name}</Text>
         <Text style={styles.memberCount} testID="circle-member-count">{memberCountLabel(home.membersCount)}</Text>
         {home.description ? <Text style={styles.description}>"{home.description}"</Text> : null}
         {isAdmin ? (
-          <Link href={`/(app)/circles/${id}/settings`} style={styles.settingsLink} testID="circle-settings-link">
+          <Link href={`/(app)/circles/${id}/settings`} style={[styles.settingsLink, { color: themed.colors.accent }]} testID="circle-settings-link">
             Circle settings
           </Link>
         ) : null}
-        <Link href="/(app)/notification-settings" style={styles.settingsLink} testID="circle-notifications-link">
+        <Link href="/(app)/notification-settings" style={[styles.settingsLink, { color: themed.colors.accent }]} testID="circle-notifications-link">
           Notification settings
         </Link>
       </View>
 
       {home.conversationId ? (
         <Pressable
-          style={({ pressed }) => [styles.openChatButton, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.openChatButton, { backgroundColor: themed.colors.primary }, pressed && styles.buttonPressed]}
           onPress={() => router.push(`/(app)/chats/${home.conversationId}`)}
           testID="circle-open-chat"
         >
@@ -368,7 +387,7 @@ export default function CircleHomeScreen() {
       )}
       {isAdmin ? (
         <Pressable
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.primaryButton, { backgroundColor: themed.colors.primary }, pressed && styles.buttonPressed]}
           onPress={() => {
             setInviteCode(null);
             setInviteModalVisible(true);
@@ -391,14 +410,14 @@ export default function CircleHomeScreen() {
           disabled={!isAdmin}
           testID={`circle-member-${member.username}`}
         >
-          <View style={styles.memberAvatar}>
+          <View style={[styles.memberAvatar, { backgroundColor: themed.colors.primary }]}>
             <Text style={styles.memberAvatarText}>{member.displayName.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={styles.memberInfo}>
             <Text style={styles.memberName}>{member.displayName}</Text>
             <Text style={styles.memberUsername}>@{member.username}</Text>
           </View>
-          <Text style={[styles.roleBadge, member.role === 'owner' && styles.roleBadgeOwner]}>{member.role}</Text>
+          <Text style={[styles.roleBadge, member.role === 'owner' && { color: themed.colors.accent, borderColor: themed.colors.accent }]}>{member.role}</Text>
         </Pressable>
       ))}
 
@@ -422,8 +441,8 @@ export default function CircleHomeScreen() {
             {inviteCode ? (
               <>
                 <Text style={styles.modalNote}>Shown only once — share it now.</Text>
-                <Text style={styles.inviteCode} selectable testID="invite-code">{inviteCode}</Text>
-                <Pressable style={styles.primaryButton} onPress={() => void onShareInvite()} testID="invite-share">
+                <Text style={[styles.inviteCode, { backgroundColor: themed.colors.background }]} selectable testID="invite-code">{inviteCode}</Text>
+                <Pressable style={[styles.primaryButton, { backgroundColor: themed.colors.primary }]} onPress={() => void onShareInvite()} testID="invite-share">
                   <Text style={styles.primaryButtonText}>Share code</Text>
                 </Pressable>
                 <Pressable style={styles.textButton} onPress={onRevokeInvite} disabled={inviteBusy} testID="invite-revoke">
@@ -432,7 +451,7 @@ export default function CircleHomeScreen() {
               </>
             ) : (
               <Pressable
-                style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+                style={({ pressed }) => [styles.primaryButton, { backgroundColor: themed.colors.primary }, pressed && styles.buttonPressed]}
                 onPress={() => void onGenerateInvite()}
                 disabled={inviteBusy || capacityLeft <= 0}
                 testID="invite-generate"
@@ -485,11 +504,12 @@ export default function CircleHomeScreen() {
         ) : null}
       </Modal>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 24, paddingTop: 64 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
   header: { alignItems: 'center' },
@@ -558,7 +578,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  roleBadgeOwner: { color: colors.accent, borderColor: colors.accent },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,

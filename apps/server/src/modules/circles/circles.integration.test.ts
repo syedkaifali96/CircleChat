@@ -5,6 +5,7 @@ import { buildApp } from '../../app';
 import { createDatabase, type Database } from '../../db/client';
 import { InMemoryStorageGateway } from '../media/storage';
 import { migrateTestDatabase, resolveTestDatabaseUrl, startEmbeddedPostgres } from '../../db/testing';
+import { BACKGROUND_KEYS, THEME_PRESETS } from '@circlechat/shared';
 
 /**
  * M4 Circles integration tests — real PostgreSQL, real HTTP flows. Covers the
@@ -1264,5 +1265,141 @@ describe('circle pinboard (M10, docs/API.md /circles/:id/pinboard)', () => {
     const items = list.json().items as Array<{ messageId: string }>;
     expect(items).toHaveLength(1);
     expect(items[0]!.messageId).toBe(messageId);
+  });
+});
+
+describe('settings personalization validation (M12)', () => {
+  it('rejects unknown theme presets and background keys, accepts approved ones and resets', async () => {
+    const owner = await signup(`pers_${suffix()}`);
+    const circle = await createCircle(owner.token, `Personalized ${suffix()}`);
+
+    const badPreset = await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(owner.token),
+      payload: { themePreset: 'neon_rainbow' },
+    });
+    expect(badPreset.statusCode).toBe(400);
+
+    const badBackground = await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(owner.token),
+      payload: { backgroundKey: 'https://evil.example/bg.png' },
+    });
+    expect(badBackground.statusCode).toBe(400);
+
+    // Every approved preset/background key round-trips (stable enum contract).
+    for (const preset of THEME_PRESETS) {
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/v1/circles/${circle.id}/settings`,
+        headers: bearer(owner.token),
+        payload: { themePreset: preset },
+      });
+      expect(patch.statusCode).toBe(200);
+      expect(patch.json().settings.themePreset).toBe(preset);
+    }
+    for (const key of BACKGROUND_KEYS) {
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/v1/circles/${circle.id}/settings`,
+        headers: bearer(owner.token),
+        payload: { backgroundKey: key },
+      });
+      expect(patch.statusCode).toBe(200);
+      // `none` normalizes to the documented nullable default.
+      expect(patch.json().settings.backgroundKey).toBe(key === 'none' ? null : key);
+    }
+
+    // Reset: background back to none (null) — the documented nullable default.
+    const reset = await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(owner.token),
+      payload: { backgroundKey: null },
+    });
+    expect(reset.statusCode).toBe(200);
+    expect(reset.json().settings.backgroundKey).toBeNull();
+  });
+
+  it('enforces the authorization matrix: member denied, admin allowed, non-member 404, revoked session 401', async () => {
+    const owner = await signup(`perso_${suffix()}`);
+    const admin = await signup(`persa_${suffix()}`);
+    const member = await signup(`persm_${suffix()}`);
+    const outsider = await signup(`persx_${suffix()}`);
+    const circle = await createCircle(owner.token, `Theme Matrix ${suffix()}`);
+    const join = async (user: { token: string }) => {
+      const code = await createInvite(owner.token, circle.id as string);
+      await app.inject({
+        method: 'POST',
+        url: '/v1/circles/join',
+        headers: bearer(user.token),
+        payload: { inviteCode: code },
+      });
+    };
+    await join(admin);
+    await join(member);
+    // Promote admin to the admin role so the allow-side of the matrix is real.
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/members/${admin.userId}`,
+      headers: bearer(owner.token),
+      payload: { role: 'admin' },
+    });
+
+    // Plain member: denied with the generic 404 (no settings existence leak).
+    const denied = await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(member.token),
+      payload: { themePreset: 'midnight' },
+    });
+    expect(denied.statusCode).toBe(404);
+
+    // Admin: allowed — personalization follows the settings role guard.
+    const allowed = await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(admin.token),
+      payload: { themePreset: 'midnight', backgroundKey: 'velvet' },
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.json().settings.themePreset).toBe('midnight');
+
+    // Non-member: the same generic 404 on both read and write.
+    for (const method of ['GET', 'PATCH'] as const) {
+      const res = await app.inject({
+        method,
+        url: `/v1/circles/${circle.id}/settings`,
+        headers: bearer(outsider.token),
+        ...(method === 'PATCH' ? { payload: { themePreset: 'ember' } } : {}),
+      });
+      expect(res.statusCode).toBe(404);
+    }
+
+    // Revoked session: 401 before any authorization decision.
+    await client.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1`, [member.userId]);
+    const revoked = await app.inject({
+      method: 'PATCH',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(member.token),
+      payload: { themePreset: 'ember' },
+    });
+    expect(revoked.statusCode).toBe(401);
+
+    // The cross-Circle isolation is covered by the M4 suite above; here the
+    // persisted state proves the admin write is the surviving one.
+    const readBack = await app.inject({
+      method: 'GET',
+      url: `/v1/circles/${circle.id}/settings`,
+      headers: bearer(owner.token),
+    });
+    expect(readBack.statusCode).toBe(200);
+    expect(readBack.json().settings).toEqual({
+      themePreset: 'midnight',
+      accentColor: null,
+      backgroundKey: 'velvet',
+    });
   });
 });

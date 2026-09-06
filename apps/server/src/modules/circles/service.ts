@@ -440,7 +440,11 @@ export async function updateCircleSettings(
     .set({
       ...(input.themePreset !== undefined ? { themePreset: input.themePreset } : {}),
       ...(input.accentColor !== undefined ? { accentColor: input.accentColor } : {}),
-      ...(input.backgroundKey !== undefined ? { backgroundKey: input.backgroundKey } : {}),
+      // `none` is the API spelling of the documented nullable default — it
+      // must never reach storage as a literal key.
+      ...(input.backgroundKey !== undefined
+        ? { backgroundKey: input.backgroundKey === 'none' ? null : input.backgroundKey }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(circleSettings.circleId, input.circleId));

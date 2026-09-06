@@ -40,8 +40,8 @@ DELETE /v1/circles/:id/members/me       leave (owner must transfer first)
 DELETE /v1/circles/:id/members/:userId  owner/admin
 PATCH /v1/circles/:id/members/:userId   change role — owner only
 POST /v1/circles/:id/ownership-transfer {newOwnerUserId} — owner only; atomic transfer
-GET  /v1/circles/:id/settings           member
-PATCH /v1/circles/:id/settings          owner/admin (theme, accent, background)
+GET  /v1/circles/:id/settings           member — {themePreset: dark_purple|midnight|orchid|ember, accentColor: #RRGGBB|null, backgroundKey: none|aurora|dusk|velvet|null}
+PATCH /v1/circles/:id/settings          owner/admin; same fields, all optional; unknown enum values → 400; backgroundKey 'none' persists as null
 GET  /v1/circles/:id/home               Circle Home payload (unread, active polls preview + activePollsCount, pins, member count, members preview, caller role, conversation id) — active member only (non-members get a generic 404)
 PATCH /v1/circles/:id/notification-pref {pref: all|mentions|muted} — member
 

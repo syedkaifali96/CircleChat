@@ -11,6 +11,8 @@ import {
 } from '../../../../src/lib/api';
 import { useAuth } from '../../../../src/auth/AuthContext';
 import { loadSessionToken } from '../../../../src/auth/session';
+import { CircleThemeGate } from '../../../../src/design/useCircleSettings';
+import { useCircleTheme } from '../../../../src/design/CircleTheme';
 import { colors } from '../../../../src/design/tokens';
 
 /**
@@ -57,8 +59,19 @@ function friendlyError(code: string): string {
 
 export default function PinboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // M12: the gate sits ABOVE the themed body so hooks resolve the live
+  // Circle theme (preset + accent), not the provider default.
+  return (
+    <CircleThemeGate circleId={id}>
+      <PinboardScreenThemed circleId={id} />
+    </CircleThemeGate>
+  );
+}
+
+function PinboardScreenThemed({ circleId: id }: { circleId: string }) {
   const router = useRouter();
   const { user } = useAuth();
+  const themed = useCircleTheme().colors;
   const [pins, setPins] = useState<PinItem[] | null>(null);
   const [home, setHome] = useState<CircleHome | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,15 +117,15 @@ export default function PinboardScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered} testID="pinboard-loading">
-        <ActivityIndicator color={colors.accent} />
+      <View style={[styles.centered, { backgroundColor: themed.background }]} testID="pinboard-loading">
+        <ActivityIndicator color={themed.accent} />
       </View>
     );
   }
 
   if (loadError || !pins || !home) {
     return (
-      <View style={styles.centered} testID="pinboard-error">
+      <View style={[styles.centered, { backgroundColor: themed.background }]} testID="pinboard-error">
         <Text style={styles.stateTitle}>Something went wrong.</Text>
         <Text style={styles.stateText}>Couldn't load the Pinboard.</Text>
         <Pressable style={styles.secondaryButton} onPress={() => void load()} testID="pinboard-retry">
@@ -125,11 +138,12 @@ export default function PinboardScreen() {
   const isAdmin = home.callerRole === 'owner' || home.callerRole === 'admin';
 
   return (
+    <View style={{ flex: 1, backgroundColor: themed.background }}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       testID="pinboard-screen"
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={colors.accent} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} tintColor={themed.accent} />}
     >
       <Text style={styles.title}>Pinboard</Text>
       <Text style={styles.subtitle} testID="pinboard-count">
@@ -174,6 +188,7 @@ export default function PinboardScreen() {
         })
       )}
     </ScrollView>
+    </View>
   );
 }
 

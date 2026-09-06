@@ -126,9 +126,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M11 complete (all suites green).**
+**M0–M12 complete (all suites green).**
 
-Latest verification: server 236/236 tests (Vitest, real PostgreSQL), mobile 102/102 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
+Latest verification: server 238/238 tests (Vitest, real PostgreSQL), mobile 112/112 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|
@@ -147,7 +147,8 @@ Latest verification: server 236/236 tests (Vitest, real PostgreSQL), mobile 102/
 | M9 — Circle Home (identity + members preview + Open Chat with unread, single authorized payload) | ✅ Done |
 | M10 — Pinboard (message-reference pins, uniqueness, tombstone-safe, home preview + full list) | ✅ Done |
 | M11 — Polls (single-choice, Circle-scoped, home preview + dedicated screen, PK-enforced one vote) | ✅ Done |
-| M12+ — Themes, App Lock | ⬜ Not started |
+| M12 — Personalization (Circle theme presets, accent palette, bundled chat backgrounds, settings pickers) | ✅ Done |
+| M13 — App Lock | ⬜ Not started |
 
 ## Getting Started
 
