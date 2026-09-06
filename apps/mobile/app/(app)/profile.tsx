@@ -142,6 +142,9 @@ export default function ProfileScreen() {
       <Link href="/(app)/profile-edit" style={styles.editLink} testID="profile-edit-link">
         Edit profile
       </Link>
+      <Link href="/(app)/app-lock" style={styles.editLink} testID="app-lock-link">
+        App lock
+      </Link>
       <Pressable
         style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
         onPress={() => void signOut()}

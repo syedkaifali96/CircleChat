@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### M13 — App Lock
+
+- Mobile-only local privacy layer (design.md §22, docs/ARCHITECTURE.md §2.8): a PIN (4–6 digits) plus platform biometrics locks the whole app. **100% local** — the PIN lives only as a salted Argon2id PHC string in SecureStore (fresh 16-byte salt per setup, OWASP m=19456/t=2/p=1 carried inline in the PHC string, constant-time comparison via `@noble/hashes` pure-JS Argon2id + `expo-crypto` salt); **nothing is sent to the server and no App-Lock endpoint, storage, or migration exists**.
+- Lock policy per design.md §22: Off / Immediately / After 1 / 5 / 15 minutes / On app restart. Every enabled mode locks a fresh app launch; timed modes re-lock on background→foreground only after their threshold; `restart` re-locks only when the process starts. While locked, `AppLockProvider` renders the LockScreen **instead of all navigation content** (design.md's locked-state rule: no private message previews can ever render behind it). PushManager stays mounted outside the gate so M8 delivery and its preview-privacy rules keep working while locked.
+- Lock screen per the documented layout (logo, "App locked", Unlock with PIN, Use biometrics). Biometrics use expo-local-authentication only (hardware + enrollment detected; the button hides when unavailable) — no custom biometric handling. Wrong PIN answers "Incorrect PIN."; biometric failures fall back to the PIN.
+- Settings: a new App lock screen (Profile → App lock) lists the six documented options; enabling any mode without a PIN opens inline setup (enter + repeat, mismatch surfaces an error), switching to Off removes the PIN after a destructive-action confirmation. The screen states plainly that nothing is sent to the server.
+- Forgot-PIN recovery: one path — confirm "Sign out", which wipes the local PIN hash and resets the mode to Off, clears the session token, and signs out; the user then authenticates normally on the login screen. This keeps the recovery path server-clean while making a permanently-locked device impossible.
+- Logout isolation: the lock is device-local, not per-account — signing out neither reads nor clears the lock, and a locked app gates the auth screens too, so switching accounts cannot bypass an engaged lock.
+- Tests: 18 new mobile tests (PIN hash/verify/unique-salt/corrupt-record, mode storage round-trip + corrupt fallback, full lock-policy table for all six modes, provider gate locking cold starts and threshold transitions with children unmounted, PIN unlock reject/accept, biometric availability + platform-prompt success, forgot-PIN alert flow wiping lock data, settings modes + setup flow + Off confirmation). Server suite regression only — no server changes (238/238).
+
 ### M12 — Personalization
 
 - Shared contract (packages/shared): the previously free-text `themePreset`/`backgroundKey` settings fields are now stable app-defined enums — `THEME_PRESETS` (`dark_purple` default, `midnight`, `orchid`, `ember`) and `BACKGROUND_KEYS` (`none`, `aurora`, `dusk`, `velvet`) — so the client can never ship arbitrary style blobs (docs/DATABASE.md §1.4 "app-defined presets"). Unknown presets/background keys (e.g. a URL smuggled into `backgroundKey`) answer `400 VALIDATION_FAILED` via the tightened Zod schemas; the accent stays the server-validated `#RRGGBB` field.

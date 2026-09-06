@@ -78,9 +78,10 @@
 
 ### 2.8 App Lock — **local-only**
 
-- PIN and/or biometrics use platform APIs.
-- PIN verification uses the documented local salted Argon2id approach and SecureStore.
-- The server never stores App-Lock state.
+- PIN and/or biometrics use platform APIs (expo-local-authentication; biometrics never leave the OS prompt).
+- PIN verification uses the documented local salted Argon2id approach and SecureStore: the PIN is hashed as a standard PHC string (`argon2id`, m=19456 KiB, t=2, p=1 — OWASP password-hashing parameters, carried inline so retunes stay verifiable) with a fresh 16-byte salt per setup, compared in constant time, and stored ONLY in device SecureStore.
+- The server never stores App-Lock state; no App-Lock endpoint exists.
+- Lock policy (design.md §22): off / immediately / after 1 / 5 / 15 minutes / on app restart. Every enabled mode locks a fresh app launch; the `restart` mode re-locks only on process start. While locked, the lock screen replaces ALL app content — nothing private renders behind it. Forgetting the PIN has one recovery: sign out, which wipes the local PIN hash and mode (the lock is convenience-layer, per docs/SECURITY.md — a device thief with the OS unlocked is out of this layer's threat model).
 
 ### 2.9 Testing — **Vitest (server) + Jest/RNTL (app)**
 
