@@ -44,6 +44,13 @@ NODE_ENV=production
 - Secrets live in Railway/R2/EAS secret stores only. `.env` is git-ignored; `.env.example` lists names with empty values. Never log secrets; never put them in the Expo client bundle — the mobile app only knows the API base URL.
 - Client-side config: `API_BASE_URL` per build channel (staging build points at staging).
 
+### 3.1 Local development & real-device (USB) workflow
+
+- **Database:** local PostgreSQL 16 with a `circlechat_dev` database is the expected local setup; apply migrations with `npm run db:migrate` (`DATABASE_URL` must be set — `drizzle-kit` reads it from the environment).
+- **Server `.env` minimum:** `DATABASE_URL` at minimum to start; **R2 credentials (`R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET`) are required for media features** — placeholder values let the server start, but uploads/downloads fail without a real bucket.
+- **USB debugging:** with an Android device connected over USB, `adb reverse tcp:8081 tcp:8081 && adb reverse tcp:3000 tcp:3000` lets the phone reach Metro and the local API server over USB via `localhost` — no WiFi/IP configuration needed (the app's default `EXPO_PUBLIC_API_URL` fallback of `http://localhost:3000` matches this).
+- **Expo Go (SDK 53) is sufficient for this app** — no custom dev client is required, **except Android push notifications**, which need a development build to test (Expo Go removed remote push; an Expo Go limitation, not an app bug — see M8 notes in the changelog).
+
 ## 4. CI/CD (GitHub Actions)
 
 ```text
