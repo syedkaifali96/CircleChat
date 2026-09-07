@@ -53,6 +53,8 @@ export interface R2StorageConfig {
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
+  /** Optional S3 endpoint override (local MinIO in dev); unset = real R2. */
+  endpoint?: string;
 }
 
 export function readR2StorageConfig(env: NodeJS.ProcessEnv = process.env): R2StorageConfig | undefined {
@@ -63,7 +65,15 @@ export function readR2StorageConfig(env: NodeJS.ProcessEnv = process.env): R2Sto
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
     return undefined;
   }
-  return { accountId, accessKeyId, secretAccessKey, bucket };
+  return {
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+    // Optional S3 endpoint override — set to the local MinIO endpoint in dev
+    // (http://127.0.0.1:9000); unset means real Cloudflare R2.
+    endpoint: env.R2_ENDPOINT || undefined,
+  };
 }
 
 export class R2StorageGateway implements StorageGateway {
@@ -72,11 +82,17 @@ export class R2StorageGateway implements StorageGateway {
   constructor(private readonly config: R2StorageConfig) {
     this.client = new S3Client({
       region: 'auto',
-      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+      // R2 is S3-compatible and so is MinIO: when R2_ENDPOINT is set the
+      // accountId is unused and the endpoint wins; otherwise the standard
+      // R2 endpoint is derived from the account id.
+      endpoint: config.endpoint ?? `https://${config.accountId}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
+      // MinIO presigned endpoints are plain http://127.0.0.1:9000 — keep
+      // request signing compatible (no virtual-host bucket addressing).
+      forcePathStyle: config.endpoint !== undefined,
     });
   }
 
