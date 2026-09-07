@@ -30,6 +30,7 @@ module.exports = tseslint.config(
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         process: 'readonly',
+        AbortController: 'readonly',
       },
     },
   },

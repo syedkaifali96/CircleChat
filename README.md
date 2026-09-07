@@ -161,6 +161,8 @@ embedded PostgreSQL automatically where supported.
 npm install          # install all workspaces
 npm run dev:server   # Fastify API + Socket.IO on http://localhost:3000 (GET /health)
 npm run dev:mobile   # Expo dev server (press a for Android)
+npm run minio        # local MinIO (S3-compatible dev storage) — idempotent start
+npm run device       # reverse dev ports (8081/3000/9000) to a USB-connected phone
 npm run typecheck    # all workspaces
 npm run lint         # eslint
 npm run test         # server + shared + mobile tests
@@ -172,6 +174,30 @@ migrations live in `apps/server/drizzle/` and are applied to a fresh database by
 the integration tests. `npm run db:generate` / `npm run db:migrate` manage them.
 Copy `.env.example` to `.env` for local configuration — never commit real values.
 
+### Local media storage & real-device (USB) workflow
+
+Media (avatars + chat attachments) needs an S3-compatible bucket. In dev, run
+local MinIO — the server targets it through the optional `R2_ENDPOINT` in
+`.env` (see docs/DEPLOYMENT.md §3.1; production keeps using Cloudflare R2):
+
+```bash
+npm run minio        # starts MinIO if not running (binary + data live in ~/minio,
+                     # root credentials come from R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY in .env;
+                     # create the circlechat-dev bucket once via any S3 client or the MinIO console)
+npm run minio:stop   # stop the instance this script started
+```
+
+For real-device testing, connect the phone over USB (USB debugging enabled) and run:
+
+```bash
+npm run device       # adb reverse for Metro :8081, API :3000, MinIO :9000 —
+                     # the phone reaches everything via localhost over USB, no WiFi/IP setup
+```
+
+Both commands are idempotent — re-run them any time (e.g. after reconnecting
+the phone or rebooting), nothing else to remember. `npm run device` exits with
+a clear message when no device is attached.
+
 ## Environment Variables
 
 **Server** (`.env` at repo root, from `.env.example`; all real values gitignored):
@@ -182,6 +208,7 @@ Copy `.env.example` to `.env` for local configuration — never commit real valu
 | `NODE_ENV`, `PORT`, `LOG_LEVEL` | Server runtime basics |
 | `SESSION_TTL_DAYS` | Session lifetime (default 30) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PRESIGN_TTL_SECONDS` | Private Cloudflare R2 storage (profile avatars + chat media) |
+| `R2_ENDPOINT` | Optional S3 endpoint override — points local dev at MinIO (`http://127.0.0.1:9000`); unset means real R2 |
 
 **Mobile** (`apps/mobile/.env`, from `apps/mobile/.env.example` — Expo inlines
 `EXPO_PUBLIC_*` values into the bundle, so these are never secrets):
