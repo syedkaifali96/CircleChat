@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createCircle } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
@@ -42,8 +42,8 @@ export default function CreateCircleScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'android' ? undefined : 'padding'}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="create-circle-screen">
+    <View style={styles.flex}>
+      <View style={styles.container} testID="create-circle-screen">
         <Text style={styles.title}>Create Circle</Text>
         <Text style={styles.subtitle}>A private space for 2–5 of your people.</Text>
 
@@ -77,8 +77,8 @@ export default function CreateCircleScreen() {
         ) : null}
 
         <Pressable
+          onPress={() => onSubmit()}
           style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-          onPress={() => void onSubmit()}
           disabled={creating}
           testID="create-circle-submit"
         >
@@ -87,8 +87,8 @@ export default function CreateCircleScreen() {
         <Pressable onPress={() => router.back()} style={styles.cancel} disabled={creating} testID="create-circle-cancel">
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </View>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ApiError, fetchInvitePreview, joinCircle, type InvitePreview } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
@@ -74,8 +74,8 @@ export default function JoinCircleScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'android' ? undefined : 'padding'}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="join-circle-screen">
+    <View style={styles.flex}>
+      <View style={styles.container} testID="join-circle-screen">
         <Text style={styles.title}>Join Circle</Text>
         <Text style={styles.subtitle}>Enter the invite code a Circle member shared with you.</Text>
 
@@ -152,8 +152,8 @@ export default function JoinCircleScreen() {
         <Pressable onPress={() => router.back()} style={styles.cancel} disabled={joining} testID="join-cancel">
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </View>
   );
 }
 
