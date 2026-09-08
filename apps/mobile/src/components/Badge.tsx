@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, radii, spacing, typography } from '../design/tokens';
+import { colors, radii, spacing } from '../design/tokens';
 
 export type BadgeVariant = 'default' | 'primary' | 'unread' | 'role' | 'success' | 'warning' | 'error';
 export type BadgeSize = 'sm' | 'md';

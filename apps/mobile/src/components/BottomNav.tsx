@@ -7,6 +7,10 @@ import { Icon } from './Icon';
 
 export type BottomNavTab = 'home' | 'chats' | 'profile';
 
+// The three tab routes are static app paths; typed as a literal union so the
+// `router.push` below needs no cast while staying route-string safe.
+type TabRoute = '/(app)/home' | '/(app)/chats' | '/(app)/profile';
+
 interface BottomNavProps {
   activeTab: BottomNavTab;
 }
@@ -15,7 +19,7 @@ export function BottomNav({ activeTab }: BottomNavProps): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeInsets();
 
-  const tabs: { key: BottomNavTab; label: string; icon: 'circles' | 'chat' | 'profile'; route: string; testID?: string }[] = [
+  const tabs: { key: BottomNavTab; label: string; icon: 'circles' | 'chat' | 'profile'; route: TabRoute; testID?: string }[] = [
     { key: 'home', label: 'Circles', icon: 'circles', route: '/(app)/home', testID: 'bottom-nav-home' },
     { key: 'chats', label: 'Direct', icon: 'chat', route: '/(app)/chats', testID: 'bottom-nav-chats' },
     { key: 'profile', label: 'Profile', icon: 'profile', route: '/(app)/profile', testID: 'bottom-nav-profile' },
@@ -33,7 +37,7 @@ export function BottomNav({ activeTab }: BottomNavProps): React.JSX.Element {
               key={tab.key}
               onPress={() => {
                 if (!isActive) {
-                  router.push(tab.route as any);
+                  router.push(tab.route);
                 }
               }}
               style={({ pressed }) => [

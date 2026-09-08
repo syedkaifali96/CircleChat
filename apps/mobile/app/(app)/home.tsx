@@ -13,7 +13,7 @@ import { useSafeInsets } from '../../src/lib/safeInsets';
 import { useAuth } from '../../src/auth/AuthContext';
 import { loadSessionToken } from '../../src/auth/session';
 import { listCircles, type CircleListItem } from '../../src/lib/api';
-import { colors, radii, shadows, spacing, typography } from '../../src/design/tokens';
+import { colors, radii, shadows, spacing } from '../../src/design/tokens';
 import { Avatar } from '../../src/components/Avatar';
 import { Badge } from '../../src/components/Badge';
 import { BottomNav } from '../../src/components/BottomNav';
