@@ -20,5 +20,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# IDE
+.idea/
+*.iml
+
 # Ephemeral embedded-PostgreSQL data dirs from integration test runs
 circlechat-pg-*/
+

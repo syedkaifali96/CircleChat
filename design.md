@@ -145,6 +145,45 @@ Do not mix unrelated icon styles. Every icon-only button must have an accessible
 
 ---
 
+## 6.1 Shared Component Library Specifications
+
+The application uses an in-house, zero-external-dependency shared component suite defined in `apps/mobile/src/components/`:
+
+### 1. Button (`Button.tsx`)
+- **Variants:** `primary` (purple solid with subtle glow), `secondary` (dark elevated surface with border), `outline` (transparent with lavender border), `danger` (error red), `ghost` (transparent).
+- **Sizes:** `sm` (compact, for list items), `md` (standard actions), `lg` (hero buttons).
+- **Micro-interactions:** Interactive press scale (`0.98`) and opacity transition (`0.88`), integrated loading spinner with disabled state.
+- **Icons:** Supports leading (`icon`) and trailing (`iconTrailing`) icon slots.
+
+### 2. Avatar & AvatarGroup (`Avatar.tsx`, `AvatarGroup.tsx`)
+- **Sizes:** `xs` (24px), `sm` (32px), `md` (44px), `lg` (56px), `xl` (72px).
+- **Fallbacks:** Initial character with deterministic vibrant palette background based on string hash.
+- **Presence Dot:** Cutout green dot indicator at bottom-right for online status.
+- **AvatarGroup:** Overlapping stacked member avatars with custom overlap scale and `+N` remaining counter bubble.
+
+### 3. Card (`Card.tsx`)
+- **Surface:** Deep `#171225` surface with `#29223A` subtle border and 16px radius (`radii.xl`).
+- **Variants:** `default` (standard surface), `elevated` (higher layer `#201833`), `glass` (translucent dark glass).
+- **Interactive:** Optional `onPress` activates tactile press micro-animation (`scale: 0.985`, active border highlight).
+
+### 4. Badge & Pill (`Badge.tsx`)
+- **Variants:** `primary` / `unread` (purple glow for message badges), `role` (accent lavender for Owner/Admin/Member), `success`, `warning`, `error`.
+- **Shape:** Full pill radius (`radii.full`), bold legible typography.
+
+### 5. Input (`Input.tsx`)
+- **Focus State:** Active focus ring transitioning border to `colors.primary` with subtle purple elevation.
+- **Slots:** Leading icon (e.g. search, lock), trailing icon, error message, helper text.
+
+### 6. EmptyState (`EmptyState.tsx`)
+- **Structure:** Glowing circular icon badge, bold title, soft descriptive subtitle, action button slot. Replaces dry gray boxes with welcoming visual guidance.
+
+### 7. BottomNav (`BottomNav.tsx`)
+- **Structure:** Modern floating/docked bottom navigation pill bar housing `Circles`, `Direct`, and `Profile`.
+- **Indicator:** Active purple pill background with lavender accent icon and text.
+
+
+---
+
 ## 7. Layout Philosophy
 
 ### MVP scope

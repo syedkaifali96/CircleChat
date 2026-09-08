@@ -3,7 +3,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { ApiError } from '../../src/lib/api';
-import { colors } from '../../src/design/tokens';
+import { colors, radii, shadows, spacing } from '../../src/design/tokens';
+import { Icon } from '../../src/components/Icon';
 
 /** Login screen (M2). Errors are generic — never reveal which field failed. */
 export default function LoginScreen() {
@@ -33,49 +34,65 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container} testID="login-screen">
-      <Text style={styles.title}>CircleChat</Text>
-      <Text style={styles.tagline}>No phone number required.</Text>
+      <View style={styles.card}>
+        {/* Brand Mark */}
+        <View style={styles.logoBadge}>
+          <View style={styles.logoCircle}>
+            <Icon name="circles" size={32} color={colors.accent} />
+          </View>
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        value={username}
-        onChangeText={setUsername}
-        testID="login-username"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.textMuted}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        testID="login-password"
-      />
-      {error ? (
-        <Text style={styles.error} testID="login-error">
-          {error}
-        </Text>
-      ) : null}
-      <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-        onPress={() => void onSubmit()}
-        disabled={submitting}
-        testID="login-submit"
-      >
-        {submitting ? (
-          <ActivityIndicator color={colors.text} />
-        ) : (
-          <Text style={styles.buttonText}>Log in</Text>
-        )}
-      </Pressable>
+        <Text style={styles.title}>CircleChat</Text>
+        <Text style={styles.tagline}>No phone number required.</Text>
 
-      <Link href="/(auth)/register" style={styles.link} testID="login-to-register">
-        Create account
-      </Link>
+        <View style={styles.inputGroup}>
+          <TextInput
+            style={styles.input}
+            placeholder="Username"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={username}
+            onChangeText={setUsername}
+            testID="login-username"
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            testID="login-password"
+          />
+        </View>
+
+        {error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.error} testID="login-error">
+              {error}
+            </Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          onPress={() => void onSubmit()}
+          disabled={submitting}
+          testID="login-submit"
+        >
+          {submitting ? (
+            <ActivityIndicator color={colors.text} size="small" />
+          ) : (
+            <Text style={styles.buttonText}>Log in</Text>
+          )}
+        </Pressable>
+
+        <Link href="/(auth)/register" style={styles.link} testID="login-to-register">
+          Create account
+        </Link>
+      </View>
     </View>
   );
 }
@@ -85,28 +102,93 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.lg,
   },
-  title: { color: colors.text, fontSize: 28, fontWeight: '700', textAlign: 'center' },
-  tagline: { color: colors.textMuted, fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 24 },
-  input: {
+  card: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
+    borderRadius: radii.xxl,
     borderWidth: 1,
-    borderRadius: 12,
-    color: colors.text,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 12,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    ...shadows.card,
   },
-  error: { color: colors.error, fontSize: 13, marginBottom: 12 },
+  logoBadge: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  logoCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.glow,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  tagline: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: spacing.xl,
+  },
+  inputGroup: {
+    gap: spacing.sm,
+  },
+  input: {
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderRadius: radii.lg,
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    fontSize: 15,
+  },
+  errorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  error: {
+    color: colors.error,
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
   button: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
+    borderRadius: radii.lg,
     paddingVertical: 14,
     alignItems: 'center',
+    marginTop: spacing.md,
+    ...shadows.glow,
   },
-  buttonPressed: { opacity: 0.85 },
-  buttonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  link: { color: colors.accent, textAlign: 'center', marginTop: 20 },
+  buttonPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.985 }],
+  },
+  buttonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  link: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
 });
