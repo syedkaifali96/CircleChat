@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Chat reliability fixes
+
+- Chats now open at the newest message. Older history loads when the user
+  reaches the top and keeps the visible messages anchored; pending media stays
+  at the newest-message end.
+- Retrying a failed media upload reuses its optimistic bubble instead of
+  leaving a duplicate stuck in the uploading state.
+- Editable messages now prefill their current body and close cleanly after a
+  successful save.
+- External GIF messages render inline, and video/file attachment taps now open
+  the authorized download URL instead of silently doing nothing.
+- Closing a chat now removes it from the reconnect room registry, preventing a
+  later socket reconnect from silently rejoining rooms for closed screens.
+
 ### Realtime read-state fix
 
 - **Unread badge could remain after opening a chat:** the conversation screen

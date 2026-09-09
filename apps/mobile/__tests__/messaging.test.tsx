@@ -1,9 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { MessageBubble } from '../src/chat/MessageBubble';
+import { MediaContent } from '../src/chat/MediaContent';
 import ChatsScreen from '../app/(app)/chats';
 import ConversationScreen from '../app/(app)/chats/[id]';
 import * as apiModule from '../src/lib/api';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 /**
  * M5 mobile messaging tests: bubble rendering (own/incoming, sender name,
@@ -73,6 +74,7 @@ jest.mock('../src/lib/api', () => ({
   removePin: jest.fn(),
   removeReaction: jest.fn(),
   markConversationRead: jest.fn().mockResolvedValue({ unreadCount: 0, lastReadMessageId: null }),
+  fetchMediaDownloadUrl: jest.fn(),
 }));
 
 jest.mock('../src/auth/session', () => ({
@@ -101,6 +103,7 @@ jest.mock('../src/lib/socket', () => ({
   sendTypingStart: jest.fn(),
   sendTypingStop: jest.fn(),
   trackJoinedRoom: jest.fn(),
+  untrackJoinedRoom: jest.fn(),
   resetSocket: jest.fn(),
 }));
 
@@ -215,6 +218,53 @@ describe('MessageBubble', () => {
     );
     expect(screen.getByTestId('reply-preview-m5')).toBeTruthy();
     expect(screen.getByText('original text')).toBeTruthy();
+  });
+});
+
+describe('MediaContent', () => {
+  const media = {
+    kind: 'gif',
+    mimeType: 'image/gif',
+    sizeBytes: 0,
+    durationMs: null,
+    width: 320,
+    height: 240,
+    externalUrl: 'https://media.example.test/reaction.gif',
+    hasThumbnail: false,
+  };
+
+  it('renders an external GIF inline without requiring a media id', async () => {
+    render(
+      <MediaContent
+        message={{ ...baseMessage, id: 'gif-1', type: 'gif', body: null, mediaId: null, media }}
+      />,
+    );
+
+    const image = await screen.findByTestId('media-image-gif-1');
+    expect(image.props.source.uri).toBe(media.externalUrl);
+    expect(mockApi.fetchMediaDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it('opens the authorized URL when a video attachment is tapped', async () => {
+    mockApi.fetchMediaDownloadUrl.mockResolvedValue('https://download.example.test/video');
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+
+    render(
+      <MediaContent
+        message={{
+          ...baseMessage,
+          id: 'video-1',
+          type: 'video',
+          body: null,
+          mediaId: 'media-1',
+          media: { ...media, kind: 'video', mimeType: 'video/mp4', externalUrl: null },
+        }}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('media-attachment-video-1'));
+    await waitFor(() => expect(open).toHaveBeenCalledWith('https://download.example.test/video'));
+    open.mockRestore();
   });
 });
 
@@ -343,6 +393,52 @@ describe('ConversationScreen', () => {
     await waitFor(() => expect(screen.getByTestId('message-body-new-1')).toBeTruthy());
     // Read marking happened against the newest message.
     await waitFor(() => expect(mockApi.markConversationRead).toHaveBeenCalled());
+  }, 30_000);
+
+  it('loads older messages from the top of the list', async () => {
+    mockApi.fetchChatHeader.mockResolvedValue({ header });
+    mockApi.fetchMessages.mockResolvedValue({
+      messages: [message({ id: 'current-1', body: 'current' })],
+      nextBeforeCursor: 'older-cursor',
+    });
+
+    render(<ConversationScreen />);
+    await waitFor(() => expect(screen.getByTestId('message-current-1')).toBeTruthy(), { timeout: 8000 });
+    mockApi.fetchMessages.mockClear();
+    mockApi.fetchMessages.mockResolvedValue({
+      messages: [message({ id: 'older-1', body: 'older' })],
+      nextBeforeCursor: null,
+    });
+
+    fireEvent.scroll(screen.getByTestId('conversation-list'), {
+      nativeEvent: { contentOffset: { y: 0 } },
+    });
+
+    await waitFor(() =>
+      expect(mockApi.fetchMessages).toHaveBeenCalledWith('test-token', 'conv-1', {
+        before: 'older-cursor',
+        limit: 30,
+      }),
+    );
+    expect(screen.getByTestId('conversation-list').props.onEndReached).toBeUndefined();
+  }, 30_000);
+
+  it('prefills the current message body when editing', async () => {
+    const own = message({ id: 'own-edit', body: 'original text', createdAt: new Date().toISOString() });
+    mockApi.fetchChatHeader.mockResolvedValue({ header });
+    mockApi.fetchMessages.mockResolvedValue({ messages: [own], nextBeforeCursor: null });
+    mockApi.editMessage.mockResolvedValue({ message: { ...own, body: 'updated text' } });
+
+    render(<ConversationScreen />);
+    await waitFor(() => expect(screen.getByTestId('message-own-edit')).toBeTruthy(), { timeout: 8000 });
+    fireEvent(screen.getByTestId('message-own-edit'), 'longPress');
+
+    expect(screen.getByTestId('edit-input').props.value).toBe('original text');
+    fireEvent.changeText(screen.getByTestId('edit-input'), 'updated text');
+    fireEvent.press(screen.getByTestId('edit-save'));
+
+    await waitFor(() => expect(mockApi.editMessage).toHaveBeenCalledWith('test-token', 'own-edit', 'updated text'));
+    await waitFor(() => expect(screen.queryByTestId('message-actions')).toBeNull());
   }, 30_000);
 
   it('plain circle member sees no delete action for another member message', async () => {

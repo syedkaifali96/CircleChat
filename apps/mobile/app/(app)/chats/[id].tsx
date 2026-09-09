@@ -43,6 +43,7 @@ import {
   sendTypingStop,
   subscribeToConversation,
   trackJoinedRoom,
+  untrackJoinedRoom,
 } from '../../../src/lib/socket';
 import { MessageBubble } from '../../../src/chat/MessageBubble';
 import { Avatar } from '../../../src/components/Avatar';
@@ -181,6 +182,7 @@ export default function ConversationScreen() {
   const [actionEditTarget, setActionEditTarget] = useState<Message | null>(null);
   const myUserId = user?.id ?? null;
   const listRef = useRef<FlatList<Message>>(null);
+  const didInitialScroll = useRef(false);
   // M6 realtime: typing partner + peer presence for the header.
   const [typingUsernames, setTypingUsernames] = useState<string[]>([]);
   const [partnerPresence, setPartnerPresence] = useState<{ online: boolean; lastSeenAt: string | null } | null>(null);
@@ -235,6 +237,7 @@ export default function ConversationScreen() {
   }, [id]);
 
   useEffect(() => {
+    didInitialScroll.current = false;
     void load();
   }, [load]);
 
@@ -258,7 +261,7 @@ export default function ConversationScreen() {
         return;
       }
       trackJoinedRoom(id);
-      unsubscribe = await subscribeToConversation({
+      const detach = await subscribeToConversation({
         conversationId: id,
         onTyping: (payload) => {
           if (payload.userId === myUserId || payload.conversationId !== id) {
@@ -311,10 +314,16 @@ export default function ConversationScreen() {
           })();
         },
       });
+      if (cancelled) {
+        detach();
+      } else {
+        unsubscribe = detach;
+      }
     })();
     return () => {
       cancelled = true;
       unsubscribe?.();
+      untrackJoinedRoom(id);
       if (typingStopTimer.current) {
         clearTimeout(typingStopTimer.current);
       }
@@ -495,6 +504,9 @@ export default function ConversationScreen() {
       const token = (await loadSessionToken()) ?? '';
       const { message } = await editMessage(token, actionEditTarget.id, body);
       setMessages((current) => current.map((m) => (m.id === message.id ? message : m)));
+      setActionMessage(null);
+      setActionEditTarget(null);
+      setEditDraft('');
     } catch {
       // Editing stays unchanged if the server rejects (e.g. window expired).
     }
@@ -567,10 +579,20 @@ export default function ConversationScreen() {
     }
   };
 
-  const sendMediaAsset = (localUri: string, kind: 'image' | 'video' | 'voice', mimeType: string, durationMs?: number) => {
+  const sendMediaAsset = (
+    localUri: string,
+    kind: 'image' | 'video' | 'voice',
+    mimeType: string,
+    durationMs?: number,
+    retryLocalId?: string,
+  ) => {
     void (async () => {
-      const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      setUploadingMedia((current) => [...current, { localId, localUri, kind, stage: 'uploading', mimeType, durationMs }]);
+      const localId = retryLocalId ?? `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      setUploadingMedia((current) =>
+        retryLocalId
+          ? current.map((item) => (item.localId === localId ? { ...item, stage: 'uploading' as const } : item))
+          : [...current, { localId, localUri, kind, stage: 'uploading', mimeType, durationMs }],
+      );
       try {
         const token = (await loadSessionToken()) ?? '';
         const blobResponse = await fetch(localUri);
@@ -605,8 +627,7 @@ export default function ConversationScreen() {
   const retryMedia = (localId: string) => {
     const pending = uploadingMedia.find((m) => m.localId === localId);
     if (pending) {
-      setUploadingMedia((current) => current.map((m) => (m.localId === localId ? { ...m, stage: 'uploading' as const } : m)));
-      sendMediaAsset(pending.localUri, pending.kind, pending.mimeType, pending.durationMs);
+      sendMediaAsset(pending.localUri, pending.kind, pending.mimeType, pending.durationMs, pending.localId);
     }
   };
 
@@ -662,7 +683,9 @@ export default function ConversationScreen() {
   const openActions = (message: Message) => {
     setActionMessage(message);
     const withinWindow = Date.now() - new Date(message.createdAt).getTime() < 24 * 60 * 60 * 1000;
-    setActionEditTarget(message.deleted ? null : message.senderId === myUserId && withinWindow ? message : null);
+    const editTarget = message.deleted ? null : message.senderId === myUserId && withinWindow ? message : null;
+    setActionEditTarget(editTarget);
+    setEditDraft(editTarget?.body ?? '');
   };
 
   if (loading) {
@@ -749,7 +772,8 @@ export default function ConversationScreen() {
             onLongPress={openActions}
           />
         )}
-        ListHeaderComponent={
+        ListHeaderComponent={loadingOlder ? <ActivityIndicator color={colors.accent} style={{ margin: 12 }} /> : null}
+        ListFooterComponent={
           uploadingMedia.length > 0 ? (
             <View>
               {uploadingMedia.map((pending) => (
@@ -783,9 +807,19 @@ export default function ConversationScreen() {
           ) : null
         }
         inverted={false}
-        onEndReached={() => void onLoadOlder()}
-        onEndReachedThreshold={0.6}
-        ListFooterComponent={loadingOlder ? <ActivityIndicator color={colors.accent} style={{ margin: 12 }} /> : null}
+        onScroll={({ nativeEvent }) => {
+          if (nativeEvent.contentOffset.y <= 32) {
+            void onLoadOlder();
+          }
+        }}
+        scrollEventThrottle={100}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onContentSizeChange={() => {
+          if (!didInitialScroll.current && messages.length > 0) {
+            didInitialScroll.current = true;
+            listRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
         contentContainerStyle={styles.listContent}
         testID="conversation-list"
       />

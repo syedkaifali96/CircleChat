@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Audio } from 'expo-av';
 import type { Message } from '../lib/api';
 import { fetchMediaDownloadUrl } from '../lib/api';
@@ -91,19 +91,24 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
   const [imageUri, setImageUri] = useState<string | null>(localUri ?? null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [fullRes, setFullRes] = useState(false);
+  const externalUrl = message.media?.externalUrl ?? null;
 
   useEffect(() => {
-    if (uploadStage || !message.mediaId) {
+    if (uploadStage) {
       return;
     }
     // M7.1 external GIFs render straight from the provider URL — no signed
     // download round-trip (the message itself is D1-gated).
-    const externalUrl = message.media?.externalUrl ?? null;
     if (externalUrl) {
+      setLoadFailed(false);
       setImageUri(externalUrl);
       return;
     }
+    if (!message.mediaId) {
+      return;
+    }
     let cancelled = false;
+    setLoadFailed(false);
     setImageUri(localUri ?? null);
     void (async () => {
       try {
@@ -124,7 +129,7 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
     return () => {
       cancelled = true;
     };
-  }, [message.mediaId, message.media?.externalUrl, message.media?.hasThumbnail, fullRes, uploadStage, localUri]);
+  }, [message.mediaId, externalUrl, message.media?.hasThumbnail, fullRes, uploadStage, localUri]);
 
   if (uploadStage === 'failed') {
     return (
@@ -145,11 +150,11 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
     );
   }
 
-  if (!message.mediaId || loadFailed) {
+  if ((!message.mediaId && !externalUrl) || loadFailed) {
     return <Text style={styles.mediaError}>{loadFailed ? 'Media unavailable' : 'Media'}</Text>;
   }
 
-  if (message.type === 'image' && imageUri) {
+  if ((message.type === 'image' || message.type === 'gif') && imageUri) {
     const width = message.media?.width ?? null;
     const tappable = (message.media?.hasThumbnail ?? false) || (message.media?.externalUrl ?? false);
     return (
@@ -168,7 +173,7 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
     );
   }
 
-  if (message.type === 'voice') {
+  if (message.type === 'voice' && message.mediaId) {
     return (
       <View style={styles.voiceWrap}>
         <VoicePlayer mediaId={message.mediaId} />
@@ -184,7 +189,7 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
       onPress={() => void (async () => {
         try {
           const uri = await fetchMediaDownloadUrl(message.mediaId!);
-          void uri; // opening external viewers lands with the M7 UI polish pass
+          await Linking.openURL(uri);
         } catch {
           setLoadFailed(true);
         }

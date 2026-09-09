@@ -89,6 +89,7 @@ jest.mock('../src/lib/socket', () => ({
   sendTypingStart: jest.fn(),
   sendTypingStop: jest.fn(),
   trackJoinedRoom: jest.fn(),
+  untrackJoinedRoom: jest.fn(),
   resetSocket: jest.fn(),
 }));
 
@@ -98,6 +99,7 @@ const mockSocket = socketModule as unknown as {
   sendTypingStart: jest.Mock;
   sendTypingStop: jest.Mock;
   trackJoinedRoom: jest.Mock;
+  untrackJoinedRoom: jest.Mock;
 };
 
 type TypingHandler = (payload: { conversationId: string; userId: string; isTyping: boolean }) => void;
@@ -245,6 +247,7 @@ describe('presence (M6)', () => {
 
     view.unmount();
     expect(unsubscribeCalls).toBe(1);
+    expect(mockSocket.untrackJoinedRoom).toHaveBeenCalledWith('conv-1');
     expect(mockSocket.sendTypingStop).toHaveBeenCalledWith('conv-1');
   }, 30_000);
 });
