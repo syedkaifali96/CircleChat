@@ -7,8 +7,8 @@ import { Icon } from './Icon';
 
 export type BottomNavTab = 'home' | 'chats' | 'profile';
 
-// The three tab routes are static app paths; typed as a literal union so the
-// `router.push` below needs no cast while staying route-string safe.
+// Tab switches replace the current route so repeated navigation never builds
+// a deep back stack of top-level destinations.
 type TabRoute = '/(app)/home' | '/(app)/chats' | '/(app)/profile';
 
 interface BottomNavProps {
@@ -21,11 +21,11 @@ export function BottomNav({ activeTab }: BottomNavProps): React.JSX.Element {
 
   const tabs: { key: BottomNavTab; label: string; icon: 'circles' | 'chat' | 'profile'; route: TabRoute; testID?: string }[] = [
     { key: 'home', label: 'Circles', icon: 'circles', route: '/(app)/home', testID: 'bottom-nav-home' },
-    { key: 'chats', label: 'Direct', icon: 'chat', route: '/(app)/chats', testID: 'bottom-nav-chats' },
+    { key: 'chats', label: 'Chats', icon: 'chat', route: '/(app)/chats', testID: 'bottom-nav-chats' },
     { key: 'profile', label: 'Profile', icon: 'profile', route: '/(app)/profile', testID: 'bottom-nav-profile' },
   ];
 
-  const bottomPadding = Math.max(insets.bottom, 12) + 8;
+  const bottomPadding = Math.max(insets.bottom, 10) + 6;
 
   return (
     <View style={[styles.wrapper, { paddingBottom: bottomPadding }]}>
@@ -37,7 +37,7 @@ export function BottomNav({ activeTab }: BottomNavProps): React.JSX.Element {
               key={tab.key}
               onPress={() => {
                 if (!isActive) {
-                  router.push(tab.route);
+                  router.replace(tab.route);
                 }
               }}
               style={({ pressed }) => [
@@ -73,41 +73,40 @@ export function BottomNav({ activeTab }: BottomNavProps): React.JSX.Element {
 const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: spacing.lg,
-    paddingTop: 4,
-    backgroundColor: 'transparent',
+    paddingTop: spacing.xs,
+    backgroundColor: colors.background,
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.full,
-    paddingVertical: 6,
+    borderRadius: radii.xxl,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
-    ...shadows.card,
+    ...shadows.subtle,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    minHeight: 48,
+    paddingVertical: 7,
     paddingHorizontal: spacing.sm,
     borderRadius: radii.full,
-    flexDirection: 'row',
-    gap: 8,
+    flexDirection: 'column',
+    gap: 3,
   },
   activeTab: {
-    backgroundColor: 'rgba(124, 58, 237, 0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.4)',
+    backgroundColor: colors.backgroundElevated,
   },
   pressed: {
     opacity: 0.75,
   },
   label: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     includeFontPadding: false,
   },

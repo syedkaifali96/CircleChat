@@ -50,38 +50,41 @@ The interface should communicate **"this is our little space"** rather than **"t
 
 ### 3.1 Color Palette
 
-Primary Purple: `#7C3AED`
+Primary Coral: `#F58A7A`
 
-Deep Background: `#0B0714`
+Midnight Background: `#0B1020`
 
-Surface: `#171225`
+Surface: `#151E30`
 
-Accent Lavender: `#A78BFA`
+Accent Lavender: `#D4B5FF`
 
-Primary Text: `#F5F3FF`
+Primary Text: `#F7F7FA`
 
 Recommended supporting colors:
 
-- Secondary text: `#B8B2C8`
-- Muted text: `#81798F`
-- Border: `#29223A`
-- Success: `#22C55E`
+- Secondary text: `#C8D1E0`
+- Muted text: `#8D9AB0`
+- Border: `#263044`
+- Success: `#4CD69A`
 - Warning: `#F59E0B`
 - Error: `#EF4444`
 - Info: `#60A5FA`
 
-Supporting colors should be used sparingly. Purple remains the main brand identity.
+Supporting colors should be used sparingly. Coral carries primary actions while
+lavender adds warmth to secondary highlights. Neither color should become a
+full-screen wash or decorative glow.
 
 ### 3.2 Color Usage
 
-- Primary purple: primary actions, selected navigation, important interactive elements.
-- Lavender: highlights, secondary accents, subtle focus states.
-- Deep background: application shell and dark-mode page background.
+- Primary coral: primary actions, unread indicators, and high-priority interactive elements.
+- Lavender: secondary highlights, identity accents, and subtle focus states.
+- Midnight background: application shell and dark-mode page background.
 - Surface: cards, panels, dialogs, chat composer, navigation surfaces.
 - Text: high-priority content.
 - Muted text: metadata, timestamps, secondary descriptions.
 
-Do not use bright purple for every element. The UI should have visual hierarchy.
+Avoid decorative glows and repeated outlined cards. Hierarchy should come from
+spacing, typography, restrained surface contrast, and one clear primary action.
 
 ### 3.3 Typography
 
@@ -150,7 +153,7 @@ Do not mix unrelated icon styles. Every icon-only button must have an accessible
 The application uses an in-house, zero-external-dependency shared component suite defined in `apps/mobile/src/components/`:
 
 ### 1. Button (`Button.tsx`)
-- **Variants:** `primary` (purple solid with subtle glow), `secondary` (dark elevated surface with border), `outline` (transparent with lavender border), `danger` (error red), `ghost` (transparent).
+- **Variants:** `primary` (coral solid with restrained depth), `secondary` (midnight elevated surface), `outline` (transparent with lavender border), `danger` (error red), `ghost` (transparent).
 - **Sizes:** `sm` (compact, for list items), `md` (standard actions), `lg` (hero buttons).
 - **Micro-interactions:** Interactive press scale (`0.98`) and opacity transition (`0.88`), integrated loading spinner with disabled state.
 - **Icons:** Supports leading (`icon`) and trailing (`iconTrailing`) icon slots.
@@ -162,24 +165,24 @@ The application uses an in-house, zero-external-dependency shared component suit
 - **AvatarGroup:** Overlapping stacked member avatars with custom overlap scale and `+N` remaining counter bubble.
 
 ### 3. Card (`Card.tsx`)
-- **Surface:** Deep `#171225` surface with `#29223A` subtle border and 16px radius (`radii.xl`).
-- **Variants:** `default` (standard surface), `elevated` (higher layer `#201833`), `glass` (translucent dark glass).
+- **Surface:** Midnight `#151E30` surface with `#263044` subtle border and 16px radius (`radii.xl`).
+- **Variants:** `default` (standard surface), `elevated` (higher layer `#1B263A`), `glass` (translucent midnight glass).
 - **Interactive:** Optional `onPress` activates tactile press micro-animation (`scale: 0.985`, active border highlight).
 
 ### 4. Badge & Pill (`Badge.tsx`)
-- **Variants:** `primary` / `unread` (purple glow for message badges), `role` (accent lavender for Owner/Admin/Member), `success`, `warning`, `error`.
+- **Variants:** `primary` / `unread` (coral for message badges), `role` (accent lavender for Owner/Admin/Member), `success`, `warning`, `error`.
 - **Shape:** Full pill radius (`radii.full`), bold legible typography.
 
 ### 5. Input (`Input.tsx`)
-- **Focus State:** Active focus ring transitioning border to `colors.primary` with subtle purple elevation.
+- **Focus State:** Active focus ring transitioning border to `colors.primary` with restrained coral emphasis.
 - **Slots:** Leading icon (e.g. search, lock), trailing icon, error message, helper text.
 
 ### 6. EmptyState (`EmptyState.tsx`)
 - **Structure:** Glowing circular icon badge, bold title, soft descriptive subtitle, action button slot. Replaces dry gray boxes with welcoming visual guidance.
 
 ### 7. BottomNav (`BottomNav.tsx`)
-- **Structure:** Modern floating/docked bottom navigation pill bar housing `Circles`, `Direct`, and `Profile`.
-- **Indicator:** Active purple pill background with lavender accent icon and text.
+- **Structure:** Docked bottom navigation surface housing `Circles`, `Chats`, and `Profile`.
+- **Indicator:** Quiet midnight surface with a coral active label; no glowing pill.
 
 
 ---
@@ -253,23 +256,20 @@ The Home screen should make Circles immediately visible.
 ```text
 Greeting / profile
 
+Featured Circle
+
 Your Circles
-┌─────────────────────────────┐
-│ Circle avatar   Circle name │
-│                 3 members   │
-│                 latest text │
-└─────────────────────────────┘
+- Circle avatar, name, member count, role
+- Unread indicator only when needed
 
-Recent private chats
-
-Quick actions
-- Create Circle
-- Join Circle
+Quick actions: Create Circle / Join with code
 ```
 
 ### Circle Card
 
-Show Circle avatar, name, member count, latest activity/message preview, and unread indicator when needed. Avoid excessive metadata.
+Show Circle avatar, name, member count, role, and unread indicator when needed.
+Use flat list rows for the full collection; reserve the elevated hero surface
+for one featured Circle only.
 
 ### Empty State
 

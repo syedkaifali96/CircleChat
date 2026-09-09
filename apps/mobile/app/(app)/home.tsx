@@ -8,21 +8,15 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Link, useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeInsets } from '../../src/lib/safeInsets';
 import { useAuth } from '../../src/auth/AuthContext';
 import { loadSessionToken } from '../../src/auth/session';
 import { listCircles, type CircleListItem } from '../../src/lib/api';
-import { colors, radii, shadows, spacing } from '../../src/design/tokens';
+import { colors, radii, shadows, spacing, typography } from '../../src/design/tokens';
 import { Avatar } from '../../src/components/Avatar';
-import { Badge } from '../../src/components/Badge';
 import { BottomNav } from '../../src/components/BottomNav';
 import { Icon } from '../../src/components/Icon';
-
-/**
- * Home screen (design.md §9): makes the user's Circles immediately
- * visible with rich Circle cards, identity badges, and quick actions.
- */
 
 function memberLabel(count: number): string {
   return count === 1 ? '1 member' : `${count} members`;
@@ -49,7 +43,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      (async () => {
+      void (async () => {
         const token = await loadSessionToken();
         if (!cancelled && token) {
           await load(token);
@@ -63,9 +57,7 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     const token = await loadSessionToken();
-    if (!token) {
-      return;
-    }
+    if (!token) return;
     setRefreshing(true);
     await load(token);
     setRefreshing(false);
@@ -76,475 +68,209 @@ export default function HomeScreen() {
     router.replace('/(auth)/login');
   };
 
-  const topPadding = Math.max(insets.top, 24) + 16;
+  const topPadding = Math.max(insets.top, spacing.xl) + spacing.md;
+  const featuredCircle = circles?.[0];
 
   return (
-    <View style={styles.screenWrapper}>
+    <View style={styles.screen}>
       <ScrollView
-        style={styles.container}
+        style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
         testID="home-screen"
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.accent} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.primary} />
         }
       >
-        {/* Brand Bar */}
-        <View style={styles.brandRow}>
-          <View style={styles.brandBadge}>
-            <View style={styles.brandDot} />
-            <Text style={styles.title}>CircleChat</Text>
-          </View>
-          <Link href="/(app)/profile" style={styles.profileLink} testID="home-profile-link">
-            Profile
-          </Link>
-        </View>
-
-        {/* User Card */}
-        {user ? (
-          <View style={styles.userCard}>
-            <Avatar name={user.displayName || user.username} size="md" />
-            <View style={styles.userInfo}>
-              <Text style={styles.greetingText}>WELCOME BACK 👋</Text>
-              <Text style={styles.subtitle} testID="home-user">
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>YOUR PRIVATE WORLD</Text>
+            <Text style={styles.title}>Good to see you, {user?.displayName ?? 'friend'}</Text>
+            {user ? (
+              <Text style={styles.signedIn} testID="home-user">
                 Signed in as {user.displayName} (@{user.username})
               </Text>
-            </View>
+            ) : null}
           </View>
-        ) : null}
-
-        {/* Quick Actions Grid */}
-        <View style={styles.quickActionsContainer}>
-          <View style={styles.quickActionsRow}>
-            <Pressable
-              onPress={() => router.push('/(app)/chats')}
-              style={({ pressed }) => [styles.quickActionPrimary, pressed && styles.buttonPressed]}
-              testID="home-chats"
-            >
-              <View style={styles.actionIconBadgePrimary}>
-                <Icon name="chat" size={16} color={colors.text} />
-              </View>
-              <Text style={styles.primaryButtonText}>Chats</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => router.push('/(app)/circles/create')}
-              style={({ pressed }) => [styles.quickActionSecondary, pressed && styles.buttonPressed]}
-              testID="home-create-circle"
-            >
-              <View style={styles.actionIconBadgeSecondary}>
-                <Icon name="plus" size={14} color={colors.accent} />
-              </View>
-              <Text style={styles.secondaryButtonText}>Create a Circle</Text>
-            </Pressable>
-          </View>
-
           <Pressable
-            onPress={() => router.push('/(app)/circles/join')}
-            style={({ pressed }) => [styles.quickActionSecondaryFull, pressed && styles.buttonPressed]}
-            testID="home-join-circle"
+            onPress={() => router.push('/(app)/profile')}
+            style={({ pressed }) => [styles.profileButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            testID="home-profile-link"
           >
-            <View style={styles.actionIconBadgeSecondary}>
-              <Icon name="circles" size={16} color={colors.accent} />
-            </View>
-            <Text style={styles.secondaryButtonText}>Join a Circle</Text>
+            <Avatar name={user?.displayName || user?.username || 'Profile'} size="md" />
           </Pressable>
         </View>
 
-        {/* Section Header */}
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionTitleGroup}>
-            <Text style={styles.sectionTitle}>Your Circles</Text>
-            {circles && circles.length > 0 ? (
-              <Badge label={circles.length} size="sm" variant="default" />
-            ) : null}
-          </View>
+        {featuredCircle ? (
+          <Pressable
+            onPress={() => router.push(`/(app)/circles/${featuredCircle.id}`)}
+            style={({ pressed }) => [styles.featured, pressed && styles.pressed]}
+            accessibilityRole="button"
+          >
+            <View style={styles.featuredMark}>
+              <View style={styles.featuredRing}>
+                <Icon name="circles" size={28} color={colors.primary} />
+              </View>
+            </View>
+            <View style={styles.featuredCopy}>
+              <Text style={styles.featuredLabel}>OPEN YOUR CIRCLE</Text>
+              <Text style={styles.featuredName} numberOfLines={1}>{featuredCircle.name}</Text>
+              <Text style={styles.featuredMeta}>
+                {memberLabel(featuredCircle.membersCount)}
+                {featuredCircle.unreadCount ? ` · ${featuredCircle.unreadCount} unread` : ' · All caught up'}
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.textSecondary} />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={() => router.push('/(app)/circles/create')}
+            style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
+            testID="home-create-circle"
+          >
+            <Icon name="plus" size={16} color={colors.background} />
+            <Text style={styles.primaryActionText}>Create Circle</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/(app)/circles/join')}
+            style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
+            testID="home-join-circle"
+          >
+            <Text style={styles.secondaryActionText}>Join with code</Text>
+          </Pressable>
         </View>
 
-        {/* Loading State */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Your Circles</Text>
+          <Pressable
+            onPress={() => router.push('/(app)/chats')}
+            style={({ pressed }) => [styles.allChats, pressed && styles.pressed]}
+            testID="home-chats"
+          >
+            <Text style={styles.allChatsText}>All chats</Text>
+            <Icon name="chevron-right" size={16} color={colors.accent} />
+          </Pressable>
+        </View>
+
         {circles === null && !loadError ? (
-          <View style={styles.stateBox} testID="home-loading">
-            <ActivityIndicator color={colors.accent} size="small" />
-            <Text style={styles.loadingText}>Loading your spaces...</Text>
+          <View style={styles.state} testID="home-loading">
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.stateText}>Loading your Circles…</Text>
           </View>
         ) : null}
 
-        {/* Error State */}
         {loadError ? (
-          <View style={styles.stateBox} testID="home-error">
-            <View style={styles.errorIconBadge}>
-              <Icon name="close" size={16} color={colors.error} />
-            </View>
-            <Text style={styles.stateTitle}>Something went wrong.</Text>
-            <Text style={styles.stateText}>Couldn't load your Circles. Check your connection.</Text>
-            <Pressable
-              style={({ pressed }) => [styles.retryButton, pressed && styles.buttonPressed]}
-              onPress={() => void onRefresh()}
-              testID="home-retry"
-            >
-              <Text style={styles.retryButtonText}>Try again</Text>
+          <View style={styles.state} testID="home-error">
+            <View style={styles.stateIcon}><Icon name="close" size={18} color={colors.error} /></View>
+            <Text style={styles.stateTitle}>Couldn’t load your Circles</Text>
+            <Text style={styles.stateText}>Check your connection and try again.</Text>
+            <Pressable onPress={() => void onRefresh()} style={styles.retry} testID="home-retry">
+              <Text style={styles.retryText}>Try again</Text>
             </Pressable>
           </View>
         ) : null}
 
-        {/* Empty State */}
         {circles !== null && !loadError && circles.length === 0 ? (
-          <View style={styles.emptyContainer} testID="home-empty">
-            <View style={styles.emptyIconBadge}>
-              <Icon name="sparkle" size={26} color={colors.accent} />
-            </View>
+          <View style={styles.state} testID="home-empty">
+            <View style={styles.emptyIcon}><Icon name="sparkle" size={26} color={colors.primary} /></View>
             <Text style={styles.stateTitle}>Your little world starts here.</Text>
             <Text style={styles.stateText}>Create a Circle or join one with an invite code.</Text>
           </View>
         ) : null}
 
-        {/* Circles List */}
         {circles !== null && !loadError && circles.length > 0 ? (
-          <View style={styles.circleList}>
+          <View style={styles.list}>
             {circles.map((circle) => (
               <Pressable
                 key={circle.id}
-                style={({ pressed }) => [styles.circleCard, pressed && styles.buttonPressed]}
                 onPress={() => router.push(`/(app)/circles/${circle.id}`)}
+                style={({ pressed }) => [styles.circleRow, pressed && styles.pressed]}
                 testID={`circle-card-${circle.id}`}
               >
-                <Avatar name={circle.name} size="md" />
-
-                <View style={styles.circleInfo}>
-                  <View style={styles.circleTitleRow}>
-                    <Text style={styles.circleName} numberOfLines={1}>
-                      {circle.name}
-                    </Text>
-                    {circle.unreadCount && circle.unreadCount > 0 ? (
-                      <Badge label={circle.unreadCount} variant="unread" size="sm" />
-                    ) : null}
-                  </View>
-
-                  <View style={styles.circleMetaRow}>
-                    <Text style={styles.circleMeta}>
-                      {memberLabel(circle.membersCount)} · {circle.callerRole}
-                    </Text>
-                  </View>
+                <Avatar name={circle.name} size="lg" />
+                <View style={styles.circleCopy}>
+                  <Text style={styles.circleName} numberOfLines={1}>{circle.name}</Text>
+                  <Text style={styles.circleMeta}>
+                    {memberLabel(circle.membersCount)} · {circle.callerRole}
+                  </Text>
                 </View>
-
-                <Icon name="chevron-right" size={18} color={colors.textMuted} />
+                {circle.unreadCount && circle.unreadCount > 0 ? (
+                  <View style={styles.unread}><Text style={styles.unreadText}>{circle.unreadCount}</Text></View>
+                ) : (
+                  <Icon name="chevron-right" size={20} color={colors.textMuted} />
+                )}
               </Pressable>
             ))}
           </View>
         ) : null}
 
-        {/* Logout Action */}
         <Pressable
-          style={({ pressed }) => [styles.logout, pressed && styles.buttonPressed]}
           onPress={() => void onLogout()}
+          style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
           testID="logout-button"
         >
-          <Icon name="logout" size={15} color={colors.textMuted} />
+          <Icon name="logout" size={16} color={colors.textMuted} />
           <Text style={styles.logoutText}>Log out</Text>
         </Pressable>
       </ScrollView>
-
-      {/* Docked Bottom Navigation with Safe Area */}
       <BottomNav activeTab="home" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screenWrapper: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  brandBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  brandDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-    ...shadows.glow,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  profileLink: {
-    color: colors.accent,
-    fontSize: 14,
-    fontWeight: '600',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+  screen: { flex: 1, backgroundColor: colors.background },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xl },
+  headerCopy: { flex: 1, paddingRight: spacing.md },
+  eyebrow: { ...typography.captionStrong, color: colors.textMuted, letterSpacing: 1.2 },
+  title: { ...typography.h2, color: colors.text, marginTop: spacing.xs },
+  signedIn: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  profileButton: { borderRadius: radii.xl },
+  featured: {
+    minHeight: 126,
+    padding: spacing.lg,
+    borderRadius: radii.xxl,
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    gap: spacing.md,
-    ...shadows.subtle,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  greetingText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  subtitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  quickActionsContainer: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  quickActionPrimary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: radii.xl,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    ...shadows.glow,
-  },
-  quickActionSecondary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.xl,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-  },
-  quickActionSecondaryFull: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.xl,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-  },
-  actionIconBadgePrimary: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionIconBadgeSecondary: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(124, 58, 237, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  secondaryButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  sectionTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  circleList: {
-    gap: spacing.sm,
-  },
-  circleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
     gap: spacing.md,
     ...shadows.card,
   },
-  circleInfo: {
-    flex: 1,
-  },
-  circleTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  circleName: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-  },
-  circleMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: 4,
-  },
-  circleMeta: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  stateBox: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xl,
-    marginVertical: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  loadingText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginTop: spacing.xs,
-  },
-  errorIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  stateTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  stateText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: spacing.md,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.lg,
-  },
-  retryButtonText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xxl,
-    marginVertical: spacing.md,
-    alignItems: 'center',
-  },
-  emptyIconBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  logout: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.full,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: colors.surfaceElevated,
-  },
-  buttonPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  logoutText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  featuredMark: { width: 68, height: 68, borderRadius: radii.xxl, backgroundColor: colors.accentMuted, alignItems: 'center', justifyContent: 'center' },
+  featuredRing: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.backgroundElevated, alignItems: 'center', justifyContent: 'center' },
+  featuredCopy: { flex: 1 },
+  featuredLabel: { ...typography.captionStrong, color: colors.primary, letterSpacing: 0.8 },
+  featuredName: { ...typography.h2, color: colors.text, marginTop: spacing.xs },
+  featuredMeta: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
+  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  primaryAction: { flex: 1, minHeight: 48, borderRadius: radii.lg, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  primaryActionText: { ...typography.button, color: colors.background },
+  secondaryAction: { flex: 1, minHeight: 48, borderRadius: radii.lg, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  secondaryActionText: { ...typography.button, color: colors.text },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xxxl, marginBottom: spacing.sm },
+  sectionTitle: { ...typography.h3, color: colors.text },
+  allChats: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: spacing.md },
+  allChatsText: { ...typography.captionStrong, color: colors.accent },
+  list: {},
+  circleRow: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  circleCopy: { flex: 1 },
+  circleName: { ...typography.bodyStrong, color: colors.text },
+  circleMeta: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
+  unread: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  unreadText: { ...typography.captionStrong, color: colors.background },
+  state: { padding: spacing.xxl, borderRadius: radii.xxl, backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm },
+  stateIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.errorMuted, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon: { width: 56, height: 56, borderRadius: radii.xxl, backgroundColor: colors.primaryGlow, alignItems: 'center', justifyContent: 'center' },
+  stateTitle: { ...typography.bodyStrong, color: colors.text, textAlign: 'center' },
+  stateText: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  retry: { minHeight: 44, paddingHorizontal: spacing.xl, borderRadius: radii.lg, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
+  retryText: { ...typography.button, color: colors.text },
+  logout: { minHeight: 48, marginTop: spacing.xxl, flexDirection: 'row', gap: spacing.sm, alignItems: 'center', justifyContent: 'center' },
+  logoutText: { ...typography.captionStrong, color: colors.textMuted },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

@@ -28,32 +28,32 @@ export function Badge({
       case 'unread':
         return {
           bg: colors.primary,
-          text: colors.text,
+          text: colors.primaryContent,
           border: 'transparent',
         };
       case 'role':
         return {
-          bg: 'rgba(167, 139, 250, 0.15)',
+          bg: colors.accentMuted,
           text: colors.accent,
-          border: 'rgba(167, 139, 250, 0.3)',
+          border: colors.accentBorder,
         };
       case 'success':
         return {
-          bg: 'rgba(34, 197, 94, 0.15)',
+          bg: colors.successMuted,
           text: colors.success,
-          border: 'rgba(34, 197, 94, 0.3)',
+          border: colors.successBorder,
         };
       case 'warning':
         return {
-          bg: 'rgba(245, 158, 11, 0.15)',
+          bg: colors.warningMuted,
           text: colors.warning,
-          border: 'rgba(245, 158, 11, 0.3)',
+          border: colors.warningBorder,
         };
       case 'error':
         return {
-          bg: 'rgba(239, 68, 68, 0.15)',
+          bg: colors.errorMuted,
           text: colors.error,
-          border: 'rgba(239, 68, 68, 0.3)',
+          border: colors.errorBorder,
         };
       default:
         return {
@@ -76,7 +76,6 @@ export function Badge({
           paddingVertical: isSm ? 2 : 4,
           paddingHorizontal: isSm ? spacing.xs + 2 : spacing.sm + 2,
         },
-        variant === 'unread' && styles.unreadShadow,
         style,
       ]}
       testID={testID}
@@ -109,12 +108,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     includeFontPadding: false,
     textTransform: 'capitalize',
-  },
-  unreadShadow: {
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 3,
   },
 });

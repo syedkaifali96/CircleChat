@@ -21,7 +21,7 @@ const SIZE_MAP: Record<AvatarSize, { dimension: number; fontSize: number; dotSiz
   xl: { dimension: 72, fontSize: 32, dotSize: 16 },
 };
 
-const ACCENT_COLORS = ['#7C3AED', '#8B5CF6', '#6366F1', '#4F46E5', '#A855F7', '#EC4899'];
+const ACCENT_COLORS = ['#F58A7A', '#D4B5FF', '#92B7E8', '#71B7A2', '#E6B977', '#C58EA8'];
 
 function getColorForName(name: string): string {
   let hash = 0;
@@ -48,7 +48,7 @@ export function Avatar({
       {uri ? (
         <Image
           source={{ uri }}
-          style={[styles.image, { width: dimension, height: dimension, borderRadius: dimension / 2 }]}
+          style={[styles.image, { width: dimension, height: dimension, borderRadius: dimension * 0.34 }]}
         />
       ) : (
         <View
@@ -57,7 +57,7 @@ export function Avatar({
             {
               width: dimension,
               height: dimension,
-              borderRadius: dimension / 2,
+              borderRadius: dimension * 0.34,
               backgroundColor: bgColor,
             },
           ]}
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: colors.borderActive,
   },
   initial: {
     color: colors.text,

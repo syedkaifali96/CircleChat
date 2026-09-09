@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/auth/AuthContext';
 import { apiFetch, uploadAndAssignAvatar } from '../../src/lib/api';
-import { colors } from '../../src/design/tokens';
-
-/**
- * Profile screen (M3): shows the authenticated user's profile (username is
- * fixed, per the MVP rule), links to the edit flow, and handles avatar
- * selection/upload with progress and error states. The avatar image itself
- * loads through a short-TTL presigned URL issued by the server after the
- * avatar access check — never a permanent public URL.
- */
+import { useSafeInsets } from '../../src/lib/safeInsets';
+import { colors, radii, shadows, spacing, typography } from '../../src/design/tokens';
+import { BottomNav } from '../../src/components/BottomNav';
+import { Icon, type IconName } from '../../src/components/Icon';
 
 async function fetchAvatarUri(token: string): Promise<string | null> {
   try {
@@ -26,8 +21,31 @@ async function fetchAvatarUri(token: string): Promise<string | null> {
   }
 }
 
+interface SettingsRowProps {
+  icon: IconName;
+  title: string;
+  detail: string;
+  onPress: () => void;
+  testID: string;
+}
+
+function SettingsRow({ icon, title, detail, onPress, testID }: SettingsRowProps) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]} testID={testID}>
+      <View style={styles.settingsIcon}><Icon name={icon} size={19} color={colors.accent} /></View>
+      <View style={styles.settingsCopy}>
+        <Text style={styles.settingsTitle}>{title}</Text>
+        <Text style={styles.settingsDetail}>{detail}</Text>
+      </View>
+      <Icon name="chevron-right" size={20} color={colors.textMuted} />
+    </Pressable>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, updateUser, signOut } = useAuth();
+  const router = useRouter();
+  const insets = useSafeInsets();
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,7 +58,7 @@ export default function ProfileScreen() {
     }
     let cancelled = false;
     setAvatarLoading(true);
-    (async () => {
+    void (async () => {
       const session = await import('../../src/auth/session');
       const token = (await session.loadSessionToken()) ?? '';
       const uri = await fetchAvatarUri(token);
@@ -54,14 +72,6 @@ export default function ProfileScreen() {
     };
   }, [user?.avatarMediaId]);
 
-  if (!user) {
-    return (
-      <View style={styles.container} testID="profile-loading">
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
-  }
-
   const onPickAvatar = async () => {
     setUploadError(null);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -74,9 +84,8 @@ export default function ProfileScreen() {
       allowsEditing: true,
       quality: 0.8,
     });
-    if (result.canceled || result.assets.length === 0) {
-      return;
-    }
+    if (result.canceled || result.assets.length === 0) return;
+
     const asset = result.assets[0]!;
     const mimeType = asset.mimeType ?? 'image/jpeg';
     setUploading(true);
@@ -91,8 +100,7 @@ export default function ProfileScreen() {
       const token = (await session.loadSessionToken()) ?? '';
       const updated = await uploadAndAssignAvatar(token, asset.uri, mimeType, blob.size);
       updateUser(updated.user);
-      const uri = await fetchAvatarUri(token);
-      setAvatarUri(uri);
+      setAvatarUri(await fetchAvatarUri(token));
     } catch {
       setUploadError('Upload failed. Check your connection and try again.');
     } finally {
@@ -100,90 +108,121 @@ export default function ProfileScreen() {
     }
   };
 
+  if (!user) {
+    return (
+      <View style={styles.loading} testID="profile-loading">
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container} testID="profile-screen">
-      <Pressable onPress={() => void onPickAvatar()} disabled={uploading} testID="avatar-button">
-        {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={styles.avatar} testID="avatar-image" />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]} testID="avatar-placeholder">
-            <Text style={styles.avatarInitial}>{user.displayName.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        {uploading || avatarLoading ? (
-          <ActivityIndicator style={styles.uploadIndicator} color={colors.accent} />
-        ) : null}
-      </Pressable>
-      <Text style={styles.avatarHint} testID="avatar-hint">
-        Tap the avatar to change it (JPG/PNG/WebP/GIF, max 2 MB)
-      </Text>
-
-      <Text style={styles.displayName} testID="profile-display-name">
-        {user.displayName}
-      </Text>
-      <Text style={styles.username} testID="profile-username">
-        @{user.username} · username cannot be changed
-      </Text>
-      {user.bio ? (
-        <Text style={styles.bio} testID="profile-bio">
-          {user.bio}
-        </Text>
-      ) : (
-        <Text style={[styles.bio, styles.bioEmpty]} testID="profile-bio-empty">
-          No bio yet.
-        </Text>
-      )}
-      {uploadError ? (
-        <Text style={styles.error} testID="profile-upload-error">
-          {uploadError}
-        </Text>
-      ) : null}
-
-      <Link href="/(app)/profile-edit" style={styles.editLink} testID="profile-edit-link">
-        Edit profile
-      </Link>
-      <Link href="/(app)/app-lock" style={styles.editLink} testID="app-lock-link">
-        App lock
-      </Link>
-      <Pressable
-        style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
-        onPress={() => void signOut()}
-        testID="profile-logout"
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, spacing.xl) + spacing.md }]}
+        testID="profile-screen"
       >
-        <Text style={styles.logoutText}>Log out</Text>
-      </Pressable>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.eyebrow}>YOUR SPACE</Text>
+            <Text style={styles.pageTitle}>Profile</Text>
+          </View>
+          <View style={styles.lockMark}><Icon name="lock" size={18} color={colors.primary} /></View>
+        </View>
+
+        <View style={styles.hero}>
+          <Pressable
+            onPress={() => void onPickAvatar()}
+            disabled={uploading}
+            style={({ pressed }) => [styles.avatarButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            testID="avatar-button"
+          >
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatar} testID="avatar-image" />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]} testID="avatar-placeholder">
+                <Text style={styles.avatarInitial}>{user.displayName.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+            <View style={styles.cameraBadge}><Icon name="plus" size={15} color={colors.background} /></View>
+            {uploading || avatarLoading ? <ActivityIndicator style={styles.uploadIndicator} color={colors.text} /> : null}
+          </Pressable>
+
+          <Text style={styles.displayName} testID="profile-display-name">{user.displayName}</Text>
+          <Text style={styles.username} testID="profile-username">@{user.username}</Text>
+          {user.bio ? (
+            <Text style={styles.bio} testID="profile-bio">{user.bio}</Text>
+          ) : (
+            <Text style={[styles.bio, styles.bioEmpty]} testID="profile-bio-empty">Your little private world.</Text>
+          )}
+          <Text style={styles.avatarHint} testID="avatar-hint">Tap your photo to update it</Text>
+          {uploadError ? <Text style={styles.error} testID="profile-upload-error">{uploadError}</Text> : null}
+        </View>
+
+        <View style={styles.settings}>
+          <SettingsRow
+            icon="profile"
+            title="Edit profile"
+            detail="Name, bio and profile photo"
+            onPress={() => router.push('/(app)/profile-edit')}
+            testID="profile-edit-link"
+          />
+          <SettingsRow
+            icon="lock"
+            title="Privacy & app lock"
+            detail="PIN and biometric protection"
+            onPress={() => router.push('/(app)/app-lock')}
+            testID="app-lock-link"
+          />
+          <SettingsRow
+            icon="bell"
+            title="Notifications"
+            detail="Messages, sound and previews"
+            onPress={() => router.push('/(app)/notification-settings')}
+            testID="notification-settings-link"
+          />
+        </View>
+
+        <Pressable onPress={() => void signOut()} style={({ pressed }) => [styles.logout, pressed && styles.pressed]} testID="profile-logout">
+          <Icon name="logout" size={17} color={colors.primary} />
+          <Text style={styles.logoutText}>Log out</Text>
+        </Pressable>
+      </ScrollView>
+      <BottomNav activeTab="profile" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', padding: 24 },
-  avatar: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    backgroundColor: colors.surface,
-    marginTop: 48,
-  },
-  avatarPlaceholder: { alignItems: 'center', justifyContent: 'center', borderColor: colors.border, borderWidth: 1 },
-  avatarInitial: { color: colors.accent, fontSize: 40, fontWeight: '700' },
-  uploadIndicator: { position: 'absolute', top: 48 },
-  avatarHint: { color: colors.textMuted, fontSize: 10, marginTop: 8 },
-  displayName: { color: colors.text, fontSize: 24, fontWeight: '700', marginTop: 16 },
-  username: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
-  bio: { color: colors.textSecondary, fontSize: 14, marginTop: 16, textAlign: 'center' },
-  bioEmpty: { color: colors.textMuted, fontStyle: 'italic' },
-  error: { color: colors.error, fontSize: 13, marginTop: 12 },
-  editLink: { color: colors.accent, marginTop: 24, fontSize: 15, fontWeight: '600' },
-  logout: {
-    marginTop: 24,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    backgroundColor: colors.surface,
-  },
-  pressed: { opacity: 0.85 },
-  logoutText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  screen: { flex: 1, backgroundColor: colors.background },
+  loading: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xl },
+  eyebrow: { ...typography.captionStrong, color: colors.textMuted, letterSpacing: 1.2 },
+  pageTitle: { ...typography.h1, color: colors.text, marginTop: spacing.xs },
+  lockMark: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.primaryGlow, alignItems: 'center', justifyContent: 'center' },
+  hero: { alignItems: 'center', paddingVertical: spacing.md },
+  avatarButton: { width: 104, height: 104 },
+  avatar: { width: 104, height: 104, borderRadius: 35, backgroundColor: colors.surface },
+  avatarPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+  avatarInitial: { color: colors.background, fontSize: 40, fontWeight: '700' },
+  cameraBadge: { position: 'absolute', right: -4, bottom: -4, width: 36, height: 36, borderRadius: 13, borderWidth: 3, borderColor: colors.background, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+  uploadIndicator: { position: 'absolute', left: 40, top: 40 },
+  displayName: { ...typography.h2, color: colors.text, marginTop: spacing.lg },
+  username: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs },
+  bio: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md, textAlign: 'center' },
+  bioEmpty: { color: colors.textMuted },
+  avatarHint: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm },
+  error: { ...typography.caption, color: colors.error, marginTop: spacing.md, textAlign: 'center' },
+  settings: { marginTop: spacing.xl, borderRadius: radii.xxl, backgroundColor: colors.surface, paddingHorizontal: spacing.md, ...shadows.subtle },
+  settingsRow: { minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  settingsIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.backgroundElevated, alignItems: 'center', justifyContent: 'center' },
+  settingsCopy: { flex: 1 },
+  settingsTitle: { ...typography.bodyStrong, color: colors.text },
+  settingsDetail: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  logout: { minHeight: 50, marginTop: spacing.xl, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.primaryBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  logoutText: { ...typography.button, color: colors.primary },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });
