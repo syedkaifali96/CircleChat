@@ -50,7 +50,7 @@ export function Button({
         return {
           container: styles.primaryContainer,
           text: styles.primaryText,
-          spinnerColor: colors.text,
+          spinnerColor: colors.primaryContent,
         };
       case 'secondary':
         return {
@@ -175,10 +175,10 @@ const styles = StyleSheet.create({
   primaryContainer: {
     backgroundColor: colors.primary,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: colors.primaryBorder,
   },
   primaryText: {
-    color: colors.text,
+    color: colors.primaryContent,
   },
   secondaryContainer: {
     backgroundColor: colors.surfaceElevated,
