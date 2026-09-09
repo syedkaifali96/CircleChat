@@ -411,7 +411,11 @@ describe('ConversationScreen', () => {
     });
 
     fireEvent.scroll(screen.getByTestId('conversation-list'), {
-      nativeEvent: { contentOffset: { y: 0 } },
+      nativeEvent: {
+        contentOffset: { x: 0, y: 0 },
+        contentSize: { width: 320, height: 1200 },
+        layoutMeasurement: { width: 320, height: 640 },
+      },
     });
 
     await waitFor(() =>

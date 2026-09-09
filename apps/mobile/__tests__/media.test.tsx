@@ -102,6 +102,7 @@ jest.mock('../src/lib/socket', () => ({
   sendTypingStart: jest.fn(),
   sendTypingStop: jest.fn(),
   trackJoinedRoom: jest.fn(),
+  untrackJoinedRoom: jest.fn(),
   resetSocket: jest.fn(),
 }));
 
