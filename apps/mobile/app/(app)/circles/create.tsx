@@ -44,7 +44,18 @@ export default function CreateCircleScreen() {
   return (
     <View style={styles.flex}>
       <View style={styles.container} testID="create-circle-screen">
-        <Text style={styles.title}>Create Circle</Text>
+        <View style={styles.headerRow} testID="create-circle-header">
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityLabel="Back"
+            accessibilityRole="button"
+            testID="create-circle-back"
+          >
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
+          <Text style={styles.title}>Create Circle</Text>
+        </View>
         <Text style={styles.subtitle}>A private space for 2–5 of your people.</Text>
 
         <Text style={styles.label}>Circle name</Text>
@@ -95,7 +106,15 @@ export default function CreateCircleScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24, paddingTop: 64 },
+  content: { padding: 24, paddingTop: 12 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  backText: { color: colors.accent, fontSize: 28, fontWeight: '700', paddingHorizontal: 6 },
   title: { color: colors.text, fontSize: 26, fontWeight: '700' },
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
   label: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 24 },

@@ -599,6 +599,50 @@ describe('reactions (docs/DATABASE.md §1.8, design.md §15)', () => {
 });
 
 describe('read state + unread counts (docs/API.md)', () => {
+  it('advances the read pointer on an EXISTING direct conversation (guard-trigger regression)', async () => {
+    // Regression: DIRECT_PARTICIPANT_LIMIT 500s. Direct conversations carry
+    // their two participant rows from creation, so advancing the read pointer
+    // must UPDATE the existing row — the ON CONFLICT upsert used previously
+    // still fires the M1 BEFORE INSERT guard, which raises on any insert
+    // into a full direct conversation and 500s the read call.
+    const a = await signup(`rdd_${suffix()}`);
+    const b = await signup(`rdd2_${suffix()}`);
+    await formCircle(a.token, [b]);
+    const username = (await client.query<{ username: string }>(
+      `SELECT username FROM users WHERE id = $1`,
+      [b.userId],
+    )).rows[0]!.username;
+    const created = await createDirect(a.token, username);
+    const convId = created.body.conversationId as string;
+
+    // b sends two messages; a has 2 unread.
+    const ids: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await send(b.token, convId, { body: `dm${i}` });
+      expect(res.statusCode).toBe(201);
+      ids.push((res.body.message as { id: string }).id);
+    }
+
+    const listA = (await app.inject({ method: 'GET', url: '/v1/conversations', headers: bearer(a.token) }))
+      .json().conversations.find((c: { id: string }) => c.id === convId);
+    expect(listA.unreadCount).toBe(2);
+
+    // a reads the newest message — this MUST not 500.
+    const read = await app.inject({
+      method: 'POST',
+      url: `/v1/conversations/${convId}/read`,
+      headers: bearer(a.token),
+      payload: { lastReadMessageId: ids[1] },
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json().unreadCount).toBe(0);
+
+    // The list reflects the cleared unread.
+    const listAfter = (await app.inject({ method: 'GET', url: '/v1/conversations', headers: bearer(a.token) }))
+      .json().conversations.find((c: { id: string }) => c.id === convId);
+    expect(listAfter.unreadCount).toBe(0);
+  });
+
   it('tracks read pointers and computes unread server-side', async () => {
     const owner = await signup(`rd_${suffix()}`);
     const member = await signup(`rdm_${suffix()}`);

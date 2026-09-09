@@ -419,3 +419,28 @@ describe('ConversationScreen', () => {
     expect(screen.queryByTestId('action-pin')).toBeNull();
   }, 30_000);
 });
+
+// Bug fix regression (real-device): the composer must sit above the Android
+// system navigation bar using the LIVE bottom safe-area inset, never a fixed
+// pixel value. A provider-supplied inset must flow into the padding.
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+
+describe('ConversationScreen composer safe area (bug fixes)', () => {
+  it('pads the composer with the live bottom safe-area inset', async () => {
+    mockApi.fetchChatHeader.mockResolvedValue({ header: { type: 'direct', circleId: null, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null } });
+    mockApi.fetchMessages.mockResolvedValue({ messages: [], nextBeforeCursor: null });
+
+    const insets = { top: 10, bottom: 34, left: 0, right: 0 };
+    render(
+      <SafeAreaInsetsContext.Provider value={insets}>
+        <ConversationScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('composer')).toBeTruthy(), { timeout: 8000 });
+    const composer = screen.getByTestId('composer');
+    const style = Array.isArray(composer.props.style) ? Object.assign({}, ...composer.props.style) : composer.props.style;
+    // 12 base padding + the injected 34px bottom inset = 46.
+    expect(style.paddingBottom).toBe(46);
+  });
+});

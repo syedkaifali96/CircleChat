@@ -333,8 +333,13 @@ export async function markConversationRead(
   }
 
   await db.transaction(async (tx) => {
-    // Circle conversations have no participant row until the first read —
-    // upsert one. (The M1 direct-guard trigger only restricts direct rows.)
+    // Direct conversations already carry their two participant rows from
+    // creation, so advancing the pointer is an UPDATE — the M1
+    // DIRECT_PARTICIPANT_LIMIT guard fires on any INSERT against a full
+    // direct conversation, even for an ON CONFLICT upsert (BEFORE INSERT
+    // triggers run before conflict resolution). Circle conversations get
+    // their participant rows on first read, so a plain insert (conflict-safe)
+    // covers the race of two devices reading at once.
     const current = await tx
       .select({ lastReadMessageId: conversationParticipants.lastReadMessageId })
       .from(conversationParticipants)
@@ -357,17 +362,29 @@ export async function markConversationRead(
         return;
       }
     }
-    await tx
-      .insert(conversationParticipants)
-      .values({
-        conversationId: input.conversationId,
-        userId: input.userId,
-        lastReadMessageId: input.lastReadMessageId,
-      })
-      .onConflictDoUpdate({
-        target: [conversationParticipants.conversationId, conversationParticipants.userId],
-        set: { lastReadMessageId: input.lastReadMessageId },
-      });
+    if (current.length > 0) {
+      await tx
+        .update(conversationParticipants)
+        .set({ lastReadMessageId: input.lastReadMessageId })
+        .where(
+          and(
+            eq(conversationParticipants.conversationId, input.conversationId),
+            eq(conversationParticipants.userId, input.userId),
+          ),
+        );
+    } else {
+      await tx
+        .insert(conversationParticipants)
+        .values({
+          conversationId: input.conversationId,
+          userId: input.userId,
+          lastReadMessageId: input.lastReadMessageId,
+        })
+        .onConflictDoUpdate({
+          target: [conversationParticipants.conversationId, conversationParticipants.userId],
+          set: { lastReadMessageId: input.lastReadMessageId },
+        });
+    }
   });
 
   return {

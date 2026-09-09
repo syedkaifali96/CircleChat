@@ -76,7 +76,18 @@ export default function JoinCircleScreen() {
   return (
     <View style={styles.flex}>
       <View style={styles.container} testID="join-circle-screen">
-        <Text style={styles.title}>Join Circle</Text>
+        <View style={styles.headerRow} testID="join-circle-header">
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityLabel="Back"
+            accessibilityRole="button"
+            testID="join-circle-back"
+          >
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
+          <Text style={styles.title}>Join Circle</Text>
+        </View>
         <Text style={styles.subtitle}>Enter the invite code a Circle member shared with you.</Text>
 
         <Text style={styles.label}>Invite code</Text>
@@ -160,7 +171,15 @@ export default function JoinCircleScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24, paddingTop: 64 },
+  content: { padding: 24, paddingTop: 12 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  backText: { color: colors.accent, fontSize: 28, fontWeight: '700', paddingHorizontal: 6 },
   title: { color: colors.text, fontSize: 26, fontWeight: '700' },
   subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
   label: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 24 },

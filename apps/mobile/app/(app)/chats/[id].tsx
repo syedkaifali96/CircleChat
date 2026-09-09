@@ -45,6 +45,7 @@ import {
   trackJoinedRoom,
 } from '../../../src/lib/socket';
 import { MessageBubble } from '../../../src/chat/MessageBubble';
+import { useSafeInsets } from '../../../src/lib/safeInsets';
 import { colors } from '../../../src/design/tokens';
 
 /**
@@ -109,8 +110,15 @@ function ThemedComposer({
   onAttachments: () => void;
 }) {
   const themed = useCircleTheme().colors;
+  // Bottom safe-area inset keeps the composer above the system navigation
+  // bar (gesture and 3-button devices report different heights — always the
+  // live inset, never a fixed pixel value).
+  const insets = useSafeInsets();
   return (
-    <View style={[styles.composer, { borderTopColor: themed.border }]} testID="composer">
+    <View
+      style={[styles.composer, { borderTopColor: themed.border, paddingBottom: 12 + Math.max(insets.bottom, 0) }]}
+      testID="composer"
+    >
       <Pressable style={[styles.composerPlus, { backgroundColor: themed.surface, borderColor: themed.border }]} onPress={onAttachments} testID="composer-attachments">
         <Text style={styles.composerPlusText}>+</Text>
       </Pressable>

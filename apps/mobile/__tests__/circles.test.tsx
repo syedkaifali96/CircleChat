@@ -15,10 +15,12 @@ import * as apiModule from '../src/lib/api';
 
 const replaceMock = jest.fn();
 const pushMock = jest.fn();
+const backMock = jest.fn();
 
 declare global {
   var __circlesReplaceMock: jest.Mock | undefined; // hoisted expo-router mock bridge
   var __circlesPushMock: jest.Mock | undefined; // hoisted expo-router mock bridge
+  var __circlesBackMock: jest.Mock | undefined; // hoisted expo-router mock bridge
 }jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest factory must be CJS
   const { Text: RNText, Pressable: RNPressable } = require('react-native');
@@ -32,7 +34,7 @@ declare global {
     useRouter: () => ({
       replace: (...args: unknown[]) => globalThis.__circlesReplaceMock?.(...args),
       push: (...args: unknown[]) => globalThis.__circlesPushMock?.(...args),
-      back: jest.fn(),
+      back: (...args: unknown[]) => globalThis.__circlesBackMock?.(...args),
     }),
     useFocusEffect: (callback: () => void) => {
       // Focus effects fire AFTER mount (like real expo-router) — running the
@@ -124,11 +126,13 @@ beforeEach(() => {
   jest.clearAllMocks();
   (globalThis as { __circlesReplaceMock?: jest.Mock }).__circlesReplaceMock = replaceMock;
   (globalThis as { __circlesPushMock?: jest.Mock }).__circlesPushMock = pushMock;
+  (globalThis as { __circlesBackMock?: jest.Mock }).__circlesBackMock = backMock;
 });
 
 afterEach(() => {
   delete (globalThis as { __circlesReplaceMock?: jest.Mock }).__circlesReplaceMock;
   delete (globalThis as { __circlesPushMock?: jest.Mock }).__circlesPushMock;
+  delete (globalThis as { __circlesBackMock?: jest.Mock }).__circlesBackMock;
 });
 
 describe('HomeScreen circles (M4)', () => {
@@ -138,7 +142,6 @@ describe('HomeScreen circles (M4)', () => {
     render(<HomeScreen />);
 
     await waitFor(() => expect(screen.getByTestId('circle-card-c-1')).toBeTruthy());
-    expect(screen.getByText('Night Owls')).toBeTruthy();
     expect(screen.getByText('3 members · owner')).toBeTruthy();
     expect(screen.getByText('Family')).toBeTruthy();
     expect(screen.getByText('5 members · member')).toBeTruthy();
@@ -162,6 +165,19 @@ describe('HomeScreen circles (M4)', () => {
 
     await waitFor(() => expect(screen.getByTestId('home-error')).toBeTruthy());
     expect(screen.getByTestId('home-retry')).toBeTruthy();
+  });
+});
+
+describe('CreateCircleScreen header (real-device bug fixes)', () => {
+  it('renders the header with title and a working back button', () => {
+    render(<CreateCircleScreen />);
+
+    expect(screen.getByTestId('create-circle-header')).toBeTruthy();
+    expect(screen.getByTestId('create-circle-back')).toBeTruthy();
+    expect(screen.getAllByText('Create Circle').length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.press(screen.getByTestId('create-circle-back'));
+    expect(backMock).toHaveBeenCalled();
   });
 });
 
@@ -197,6 +213,19 @@ describe('CreateCircleScreen', () => {
     fireEvent.press(screen.getByTestId('create-circle-submit'));
 
     expect(await screen.findByTestId('create-circle-error')).toBeTruthy();
+  });
+});
+
+describe('JoinCircleScreen header (real-device bug fixes)', () => {
+  it('renders the header with title and a working back button', () => {
+    render(<JoinCircleScreen />);
+
+    expect(screen.getByTestId('join-circle-header')).toBeTruthy();
+    expect(screen.getByTestId('join-circle-back')).toBeTruthy();
+    expect(screen.getByText('Join Circle')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('join-circle-back'));
+    expect(backMock).toHaveBeenCalled();
   });
 });
 

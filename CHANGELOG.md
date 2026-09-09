@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Bug fixes — real-device testing pass
+
+- **Unread badge never cleared on direct conversations (server):** `markConversationRead` advanced the read pointer with an `INSERT … ON CONFLICT DO UPDATE` upsert, but the M1 `DIRECT_PARTICIPANT_LIMIT` BEFORE INSERT guard fires *before* conflict resolution on every insert into a full direct conversation — so every read call on an existing direct chat 500'd and the pointer never advanced (circle conversations worked because their participant rows are created lazily on first read). The service now UPDATEs the existing row and only INSERTs when one is absent, keeping the D1 invariant untouched. Regression test: read pointer advances on an existing direct conversation, unread goes 2 → 0, list reflects it.
+- **Create/Join Circle screens had no header:** both screens now render the app's standard header row (title + back chevron, matching the Chats/Home pattern) with working back navigation (`create-circle-header`/`join-circle-header`, `create-circle-back`/`join-circle-back`).
+- **Composer overlapped the Android navigation bar:** the chat composer now pads its bottom with the live safe-area inset (`useSafeInsets().bottom` + base padding) instead of a fixed value, so it stays reachable on both gesture and 3-button navigation devices. Regression test injects a 34px inset and asserts it flows into the composer's `paddingBottom`.
+
 ### M13 — App Lock
 
 - Mobile-only local privacy layer (design.md §22, docs/ARCHITECTURE.md §2.8): a PIN (4–6 digits) plus platform biometrics locks the whole app. **100% local** — the PIN lives only as a salted Argon2id PHC string in SecureStore (fresh 16-byte salt per setup, OWASP m=19456/t=2/p=1 carried inline in the PHC string, constant-time comparison via `@noble/hashes` pure-JS Argon2id + `expo-crypto` salt); **nothing is sent to the server and no App-Lock endpoint, storage, or migration exists**.
