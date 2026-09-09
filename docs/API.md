@@ -1,6 +1,6 @@
 # CircleChat — API Design
 
-> Status: **Planned — evolves with implementation.** All endpoints are JSON over HTTPS under
+> Status: **Implemented MVP contract through M13.** All endpoints below are JSON over HTTPS under
 > `/v1`. Auth: `Authorization: Bearer <session token>` unless marked **public**.
 > Errors: stable machine codes + generic human messages (see SECURITY.md §12).
 >
@@ -43,10 +43,9 @@ POST /v1/circles/:id/ownership-transfer {newOwnerUserId} — owner only; atomic 
 GET  /v1/circles/:id/settings           member — {themePreset: dark_purple|midnight|orchid|ember, accentColor: #RRGGBB|null, backgroundKey: none|aurora|dusk|velvet|null}
 PATCH /v1/circles/:id/settings          owner/admin; same fields, all optional; unknown enum values → 400; backgroundKey 'none' persists as null
 GET  /v1/circles/:id/home               Circle Home payload (unread, active polls preview + activePollsCount, pins, member count, members preview, caller role, conversation id) — active member only (non-members get a generic 404)
-PATCH /v1/circles/:id/notification-pref {pref: all|mentions|muted} — member
-
 POST /v1/conversations/direct           {username} → find-or-create direct conversation; target must share an active Circle with caller
 GET  /v1/conversations                  list (circles + directs) with last message + unread
+GET  /v1/conversations/:id/header      authorized Circle/direct identity for the chat header
 GET  /v1/conversations/:id/messages     ?before=&limit= keyset pagination — authorized participants/members only
 POST /v1/conversations/:id/messages     {type, body?, mediaId?, externalUrl?, replyToId?, clientMessageId} — authorized participant/member + validated + idempotent; media types require a READY, conversation-bound media row owned by the sender (M7); type=gif carries a https externalUrl (M7.1a, GIPHY client-side search) with no storage round-trip
 PATCH /v1/messages/:id                  sender only, ≤24h, {body}
@@ -73,9 +72,11 @@ GET  /v1/circles/:id/pinboard           member → {items} — each pin referenc
 POST /v1/circles/:id/pinboard           member (pin) — {messageId} only; the server verifies the message is a live, non-tombstoned message of THIS Circle's own conversation (foreign/direct ids answer a generic 404). Duplicate pin of the same message → 409 PIN_EXISTS. Owner/admin may remove any pin, a member only their own — otherwise 403 FORBIDDEN. Mutations broadcast `pinboard:updated` to the conversation room (REST stays source of truth)
 DELETE /v1/circles/:id/pinboard/:itemId
 
-GET  /v1/notifications                  activity list
-POST /v1/notifications/read             {ids? | all}
 ```
+
+Notification activity-list endpoints and the earlier Circle-level
+`{pref: all|mentions|muted}` shape are not implemented. Current preferences use
+the global user endpoints plus the per-conversation endpoints listed above.
 
 ## Realtime (Socket.IO)
 
@@ -163,9 +164,10 @@ Presigned PUT uploads must bind the intended `Content-Type` and enforce the conf
 `content-length-range` for the media kind. The server still confirms the uploaded object with size
 and magic-byte checks before marking it ready.
 
-GIF files may be uploaded as `image/gif` when the normal image upload allowlist supports them. The
-GIF picker/provider experience remains V2; supporting GIF files as an upload format does not promote
-the GIF picker to MVP.
+GIF files may be uploaded as `image/gif` when the normal image upload allowlist
+supports them. The implemented GIPHY picker calls the provider directly from
+the mobile client, shows required attribution and sends an HTTPS external URL;
+GIF bytes do not pass through the CircleChat API or private bucket.
 
 ## Conventions
 
@@ -177,11 +179,10 @@ the GIF picker to MVP.
 - Username is fixed after account creation in MVP; there is no username-change endpoint.
 - Account deletion is explicitly deferred to post-MVP; no deletion endpoint is part of the MVP API.
 
-## Open Questions (not blocking the approved documentation gate)
+## Implemented Product Decisions
 
-1. **D2 — message edit window:** 24h proposed; confirm before implementation if product policy changes.
-2. **D3 — deletion rights in Circles:** admins deleting others' messages are shown in the API above;
-   confirm or restrict to sender-only before implementation.
-
-These are product-policy details only. They do not change the approved stack or the finalized D1
-DM authorization decision.
+- **D1:** direct-message authorization uses explicit participants; direct chats
+  can only be created between people sharing an active Circle.
+- **D2:** sender edits are allowed for 24 hours.
+- **D3:** senders may tombstone their messages; Circle owners/admins may also
+  tombstone messages in their Circle conversation.

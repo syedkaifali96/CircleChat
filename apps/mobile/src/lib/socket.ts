@@ -126,6 +126,11 @@ export function trackJoinedRoom(conversationId: string): void {
   joinedRooms.add(conversationId);
 }
 
+/** Stops reconnects from silently rejoining a room after its screen closed. */
+export function untrackJoinedRoom(conversationId: string): void {
+  joinedRooms.delete(conversationId);
+}
+
 /** Optimistic typing signals; the server rate-limits and TTL-expires them. */
 export function sendTypingStart(conversationId: string): void {
   socket?.emit('typing:start', { conversationId });

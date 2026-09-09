@@ -1,8 +1,8 @@
 # CircleChat — Deployment Plan
 
-> Status: **Proposed — awaiting approval.** Environments, hosting, CI/CD, monitoring and cost
-> expectations. Provider choices can be swapped without architecture changes (all are commodity
-> Postgres/S3-compatible/Node hosts).
+> Status: **Local development and pull-request CI are implemented. Production
+> hosting, release automation, monitoring and backup verification remain the
+> approved M16 plan—not a claim that CircleChat is already deployed.**
 
 ---
 
@@ -42,7 +42,10 @@ NODE_ENV=production
 ```
 
 - Secrets live in Railway/R2/EAS secret stores only. `.env` is git-ignored; `.env.example` lists names with empty values. Never log secrets; never put them in the Expo client bundle — the mobile app only knows the API base URL.
-- Client-side config: `API_BASE_URL` per build channel (staging build points at staging).
+- Client-side config: `EXPO_PUBLIC_API_URL` per build channel and
+  `EXPO_PUBLIC_GIPHY_API_KEY` for attributed client-side GIF search. Expo public
+  values are bundle-visible configuration, never secrets.
+- No OpenAI or other generative-AI API key is required by the current app.
 
 ### 3.1 Local development & real-device (USB) workflow
 
@@ -54,9 +57,16 @@ NODE_ENV=production
 
 ## 4. CI/CD (GitHub Actions)
 
+Current pull-request CI:
+
 ```text
-pull request →  install → typecheck → lint → unit tests → integration tests (PostgreSQL service container in GitHub Actions)
-             → Drizzle migration dry-run check
+pull request → install → lint → typecheck → shared/mobile/server tests
+             → real PostgreSQL integration tests → Android Expo export
+```
+
+Planned M16 release automation (not implemented/deployed yet):
+
+```text
 merge to main → same checks → deploy server to staging → run migrations → smoke test (/health, socket ping)
 tag v*       → deploy to production → migrations → smoke test → Sentry release marker
 mobile       → EAS Build on demand / on tag: Android staging APK; manual EAS Submit for store later
@@ -94,6 +104,12 @@ Media is the cost driver to watch (spec risk #4) — upload caps and the cleanup
 
 ## 8. Production Launch Checklist (summary)
 
-Secrets rotated & in platform stores ✔ migrations applied from clean state ✔
-restore drill done ✔ rate limits active ✔ Sentry receiving ✔ backups on ✔
-`.env` not in repo ✔ dependency audit clean ✔ security checklist (SECURITY.md §14) signed off ✔
+- [ ] Production secrets rotated and stored in provider secret stores
+- [ ] Migrations applied from a clean staging database
+- [ ] Restore drill completed and recorded
+- [ ] Rate limits and WebSocket behavior verified on the chosen host
+- [ ] Sentry receiving scrubbed events and alerts configured
+- [ ] Database backups/PITR enabled
+- [ ] `.env` and real credentials absent from the repository
+- [ ] Dependency audit reviewed
+- [ ] `SECURITY.md` launch checklist signed off

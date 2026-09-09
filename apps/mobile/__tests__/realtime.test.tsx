@@ -89,6 +89,7 @@ jest.mock('../src/lib/socket', () => ({
   sendTypingStart: jest.fn(),
   sendTypingStop: jest.fn(),
   trackJoinedRoom: jest.fn(),
+  untrackJoinedRoom: jest.fn(),
   resetSocket: jest.fn(),
 }));
 
@@ -98,13 +99,16 @@ const mockSocket = socketModule as unknown as {
   sendTypingStart: jest.Mock;
   sendTypingStop: jest.Mock;
   trackJoinedRoom: jest.Mock;
+  untrackJoinedRoom: jest.Mock;
 };
 
 type TypingHandler = (payload: { conversationId: string; userId: string; isTyping: boolean }) => void;
 type PresenceHandler = (payload: { userId: string; lastSeenAt: string | null; online: boolean }) => void;
+type MessageHandler = (payload: { conversationId: string; [key: string]: unknown }) => void;
 
 let typingHandler: TypingHandler | null = null;
 let presenceHandler: PresenceHandler | null = null;
+let messageHandler: MessageHandler | null = null;
 let unsubscribeCalls = 0;
 
 const header = { type: 'direct' as const, circleId: null, title: 'Ayesha', avatarMediaId: null, subtitle: '@ayesha', circleRole: null };
@@ -131,10 +135,12 @@ beforeEach(() => {
   jest.useFakeTimers();
   typingHandler = null;
   presenceHandler = null;
+  messageHandler = null;
   unsubscribeCalls = 0;
   mockSocket.subscribeToConversation.mockImplementation(async (options) => {
     typingHandler = options.onTyping ?? null;
     presenceHandler = options.onPresence ?? null;
+    messageHandler = options.onMessage ?? null;
     return () => {
       unsubscribeCalls += 1;
     };
@@ -241,6 +247,34 @@ describe('presence (M6)', () => {
 
     view.unmount();
     expect(unsubscribeCalls).toBe(1);
+    expect(mockSocket.untrackJoinedRoom).toHaveBeenCalledWith('conv-1');
     expect(mockSocket.sendTypingStop).toHaveBeenCalledWith('conv-1');
+  }, 30_000);
+});
+
+describe('realtime message read state', () => {
+  it('refreshes an open conversation and marks the newest socket message read', async () => {
+    await renderLoadedScreen();
+    const incoming = {
+      ...sampleMessage,
+      id: 'm-2',
+      body: 'new while open',
+      createdAt: '2026-09-04T10:01:00.000Z',
+    };
+    mockApi.fetchMessages.mockResolvedValue({
+      messages: [incoming, sampleMessage],
+      nextBeforeCursor: null,
+    });
+    mockApi.markConversationRead.mockClear();
+
+    await act(async () => {
+      messageHandler?.({ conversationId: 'conv-1' });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(screen.getByTestId('message-body-m-2')).toBeTruthy(), { timeout: 8000 });
+    await waitFor(() =>
+      expect(mockApi.markConversationRead).toHaveBeenCalledWith('test-token', 'conv-1', 'm-2'),
+    );
   }, 30_000);
 });

@@ -1,6 +1,6 @@
 # CircleChat — Architecture
 
-> Status: **Approved technical direction — implementation must follow this document.** This document is the
+> Status: **Implemented MVP baseline through M13; M14 hardening is in progress.** This document is the
 > technical source of truth for how CircleChat is built. Product behavior comes from
 > `docs/CircleChat_Product_Specification.md` and UX/design behavior from `design.md`.
 >
@@ -53,7 +53,8 @@
 
 ### 2.5 Realtime — **Socket.IO**
 
-- Rooms map to domain concepts: `circle:{circleId}`, `user:{userId}` and conversation-specific rooms as needed.
+- Actual room names are `sess:{sessionId}` for immediate session revocation and
+  `conv:{conversationId}` for authorized conversation fan-out.
 - The same session token authenticates the handshake.
 - Server-side participant/member authorization is required before room joins and on every relevant event.
 - Events are notifications, not the source of truth; clients recover state through REST.
@@ -67,7 +68,10 @@
 - Presigned PUTs must bind the intended `Content-Type` and enforce a content-length range matching the media kind.
 - Server confirmation still performs size and magic-byte checks before media becomes `ready`.
 - Chat media, profile avatars, Circle avatars and invite-preview avatars have separate authorization rules.
-- GIF files may be uploaded as `image/gif` when allowed by the image upload path. A GIF picker/provider remains V2.
+- GIF files may be uploaded as `image/gif` when allowed by the image upload path.
+  The implemented picker calls GIPHY directly from the client with required
+  attribution; provider media URLs are stored as message metadata and remain
+  visible only through the authorized conversation API.
 
 ### 2.7 Push notifications — **Expo Push**
 
@@ -89,6 +93,9 @@
 - Integration tests use a real PostgreSQL database.
 - App tests use React Native Testing Library.
 - Maestro device flows are deferred to hardening.
+- Latest CI baseline: shared 2/2, server 239/239 and mobile 138/138 tests, plus
+  lint, typecheck and Android export. Counts are a snapshot, not a substitute
+  for the M14 physical-device matrix.
 
 ### 2.10 Deployment — **Railway (server) + Neon (Postgres) + R2 + EAS Build**
 
@@ -252,8 +259,12 @@ POST /v1/conversations/:id/messages
   The only persisted piece is `users.last_seen_at`, stamped when the user's LAST socket disconnects
   (no `is_online` column — a persisted boolean would drift from reality on crash/restart).
 - Read state is persisted.
-- On reconnect, the client fetches missed messages through REST and replays its room joins
-  (the server re-checks access on every join).
+- The mobile view preserves the newest server row before reversing history for
+  oldest-to-newest rendering, then marks that exact message read. Socket message
+  events trigger a REST refresh and advance the same pointer while the chat is open.
+- On reconnect, the client fetches missed messages through REST and replays only
+  currently tracked room joins (closed screens remove their room registration;
+  the server re-checks access on every join).
 - Presence visibility: Circle members may see one another's presence; direct-chat presence is visible only to the two participants. No global presence directory.
 
 ---

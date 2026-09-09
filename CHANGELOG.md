@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Documentation synchronization
+
+- Updated README and every project document to the implemented M13 baseline,
+  current warm-midnight design direction, CI test counts and honest M14/M16
+  status. Removed stale claims that GIF search and themes were future work,
+  documented the real Socket.IO room names and current API surface, separated
+  implemented CI from planned production deployment, and explicitly confirmed
+  that the app has no generative-AI integration or AI API key.
+- Added the recommended GitHub repository description and topic set to the
+  README so repository metadata has one reviewable source of truth.
+
+### Chat reliability fixes
+
+- Chats now open at the newest message. Older history loads when the user
+  reaches the top and keeps the visible messages anchored; pending media stays
+  at the newest-message end.
+- Retrying a failed media upload reuses its optimistic bubble instead of
+  leaving a duplicate stuck in the uploading state.
+- Editable messages now prefill their current body and close cleanly after a
+  successful save.
+- External GIF messages render inline, and video/file attachment taps now open
+  the authorized download URL instead of silently doing nothing.
+- Closing a chat now removes it from the reconnect room registry, preventing a
+  later socket reconnect from silently rejoining rooms for closed screens.
+
+### Realtime read-state fix
+
+- **Unread badge could remain after opening a chat:** the conversation screen
+  subscribed to socket message events without an `onMessage` callback, so a
+  message arriving while the chat was open did not refresh the REST-authoritative
+  history or advance the read pointer. The screen now refreshes on
+  `message:new`, `message:updated`, and `message:deleted`, then marks the
+  newest message read. A mobile regression test verifies the open-chat flow.
+
 ### Bug fixes — real-device testing pass
 
 - **Unread badge never cleared on direct conversations (server):** `markConversationRead` advanced the read pointer with an `INSERT … ON CONFLICT DO UPDATE` upsert, but the M1 `DIRECT_PARTICIPANT_LIMIT` BEFORE INSERT guard fires *before* conflict resolution on every insert into a full direct conversation — so every read call on an existing direct chat 500'd and the pointer never advanced (circle conversations worked because their participant rows are created lazily on first read). The service now UPDATEs the existing row and only INSERTs when one is absent, keeping the D1 invariant untouched. Regression test: read pointer advances on an existing direct conversation, unread goes 2 → 0, list reflects it.

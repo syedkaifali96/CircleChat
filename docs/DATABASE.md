@@ -1,8 +1,8 @@
 # CircleChat — Database Design
 
-> Status: **Proposed — aligned with the approved documentation gate.** PostgreSQL 16, accessed via Drizzle ORM.
-> This document is conceptual-but-concrete: names, types, constraints and indexes are the intended
-> implementation. Physical tuning happens during implementation.
+> Status: **Implemented MVP schema through M13.** PostgreSQL 16 is accessed via
+> Drizzle ORM; committed migrations and real-PostgreSQL integration tests are
+> the executable source of truth when this document and code differ.
 
 Conventions: UUID primary keys (`gen_random_uuid()`), `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`,
 snake_case names, soft deletes only where specified. All timestamps are UTC.
@@ -374,6 +374,10 @@ Account deletion is **post-MVP** and therefore has no deletion-specific table or
 - **Ownership transfer:** transfer must run as one transaction: lock the Circle, verify the current caller is owner and the target is an active member, demote the old owner, promote the target, and preserve the exactly-one-owner invariant. The caller cannot leave/demote the owner role in a way that leaves no owner.
 - **Invite lifecycle:** create/revoke/expiry updates the hashed invite fields atomically. Preview validates the supplied code against its hash, expiry, revocation state and Circle capacity before returning limited preview data.
 - **Idempotent messages:** `(conversation_id, sender_id, client_message_id)` prevents duplicate messages caused by retries.
+- **Read pointer updates:** update an existing `conversation_participants` row
+  before attempting an insert. A direct conversation already has exactly two
+  participants, so an insert-first upsert can trip the BEFORE INSERT participant
+  limit before PostgreSQL reaches conflict resolution.
 - All writes spanning tables run in transactions with row locks on contested parent rows.
 - Pagination uses keyset ordering; no OFFSET scans for message history.
 - Expected scale is tiny (≤5 members/Circle), so indexes above are sufficient; no partitioning/read replicas for MVP.
