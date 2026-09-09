@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ApiError, fetchInvitePreview, joinCircle, type InvitePreview } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { colors } from '../../../src/design/tokens';
+import { useSafeInsets } from '../../../src/lib/safeInsets';
 
 /**
  * Join Circle flow (design.md §20): enter an invite code → see the limited
@@ -29,6 +30,7 @@ function friendlyJoinError(code: string): string {
 
 export default function JoinCircleScreen() {
   const router = useRouter();
+  const insets = useSafeInsets();
   const [code, setCode] = useState('');
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -75,7 +77,7 @@ export default function JoinCircleScreen() {
 
   return (
     <View style={styles.flex}>
-      <View style={styles.container} testID="join-circle-screen">
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 24) + 12 }]} testID="join-circle-screen">
         <View style={styles.headerRow} testID="join-circle-header">
           <Pressable
             onPress={() => router.back()}

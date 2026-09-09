@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import HomeScreen from '../app/(app)/home';
 import CreateCircleScreen from '../app/(app)/circles/create';
 import JoinCircleScreen from '../app/(app)/circles/join';
@@ -178,6 +179,33 @@ describe('CreateCircleScreen header (real-device bug fixes)', () => {
 
     fireEvent.press(screen.getByTestId('create-circle-back'));
     expect(backMock).toHaveBeenCalled();
+  });
+});
+
+describe('Create/Join header top inset (status-bar clipping fix)', () => {
+  it('create-circle container pads with the live top safe-area inset', () => {
+    const insets = { top: 42, bottom: 0, left: 0, right: 0 };
+    render(
+      <SafeAreaInsetsContext.Provider value={insets}>
+        <CreateCircleScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const container = screen.getByTestId('create-circle-screen');
+    const style = Array.isArray(container.props.style) ? Object.assign({}, ...container.props.style) : container.props.style;
+    // 42px injected inset + 12 base offset = 54 — never a fixed pixel value.
+    expect(style.paddingTop).toBe(54);
+  });
+
+  it('join-circle container pads with the live top safe-area inset', () => {
+    const insets = { top: 42, bottom: 0, left: 0, right: 0 };
+    render(
+      <SafeAreaInsetsContext.Provider value={insets}>
+        <JoinCircleScreen />
+      </SafeAreaInsetsContext.Provider>,
+    );
+    const container = screen.getByTestId('join-circle-screen');
+    const style = Array.isArray(container.props.style) ? Object.assign({}, ...container.props.style) : container.props.style;
+    expect(style.paddingTop).toBe(54);
   });
 });
 

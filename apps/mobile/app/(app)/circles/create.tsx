@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { createCircle } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
 import { colors } from '../../../src/design/tokens';
+import { useSafeInsets } from '../../../src/lib/safeInsets';
 
 /**
  * Create Circle flow (design.md §19): choose a name (and optionally a short
@@ -14,6 +15,7 @@ import { colors } from '../../../src/design/tokens';
 
 export default function CreateCircleScreen() {
   const router = useRouter();
+  const insets = useSafeInsets();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
@@ -43,7 +45,7 @@ export default function CreateCircleScreen() {
 
   return (
     <View style={styles.flex}>
-      <View style={styles.container} testID="create-circle-screen">
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 24) + 12 }]} testID="create-circle-screen">
         <View style={styles.headerRow} testID="create-circle-header">
           <Pressable
             onPress={() => router.back()}
