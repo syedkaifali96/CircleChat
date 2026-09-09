@@ -87,7 +87,7 @@ export default function HomeScreen() {
             <Text style={styles.title}>Good to see you, {user?.displayName ?? 'friend'}</Text>
             {user ? (
               <Text style={styles.signedIn} testID="home-user">
-                @{user.username}
+                Signed in as {user.displayName} (@{user.username})
               </Text>
             ) : null}
           </View>
@@ -176,7 +176,7 @@ export default function HomeScreen() {
         {circles !== null && !loadError && circles.length === 0 ? (
           <View style={styles.state} testID="home-empty">
             <View style={styles.emptyIcon}><Icon name="sparkle" size={26} color={colors.primary} /></View>
-            <Text style={styles.stateTitle}>Your little world starts here</Text>
+            <Text style={styles.stateTitle}>Your little world starts here.</Text>
             <Text style={styles.stateText}>Create a Circle or join one with an invite code.</Text>
           </View>
         ) : null}
