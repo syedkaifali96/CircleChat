@@ -6,7 +6,7 @@ import { useCircleTheme } from '../design/CircleTheme';
 import { MediaContent } from './MediaContent';
 
 /**
- * Chat bubble (design.md §13–§15): outgoing purple / incoming neutral,
+ * Chat bubble (design.md §13–§15): warm outgoing / quiet incoming,
  * sender name for group messages, compact reply preview, reaction chips,
  * edited marker, and a tombstone view for deleted messages. Media content
  * (M7) renders inline with upload progress/retry for outgoing sends.
@@ -83,7 +83,10 @@ function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, 
           />
         ) : null}
         {message.body ? (
-          <Text style={[styles.body, isOwn ? styles.ownBody : null]} testID={`message-body-${message.id}`}>
+          <Text
+            style={[styles.body, isOwn ? [styles.ownBody, { color: themed.bubbleOwnText }] : null]}
+            testID={`message-body-${message.id}`}
+          >
             {message.body}
           </Text>
         ) : null}
@@ -110,16 +113,16 @@ function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, 
 export const MessageBubble = memo(MessageBubbleImpl);
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', marginTop: 6, paddingHorizontal: 4 },
+  row: { flexDirection: 'row', marginTop: 7, paddingHorizontal: 2 },
   rowOwn: { justifyContent: 'flex-end' },
   bubble: {
-    maxWidth: '82%',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    maxWidth: '80%',
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
   },
-  ownBubble: { backgroundColor: colors.primary, borderBottomRightRadius: 6 },
-  incomingBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 6 },
+  ownBubble: { backgroundColor: colors.primary, borderBottomRightRadius: 5 },
+  incomingBubble: { backgroundColor: colors.surface, borderBottomLeftRadius: 5 },
   senderName: { color: colors.accent, fontSize: 11, fontWeight: '700', marginBottom: 2 },
   replyPreview: {
     borderLeftWidth: 2,
@@ -130,7 +133,7 @@ const styles = StyleSheet.create({
   replyPreviewSender: { color: colors.accent, fontSize: 11, fontWeight: '600' },
   replyPreviewBody: { color: colors.textSecondary, fontSize: 12 },
   body: { color: colors.text, fontSize: 15, lineHeight: 20 },
-  ownBody: { color: colors.text },
+  ownBody: { color: colors.primaryContent },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   metaText: { color: colors.textMuted, fontSize: 10 },
   reactions: { flexDirection: 'row', gap: 4 },

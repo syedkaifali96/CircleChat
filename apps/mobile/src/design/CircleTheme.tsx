@@ -8,7 +8,8 @@ import type { BackgroundKey, ThemePreset } from '@circlechat/shared';
  * the server accepts as `circle_settings.theme_preset`. Each preset maps the
  * design-system roles onto the approved dark palette — personalization never
  * invents new roles, it only recolors existing tokens (docs/design.md §3).
- * `dark_purple` is the default and keeps the documented brand colors exactly.
+ * The persisted `dark_purple` key remains for API compatibility; its visual
+ * roles now resolve to the approved warm-midnight brand foundation.
  */
 
 export interface ThemeColors {
@@ -23,6 +24,7 @@ export interface ThemeColors {
   /** Chat bubble fills — derived per preset, roles unchanged. */
   bubbleOwn: string;
   bubbleOther: string;
+  bubbleOwnText: string;
 }
 
 const darkPurple: ThemeColors = {
@@ -36,6 +38,7 @@ const darkPurple: ThemeColors = {
   border: baseColors.border,
   bubbleOwn: baseColors.primary,
   bubbleOther: baseColors.surface,
+  bubbleOwnText: baseColors.primaryContent,
 };
 
 export const CIRCLE_THEMES: Record<ThemePreset, ThemeColors> = {
@@ -66,11 +69,12 @@ export const CIRCLE_THEMES: Record<ThemePreset, ThemeColors> = {
     textMuted: '#9C8878',
     bubbleOwn: '#B45309',
     bubbleOther: '#2A1712',
+    bubbleOwnText: baseColors.text,
   },
 };
 
 export const THEME_LABELS: Record<ThemePreset, string> = {
-  dark_purple: 'Dark Purple (default)',
+  dark_purple: 'Warm Midnight (default)',
   midnight: 'Midnight',
   orchid: 'Orchid',
   ember: 'Ember',
@@ -115,7 +119,7 @@ export function themedBackdrop(backgroundKey?: string | null): ReactNode {
         style={StyleSheet.absoluteFill}
         imageStyle={{ opacity: 0.5 }}
       >
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(11,7,20,0.55)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: baseColors.overlay }]} />
       </ImageBackground>
     </View>
   );

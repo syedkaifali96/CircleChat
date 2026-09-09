@@ -45,8 +45,9 @@ import {
   trackJoinedRoom,
 } from '../../../src/lib/socket';
 import { MessageBubble } from '../../../src/chat/MessageBubble';
+import { Avatar } from '../../../src/components/Avatar';
 import { useSafeInsets } from '../../../src/lib/safeInsets';
-import { colors } from '../../../src/design/tokens';
+import { colors, radii, spacing, typography } from '../../../src/design/tokens';
 
 /**
  * Conversation screen (M5): Circle or private chat — newest messages at the
@@ -78,8 +79,12 @@ function ThemedSurface() {
  * existing header JSX keeps its structure. */
 function ThemedHeaderBar({ children }: { children: React.ReactNode }) {
   const themed = useCircleTheme().colors;
+  const insets = useSafeInsets();
   return (
-    <View style={[styles.headerBar, { borderBottomColor: themed.border }]} testID="conversation-header">
+    <View
+      style={[styles.headerBar, { borderBottomColor: themed.border, paddingTop: Math.max(insets.top, spacing.md) }]}
+      testID="conversation-header"
+    >
       {children}
     </View>
   );
@@ -119,11 +124,17 @@ function ThemedComposer({
       style={[styles.composer, { borderTopColor: themed.border, paddingBottom: 12 + Math.max(insets.bottom, 0) }]}
       testID="composer"
     >
-      <Pressable style={[styles.composerPlus, { backgroundColor: themed.surface, borderColor: themed.border }]} onPress={onAttachments} testID="composer-attachments">
+      <Pressable
+        style={[styles.composerPlus, { backgroundColor: themed.surface }]}
+        onPress={onAttachments}
+        accessibilityRole="button"
+        accessibilityLabel="Add attachment"
+        testID="composer-attachments"
+      >
         <Text style={styles.composerPlusText}>+</Text>
       </Pressable>
       <TextInput
-        style={[styles.composerInput, { backgroundColor: themed.surface, borderColor: themed.border }]}
+        style={[styles.composerInput, { backgroundColor: themed.surface }]}
         value={draft}
         onChangeText={onDraftChange}
         placeholder="Write a message..."
@@ -132,11 +143,18 @@ function ThemedComposer({
         editable={!sending}
         testID="composer-input"
       />
-      <Pressable style={[styles.composerSend, { backgroundColor: themed.primary }]} onPress={onSend} disabled={sending || draft.trim().length === 0} testID="composer-send">
+      <Pressable
+        style={[styles.composerSend, { backgroundColor: themed.primary }, (sending || draft.trim().length === 0) && styles.composerSendDisabled]}
+        onPress={onSend}
+        disabled={sending || draft.trim().length === 0}
+        accessibilityRole="button"
+        accessibilityLabel="Send message"
+        testID="composer-send"
+      >
         {sending ? (
-          <ActivityIndicator color={colors.text} size="small" />
+          <ActivityIndicator color={themed.bubbleOwnText} size="small" />
         ) : (
-          <Text style={styles.composerSendText}>Send</Text>
+          <Text style={[styles.composerSendText, { color: themed.bubbleOwnText }]}>↑</Text>
         )}
       </Pressable>
     </View>
@@ -655,6 +673,11 @@ export default function ConversationScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} testID="conversation-back">
           <Text style={styles.backText}>‹</Text>
         </Pressable>
+        <Avatar
+          name={header.title}
+          size="sm"
+          online={header.type === 'direct' && partnerPresence ? partnerPresence.online : undefined}
+        />
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>{header.title}</Text>
           {typingUsernames.length > 0 ? (
@@ -922,44 +945,43 @@ export default function ConversationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: 56 },
+  container: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    minHeight: 66,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  backText: { color: colors.accent, fontSize: 28, fontWeight: '700', paddingHorizontal: 6 },
-  headerCenter: { marginLeft: 8, flex: 1 },
-  headerTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  headerSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
-  typingText: { color: colors.accent, fontSize: 12, marginTop: 1, fontStyle: 'italic' },
+  backText: { color: colors.textSecondary, fontSize: 30, fontWeight: '600', paddingHorizontal: spacing.xs },
+  headerCenter: { marginLeft: spacing.sm, flex: 1 },
+  headerTitle: { ...typography.bodyStrong, color: colors.text },
+  headerSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 1 },
+  typingText: { ...typography.caption, color: colors.accent, marginTop: 1, fontStyle: 'italic' },
   presenceOnline: { color: colors.success },
   muteIcon: { color: colors.textMuted, fontSize: 18, paddingHorizontal: 4 },
   muteIconActive: { color: colors.accent },
-  listContent: { padding: 16, paddingBottom: 8 },
+  listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm },
   sendError: { color: colors.error, fontSize: 12, paddingHorizontal: 16, paddingVertical: 4 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 12,
-    borderTopWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
     gap: 8,
   },
   composerPlus: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.5, // attachments arrive with M7 — intentionally inert
   },
   composerPlusText: { color: colors.textMuted, fontSize: 22, fontWeight: '600' },
   comingSoonText: { color: colors.textMuted, fontStyle: 'italic' },
@@ -979,22 +1001,23 @@ const styles = StyleSheet.create({
   composerInput: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 17,
     color: colors.text,
     fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
     maxHeight: 110,
   },
   composerSend: {
     backgroundColor: colors.primary,
-    borderRadius: 19,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  composerSendText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  composerSendDisabled: { opacity: 0.42 },
+  composerSendText: { fontSize: 23, fontWeight: '700', marginTop: -2 },
   stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
   stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
   secondaryButton: {
@@ -1007,13 +1030,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(11,7,20,0.8)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 20,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
     alignSelf: 'stretch',
   },
   modalTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },

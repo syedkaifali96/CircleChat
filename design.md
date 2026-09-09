@@ -351,10 +351,13 @@ Do not display every action permanently beside every message.
 ### Composer
 
 ```text
-[ + ] [ Write a message...                 ] [ 😊 ] [ 🎙 ]
+[ + ] [ Write a message...                        ] [ ↑ ]
 ```
 
-Attachment options can include Photo, Video, File where supported, and Camera where supported. The composer should remain easy to reach on mobile.
+Attachment options live behind the plus action and can include Photo, Video,
+Voice, and GIF where supported. The composer uses the live safe-area inset,
+remains easy to reach, and shows one compact send action only when text can be
+sent.
 
 ---
 
@@ -378,7 +381,10 @@ The experience should clearly communicate that the conversation is private and s
 
 ## 13. Chat Bubble Design
 
-Use subtle visual distinction between incoming and outgoing messages. Outgoing messages can use the primary purple family; incoming messages use a neutral surface.
+Use subtle visual distinction between incoming and outgoing messages. Outgoing
+messages use the theme primary role with a contrast-safe text role; incoming
+messages use a quiet neutral surface. Avoid bubble borders unless communicating
+a special state such as deletion or failure.
 
 Message bubbles should support multiline text, media previews, reactions, long usernames, and long URLs without breaking layout.
 
