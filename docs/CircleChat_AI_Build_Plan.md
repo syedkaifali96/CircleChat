@@ -1,5 +1,8 @@
 # CircleChat — AI-Assisted Development Plan
 
+> Status snapshot: **M0–M13 are implemented. M14 testing/hardening is active;
+> M15 security hardening and M16 production deployment remain planned.**
+
 ## Purpose
 Use AI as a virtual development team while keeping human control over product, architecture, security and production decisions.
 
@@ -48,6 +51,7 @@ M4 Circles
 M5 Direct + Circle Messaging
 M6 Realtime
 M7 Media
+M7.1 Thumbnails + GIF search
 M8 Notifications
 M9 Circle Home
 M10 Pinboard
@@ -58,6 +62,13 @@ M14 Testing
 M15 Security Hardening
 M16 Deployment / Android build
 ```
+
+| Delivery range | Current state |
+|---|---|
+| M0–M13 | Complete and covered by CI |
+| M14 Testing / hardening | In progress — automated coverage is strong; the full device/E2E matrix remains |
+| M15 Security hardening | Planned; pre-launch review checklist remains open |
+| M16 Deployment / Android release | Planned; local Android export works, production release is not claimed |
 
 For each milestone:
 
@@ -154,6 +165,10 @@ AI should generate tests for:
 - App lock behavior
 - Socket reconnect/disconnect after revocation
 - Network disconnect/reconnect
+- Newest-message opening and top-edge history pagination
+- Read-pointer accuracy after realtime messages
+- Media retry without duplicate optimistic bubbles
+- External GIF rendering and authorized attachment opening
 
 ## Bug-Fixing Workflow
 When reporting a bug provide:
@@ -173,6 +188,11 @@ When a design/architecture decision changes, update all affected cross-reference
 
 If `CHANGELOG.md` exists, record user-visible/product-significant changes and major architecture/security decisions briefly.
 Do not add secrets, tokens, recovery codes or message content to the changelog.
+
+The project currently uses no generative-AI runtime integration. The name of
+this document describes AI-assisted development only; experimental product AI
+features require a separately approved scope, privacy review and documented
+provider/configuration decision.
 
 ## AI Prompt Template
 

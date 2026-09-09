@@ -8,6 +8,10 @@ This document defines the visual language, UX principles, screen structure, inte
 
 The goal is to give designers and AI coding agents a single design source of truth before implementation.
 
+> Implementation status: the warm-midnight foundation and conversation UI are
+> active on `feat/chat-ui-redesign`; future screens must extend these tokens and
+> interaction rules instead of reintroducing the earlier purple/glow-heavy look.
+
 CircleChat is a **private messenger for small Circles of 2–5 people**. It includes both private 1-to-1 chats and private Circle group chats.
 
 **Core design principle:**
@@ -359,6 +363,11 @@ Voice, and GIF where supported. The composer uses the live safe-area inset,
 remains easy to reach, and shows one compact send action only when text can be
 sent.
 
+Conversations open at the newest message. Older history loads only when the
+user reaches the top, prepending without jumping the visible content. A message
+received while the chat is open must refresh the REST-authoritative history and
+advance the read pointer so unread badges remain accurate.
+
 ---
 
 ## 12. Private 1-to-1 Chat
@@ -408,7 +417,9 @@ Show thumbnail, clear play control, and simple playback UI.
 
 Include playback progress and duration without letting the voice UI dominate the conversation.
 
-GIF files may be uploaded through the image upload path when supported. The GIF picker/provider remains V2.
+External GIF search is implemented through GIPHY with visible provider
+attribution. Results render inline without passing GIF bytes through CircleChat
+storage. Uploaded GIF files may still use the normal image path when supported.
 
 ---
 
@@ -924,6 +935,9 @@ The chat UI must handle:
 16. Large image/video
 17. Many reactions
 18. Unread messages
+19. Opening at the newest message
+20. Loading older history from the top without a scroll jump
+21. Realtime edit/delete/new-message refresh while the chat remains open
 
 No state should break the layout.
 
@@ -954,7 +968,7 @@ Never show sensitive backend details in these states.
 
 - Make Circles visually important.
 - Keep the interface calm.
-- Use purple as an identity accent.
+- Use coral for primary action and lavender as a restrained identity accent.
 - Prioritize readability.
 - Keep private conversations clearly private.
 - Use reusable components.
@@ -1010,13 +1024,12 @@ Never show sensitive backend details in these states.
 
 ### P2 — Later
 
-- GIF picker
 - Stickers
 - Memories
 - Mood
 - Events/countdowns
 - Disappearing moments
-- Advanced themes
+- Additional themes and richer appearance controls
 
 ### Experimental
 

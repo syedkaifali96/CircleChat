@@ -1,6 +1,7 @@
 # CircleChat — Security Design
 
-> Status: **Approved security direction for the documentation gate.**
+> Status: **Core MVP controls are implemented through M13 and exercised by
+> automated tests. The manual M15/pre-launch security review remains open.**
 > Honest framing: this document describes a realistic, layered security posture for a small private
 > messenger. It does **not** promise 100% security or perfect privacy. No system can.
 
@@ -199,6 +200,11 @@ picker/provider in MVP; the picker remains V2.
 ---
 
 ## 11. Sensitive Information Handling
+
+The current product has no generative-AI integration and therefore no OpenAI
+or other AI-provider secret. Adding one in the future requires an explicit
+privacy/threat-model update; no AI credential may be exposed through an
+`EXPO_PUBLIC_*` variable.
 
 Never collected: phone number, email, contacts, precise location, advertising IDs and unnecessary behavioral analytics.
 

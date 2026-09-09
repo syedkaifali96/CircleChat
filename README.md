@@ -6,6 +6,10 @@ CircleChat is a privacy-focused messenger designed for **small private Circles o
 
 It combines private 1-to-1 conversations with private Circle group spaces, personalization and lightweight social features.
 
+**Repository description:** Privacy-first, Circle-centric messenger for 2–5 close people, built with Expo, Fastify, Socket.IO and PostgreSQL.
+
+**Suggested GitHub topics:** `react-native`, `expo`, `typescript`, `fastify`, `socket-io`, `postgresql`, `drizzle-orm`, `private-messaging`, `android`, `privacy-first`
+
 ## Product Direction
 
 CircleChat is intentionally **not a WhatsApp clone**. The Circle itself is the core product experience.
@@ -36,14 +40,14 @@ CircleChat is intentionally **not a WhatsApp clone**. The Circle itself is the c
 - Session/device management
 - Notification controls
 
-## Current Capabilities (implemented through M9)
+## Current Capabilities (implemented through M13)
 
 What actually ships today, verified by the test suites referenced below:
 
 - **Authentication:** username/password accounts, recovery codes, session/device management with revocation (revoked sessions also disconnect live sockets)
 - **Profiles:** display name, bio, avatars via private R2 storage with authorized presigned access
 - **Circles:** create/join via multi-use expiring revocable invites, roles (owner/admin/member), ownership transfer, server-enforced 5-member limit (transaction + trigger + CHECK)
-- **Messaging:** Direct (requires a shared active Circle) and Circle text chats with idempotent sends, keyset-paginated history, reactions, replies, 24-hour sender-only edits, sender/admin tombstone deletes, read state and unread counts
+- **Messaging:** Direct (requires a shared active Circle) and Circle text chats with idempotent sends, keyset-paginated history, reactions, reply metadata/rendering, 24-hour sender-only edits, sender/admin tombstone deletes, read state and unread counts
 - **Realtime:** typing indicators (server-side TTL expiry) and online/offline presence with last-seen timestamps
 - **Media messaging:** images, video, voice messages (2-minute server-enforced limit) via presigned uploads to private R2 with magic-byte verification; image thumbnails (400px) served alongside originals
 - **GIF search:** via **GIPHY**, called directly from the client per GIPHY's API terms (proxying prohibited), with the "Powered By GIPHY" attribution in the picker
@@ -51,6 +55,11 @@ What actually ships today, verified by the test suites referenced below:
 - **Circle Home:** a private dashboard per Circle — identity header (avatar, name, description, member count), members preview with roles, the primary Open Chat action carrying the server-computed unread count, and management actions (invites, role changes, settings) — served by GET /v1/circles/:id/home, active members only
 - **Pinboard:** Circle-scoped pins of existing messages (never duplicates) — pin from the chat long-press menu, preview on Circle Home, full list with unpin on the dedicated Pinboard screen; server-verified message-to-Circle eligibility, per-Circle uniqueness, and tombstone-safe rendering with media served through the existing authorized presigned pipeline
 - **Polls:** single-choice Circle polls (2–6 options) created from the Circle, voted inline with live per-option results and the caller's selection, closed polls stay readable — surfaced as an active-polls preview on Circle Home with a dedicated Polls screen; one vote per member enforced by the database PK, change-vote via the documented delete+re-vote flow
+- **Personalization:** four server-validated Circle theme presets, a finite accent palette and bundled contrast-protected chat backgrounds, editable by owners/admins
+- **App Lock:** local-only PIN plus platform biometrics, six lock modes and a full-content privacy gate; no App-Lock state is sent to the server
+- **Chat reliability:** newest-message opening, top-edge history pagination, realtime REST refresh/read sync, retry-safe optimistic media, inline external GIFs and working authorized attachment links
+
+CircleChat currently has **no generative-AI feature, AI SDK, AI provider API or AI API key**. “AI” in the development-plan filename describes the coding workflow only; product AI ideas remain experimental and unimplemented.
 
 ## Documentation
 
@@ -60,7 +69,7 @@ Product & design sources of truth:
 - [Design System & UX Specification](design.md)
 - [AI-Assisted Development Plan](docs/CircleChat_AI_Build_Plan.md)
 
-Technical foundation (approved and implemented through M5):
+Technical foundation (approved and implemented through M13):
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Database Design](docs/DATABASE.md)
@@ -126,9 +135,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M13 complete (all suites green).**
+**M0–M13 complete; M14 hardening is in progress (all automated suites green).**
 
-Latest verification: server 238/238 tests (Vitest, real PostgreSQL), mobile 130/130 tests (Jest + RNTL), typecheck 0 errors, lint clean. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
+Latest verification (CI run 34): shared 2/2, server 239/239 (Vitest + real PostgreSQL) and mobile 138/138 (Jest + RNTL), with lint, typecheck and Android export all green. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|
@@ -149,7 +158,7 @@ Latest verification: server 238/238 tests (Vitest, real PostgreSQL), mobile 130/
 | M11 — Polls (single-choice, Circle-scoped, home preview + dedicated screen, PK-enforced one vote) | ✅ Done |
 | M12 — Personalization (Circle theme presets, accent palette, bundled chat backgrounds, settings pickers) | ✅ Done |
 | M13 — App Lock (local PIN + platform biometrics, six lock modes, full-content lock screen) | ✅ Done |
-| M14 — Testing | ⬜ Not started |
+| M14 — Testing / hardening | 🟡 In progress — unit/integration coverage strong; device/E2E matrix pending |
 
 ## Getting Started
 
@@ -218,9 +227,14 @@ a clear message when no device is attached.
 | `EXPO_PUBLIC_API_URL` | Server base URL |
 | `EXPO_PUBLIC_GIPHY_API_KEY` | GIPHY app key for GIF search. Goes in `apps/mobile/.env` (gitignored), NOT `.env.example`. Get a beta key at developers.giphy.com. Dev keys are rate-limited to ~42 requests/hour; a production-tier key requires submitting the app to GIPHY for review once the "Powered By GIPHY" attribution is live in the app. |
 
+There is no OpenAI or other generative-AI environment variable in the current application.
+
 ## Known Limitations
 
 - Typing/presence state is single-process in-memory; a multi-node deployment would need a shared store (Redis).
 - Presence is only shown for the direct-chat partner; no group-wide online indicator.
 - Video thumbnails are not generated (frame extraction needs ffmpeg-scale native tooling).
-- No real Android emulator/device UI pass yet — realtime and media behavior were verified server-side with real Socket.IO clients plus automated suites.
+- Reply messages render correctly and the API accepts `replyToId`, but the
+  mobile composer still needs its user-facing Reply action during M14 polish.
+- The basic Android smoke pass is complete, but the full device matrix (media retry, realtime reconnect, deep links, biometrics and remote push in a development build) is still part of M14 hardening.
+- iOS, tablet/desktop layouts, multi-node realtime and E2EE are post-MVP work.

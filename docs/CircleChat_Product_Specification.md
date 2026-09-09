@@ -1,5 +1,7 @@
 # CircleChat — Product Specification
 
+> Status: **MVP product baseline implemented through M13; M14 testing and hardening is in progress.**
+
 ## Product
 CircleChat is a private messenger designed for small circles of 2–5 close friends or family members.
 
@@ -60,18 +62,24 @@ A private group space for 2–5 members with messaging plus Circle-specific feat
 - App lock
 - Session/device management
 - Basic notification controls
+- GIF search with required provider attribution
+- Four Circle theme presets, accent choices and bundled chat backgrounds
+
+The implemented MVP remains deliberately small: there is no contact upload,
+phone-number identity, public user directory, advertising, E2EE claim or
+generative-AI product feature.
 
 ## V2
-- GIFs
 - Stickers
 - Shared memories
 - Mood check-ins
 - Circle status
 - Events/countdowns
 - Disappearing moments
-- Advanced themes
+- Additional themes and richer appearance controls
 - Message search
 - Better media management
+- Full-screen video/file preview and download management
 
 ## Experimental
 - Circle personality
@@ -81,15 +89,18 @@ A private group space for 2–5 members with messaging plus Circle-specific feat
 - Inside-joke cards
 - Message effects
 
+Experimental AI ideas are not implemented. The current app includes no AI SDK,
+AI provider API, AI endpoint or AI API key.
+
 ## Design
-**Modern + Dark Purple + Premium + Clean + Slightly Playful**
+**Modern + Warm Midnight + Premium + Clean + Slightly Playful**
 
 Palette:
-- Primary: `#7C3AED`
-- Background: `#0B0714`
-- Surface: `#171225`
-- Accent: `#A78BFA`
-- Text: `#F5F3FF`
+- Primary coral: `#F58A7A`
+- Midnight background: `#0B1020`
+- Surface: `#151E30`
+- Accent lavender: `#D4B5FF`
+- Text: `#F7F7FA`
 
 Font: Inter
 

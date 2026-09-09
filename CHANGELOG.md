@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Documentation synchronization
+
+- Updated README and every project document to the implemented M13 baseline,
+  current warm-midnight design direction, CI test counts and honest M14/M16
+  status. Removed stale claims that GIF search and themes were future work,
+  documented the real Socket.IO room names and current API surface, separated
+  implemented CI from planned production deployment, and explicitly confirmed
+  that the app has no generative-AI integration or AI API key.
+- Added the recommended GitHub repository description and topic set to the
+  README so repository metadata has one reviewable source of truth.
+
 ### Chat reliability fixes
 
 - Chats now open at the newest message. Older history loads when the user
