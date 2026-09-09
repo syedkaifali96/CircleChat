@@ -216,10 +216,10 @@ export default function ConversationScreen() {
         fetchMessages(token, id, { limit: 30 }),
       ]);
       setHeader(headerRes.header);
-      setMessages(history.messages.reverse()); // oldest first for the FlatList
+      const newest = history.messages[0];
+      setMessages([...history.messages].reverse()); // oldest first for the FlatList
       setOlderCursor(history.nextBeforeCursor);
       // Mark the newest message read; failures are non-fatal.
-      const newest = history.messages[0];
       if (newest) {
         try {
           await markConversationRead(token, id, newest.id);
@@ -284,6 +284,32 @@ export default function ConversationScreen() {
           }
           setPartnerPresence({ online: payload.online, lastSeenAt: payload.lastSeenAt });
         },
+        onMessage: (payload) => {
+          if (payload.conversationId !== id) {
+            return;
+          }
+          // Socket events are change notifications only. Refresh from REST so
+          // message:new / updated / deleted share one authoritative path, then
+          // advance the read pointer while this conversation is visibly open.
+          void (async () => {
+            try {
+              const token = (await loadSessionToken()) ?? '';
+              const history = await fetchMessages(token, id, { limit: 30 });
+              if (cancelled) {
+                return;
+              }
+              const newest = history.messages[0];
+              setMessages([...history.messages].reverse());
+              setOlderCursor(history.nextBeforeCursor);
+              if (newest) {
+                await markConversationRead(token, id, newest.id);
+              }
+            } catch {
+              // The current rendered history remains usable. A later socket
+              // event or screen focus will retry against REST.
+            }
+          })();
+        },
       });
     })();
     return () => {
@@ -333,7 +359,7 @@ export default function ConversationScreen() {
     try {
       const token = (await loadSessionToken()) ?? '';
       const page = await fetchMessages(token, id, { before: olderCursor, limit: 30 });
-      setMessages((current) => [...page.messages.reverse(), ...current]);
+      setMessages((current) => [...[...page.messages].reverse(), ...current]);
       setOlderCursor(page.nextBeforeCursor);
     } catch {
       // Keep the loaded history; a retry can fetch older pages again.

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Realtime read-state fix
+
+- **Unread badge could remain after opening a chat:** the conversation screen
+  subscribed to socket message events without an `onMessage` callback, so a
+  message arriving while the chat was open did not refresh the REST-authoritative
+  history or advance the read pointer. The screen now refreshes on
+  `message:new`, `message:updated`, and `message:deleted`, then marks the
+  newest message read. A mobile regression test verifies the open-chat flow.
+
 ### Bug fixes — real-device testing pass
 
 - **Unread badge never cleared on direct conversations (server):** `markConversationRead` advanced the read pointer with an `INSERT … ON CONFLICT DO UPDATE` upsert, but the M1 `DIRECT_PARTICIPANT_LIMIT` BEFORE INSERT guard fires *before* conflict resolution on every insert into a full direct conversation — so every read call on an existing direct chat 500'd and the pointer never advanced (circle conversations worked because their participant rows are created lazily on first read). The service now UPDATEs the existing row and only INSERTs when one is absent, keeping the D1 invariant untouched. Regression test: read pointer advances on an existing direct conversation, unread goes 2 → 0, list reflects it.
