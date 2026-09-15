@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import HomeScreen from '../app/(app)/home';
 import CreateCircleScreen from '../app/(app)/circles/create';
@@ -183,29 +184,46 @@ describe('CreateCircleScreen header (real-device bug fixes)', () => {
 });
 
 describe('Create/Join header top inset (status-bar clipping fix)', () => {
-  it('create-circle container pads with the live top safe-area inset', () => {
-    const insets = { top: 42, bottom: 0, left: 0, right: 0 };
+  // The real-device bug: headers rendered 36dp from the top on every device
+  // because insets were floored by a hardcoded number. These cases inject an
+  // inset below that old floor, so only a truly dynamic value passes.
+  const renderWithTopInset = (top: number, ui: React.ReactElement) =>
     render(
-      <SafeAreaInsetsContext.Provider value={insets}>
-        <CreateCircleScreen />
-      </SafeAreaInsetsContext.Provider>,
+      <SafeAreaInsetsContext.Provider value={{ top, bottom: 0, left: 0, right: 0 }}>{ui}</SafeAreaInsetsContext.Provider>,
     );
+
+  const topPaddingOf = (testID: string): number | undefined =>
+    (StyleSheet.flatten(screen.getByTestId(testID).props.style) as { paddingTop?: number }).paddingTop;
+
+  it('create-circle container pads by the reported top inset, not a fixed value', () => {
+    renderWithTopInset(40, <CreateCircleScreen />);
+
+    expect(topPaddingOf('create-circle-screen')).toBe(52); // inset + 12 base offset
+    // The padded container must be the one wrapping the back chevron + title.
     const container = screen.getByTestId('create-circle-screen');
-    const style = Array.isArray(container.props.style) ? Object.assign({}, ...container.props.style) : container.props.style;
-    // 42px injected inset + 12 base offset = 54 — never a fixed pixel value.
-    expect(style.paddingTop).toBe(54);
+    expect(within(container).getByTestId('create-circle-header')).toBeTruthy();
+    expect(within(container).getByTestId('create-circle-back')).toBeTruthy();
   });
 
-  it('join-circle container pads with the live top safe-area inset', () => {
-    const insets = { top: 42, bottom: 0, left: 0, right: 0 };
-    render(
-      <SafeAreaInsetsContext.Provider value={insets}>
-        <JoinCircleScreen />
-      </SafeAreaInsetsContext.Provider>,
-    );
+  it('create-circle honors a top inset smaller than the old hardcoded floor', () => {
+    renderWithTopInset(8, <CreateCircleScreen />);
+
+    expect(topPaddingOf('create-circle-screen')).toBe(20);
+  });
+
+  it('join-circle container pads by the reported top inset, not a fixed value', () => {
+    renderWithTopInset(40, <JoinCircleScreen />);
+
+    expect(topPaddingOf('join-circle-screen')).toBe(52); // inset + 12 base offset
     const container = screen.getByTestId('join-circle-screen');
-    const style = Array.isArray(container.props.style) ? Object.assign({}, ...container.props.style) : container.props.style;
-    expect(style.paddingTop).toBe(54);
+    expect(within(container).getByTestId('join-circle-header')).toBeTruthy();
+    expect(within(container).getByTestId('join-circle-back')).toBeTruthy();
+  });
+
+  it('join-circle honors a top inset smaller than the old hardcoded floor', () => {
+    renderWithTopInset(8, <JoinCircleScreen />);
+
+    expect(topPaddingOf('join-circle-screen')).toBe(20);
   });
 });
 

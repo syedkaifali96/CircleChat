@@ -45,7 +45,7 @@ export default function CreateCircleScreen() {
 
   return (
     <View style={styles.flex}>
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 24) + 12 }]} testID="create-circle-screen">
+      <View style={[styles.container, { paddingTop: insets.top + 12 }]} testID="create-circle-screen">
         <View style={styles.headerRow} testID="create-circle-header">
           <Pressable
             onPress={() => router.back()}
