@@ -93,9 +93,9 @@
 - Integration tests use a real PostgreSQL database.
 - App tests use React Native Testing Library.
 - Maestro device flows are deferred to hardening.
-- Latest CI baseline: shared 2/2, server 239/239 and mobile 138/138 tests, plus
-  lint, typecheck and Android export. Counts are a snapshot, not a substitute
-  for the M14 physical-device matrix.
+- Latest local baseline: shared 2/2, server 239/239 and mobile 143/143 tests,
+  plus lint and typecheck. Counts are a snapshot, not a substitute for the M14
+  physical-device matrix.
 
 ### 2.10 Deployment — **Railway (server) + Neon (Postgres) + R2 + EAS Build**
 
