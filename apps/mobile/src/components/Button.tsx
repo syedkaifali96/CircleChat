@@ -10,7 +10,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { colors, radii, shadows } from '../design/tokens';
+import { colors, radii, shadows, typography } from '../design/tokens';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   text: {
-    fontWeight: '600',
+    ...typography.button,
     textAlign: 'center',
     includeFontPadding: false,
   },
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     color: colors.primaryContent,
   },
   secondaryContainer: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   dangerContainer: {
     backgroundColor: colors.error,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: colors.errorBorder,
   },
   dangerText: {
     color: colors.text,

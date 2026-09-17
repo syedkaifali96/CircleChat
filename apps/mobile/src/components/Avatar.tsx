@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors } from '../design/tokens';
+import { colors, typography } from '../design/tokens';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -21,7 +21,7 @@ const SIZE_MAP: Record<AvatarSize, { dimension: number; fontSize: number; dotSiz
   xl: { dimension: 72, fontSize: 32, dotSize: 16 },
 };
 
-const ACCENT_COLORS = ['#F58A7A', '#D4B5FF', '#92B7E8', '#71B7A2', '#E6B977', '#C58EA8'];
+const ACCENT_COLORS = [colors.memberCoral, colors.memberGold, colors.memberTerracotta, colors.memberAmber];
 
 function getColorForName(name: string): string {
   let hash = 0;
@@ -100,8 +100,9 @@ const styles = StyleSheet.create({
     borderColor: colors.borderActive,
   },
   initial: {
-    color: colors.text,
-    fontWeight: '700',
+    ...typography.h2,
+    lineHeight: undefined,
+    color: colors.primaryContent,
     includeFontPadding: false,
   },
   dot: {

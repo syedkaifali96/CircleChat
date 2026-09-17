@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Message } from '../lib/api';
-import { colors } from '../design/tokens';
+import { colors, typography } from '../design/tokens';
 import { useCircleTheme } from '../design/CircleTheme';
 import { MediaContent } from './MediaContent';
 
@@ -69,7 +69,7 @@ function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, 
             <Text style={[styles.replyPreviewSender, { color: themed.accent }]} numberOfLines={1}>
               {message.replyPreview.deleted ? 'Deleted message' : `@${message.replyPreview.senderUsername}`}
             </Text>
-            <Text style={styles.replyPreviewBody} numberOfLines={2}>
+            <Text style={[styles.replyPreviewBody, isOwn && { color: themed.bubbleOwnText }]} numberOfLines={2}>
               {message.replyPreview.deleted ? 'Message deleted' : message.replyPreview.body}
             </Text>
           </View>
@@ -91,7 +91,7 @@ function MessageBubbleImpl({ message, isOwn, showSender, localUri, uploadStage, 
           </Text>
         ) : null}
         <View style={styles.metaRow}>
-          {message.editedAt ? <Text style={styles.metaText} testID={`edited-${message.id}`}>edited</Text> : null}
+          {message.editedAt ? <Text style={[styles.metaText, isOwn && { color: themed.bubbleOwnText }]} testID={`edited-${message.id}`}>edited</Text> : null}
           {message.reactions.length > 0 ? (
             <View style={styles.reactions} testID={`reactions-${message.id}`}>
               {message.reactions.map((reaction) => (
@@ -123,21 +123,22 @@ const styles = StyleSheet.create({
   },
   ownBubble: { backgroundColor: colors.primary, borderBottomRightRadius: 5 },
   incomingBubble: { backgroundColor: colors.surface, borderBottomLeftRadius: 5 },
-  senderName: { color: colors.accent, fontSize: 11, fontWeight: '700', marginBottom: 2 },
+  senderName: { ...typography.captionStrong, color: colors.accent, fontSize: 11, marginBottom: 2 },
   replyPreview: {
     borderLeftWidth: 2,
     borderLeftColor: colors.accent,
     paddingLeft: 8,
     marginBottom: 4,
   },
-  replyPreviewSender: { color: colors.accent, fontSize: 11, fontWeight: '600' },
-  replyPreviewBody: { color: colors.textSecondary, fontSize: 12 },
-  body: { color: colors.text, fontSize: 15, lineHeight: 20 },
+  replyPreviewSender: { ...typography.captionStrong, color: colors.accent, fontSize: 11 },
+  replyPreviewBody: { ...typography.caption, color: colors.textSecondary },
+  body: { ...typography.body, color: colors.text },
   ownBody: { color: colors.primaryContent },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  metaText: { color: colors.textMuted, fontSize: 10 },
+  metaText: { ...typography.caption, color: colors.textMuted, fontSize: 10 },
   reactions: { flexDirection: 'row', gap: 4 },
   reactionChip: {
+    ...typography.caption,
     backgroundColor: colors.background,
     borderColor: colors.border,
     borderWidth: 1,
@@ -149,5 +150,5 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   deletedBubble: { backgroundColor: colors.surface, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border },
-  deletedText: { color: colors.textMuted, fontSize: 13, fontStyle: 'italic' },
+  deletedText: { ...typography.caption, color: colors.textMuted, fontSize: 13, fontStyle: 'italic' },
 });

@@ -1,5 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { MediaContent } from '../src/chat/MediaContent';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { colors, typography } from '../src/design/tokens';
 import ConversationScreen from '../app/(app)/chats/[id]';
 import * as apiModule from '../src/lib/api';
 import * as mediaSendModule from '../src/lib/mediaSend';
@@ -162,8 +164,14 @@ describe('MediaContent', () => {
       />,
     );
 
-    expect(screen.getByTestId('voice-player-med-v')).toBeTruthy();
-    expect(screen.getByText('0:05')).toBeTruthy();
+    const player = screen.getByTestId('voice-player-med-v');
+    expect(player).toBeTruthy();
+    expect(screen.getByText('0:05')).toHaveStyle({ fontFamily: typography.caption.fontFamily });
+    const bars = player.findAllByType(View).filter((node: { props: { style: StyleProp<ViewStyle> } }) => StyleSheet.flatten(node.props.style)?.width === 2);
+    expect(bars).toHaveLength(14);
+    for (const bar of bars) {
+      expect(StyleSheet.flatten(bar.props.style).backgroundColor).toBe(colors.primary);
+    }
   });
 
   it('shows the pending and failed upload states with retry', () => {

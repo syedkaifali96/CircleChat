@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } 
 import { Audio } from 'expo-av';
 import type { Message } from '../lib/api';
 import { fetchMediaDownloadUrl } from '../lib/api';
-import { colors } from '../design/tokens';
+import { colors, typography } from '../design/tokens';
 
 /**
  * Media content for chat bubbles (M7): images render inline, voice shows a
@@ -205,19 +205,21 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
 }
 
 const styles = StyleSheet.create({
-  image: { width: 220, height: 160, borderRadius: 12 },
-  imageSmall: { width: 120, height: 120 },
+  image: { width: 220, height: 160, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  imageSmall: { width: 120, height: 120, borderWidth: 1, borderColor: colors.border },
   pendingBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     opacity: 0.8,
   },
-  pendingText: { color: colors.textSecondary, fontSize: 12 },
+  pendingText: { ...typography.caption, color: colors.textSecondary },
   failedBox: {
     backgroundColor: colors.background,
     borderColor: colors.error,
@@ -226,23 +228,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  failedText: { color: colors.error, fontSize: 12, fontWeight: '600' },
-  mediaError: { color: colors.textMuted, fontSize: 12, fontStyle: 'italic' },
-  voiceWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  failedText: { ...typography.captionStrong, color: colors.error },
+  mediaError: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic' },
+  voiceWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: 12 },
   voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  voiceIcon: { color: colors.text, fontSize: 16 },
+  voiceIcon: { ...typography.bodyLarge, color: colors.primary },
   waveform: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 18 },
-  waveBar: { width: 2, backgroundColor: colors.accent, borderRadius: 1 },
-  duration: { color: colors.textMuted, fontSize: 10 },
+  waveBar: { width: 2, backgroundColor: colors.primary, borderRadius: 1 },
+  duration: { ...typography.caption, color: colors.textMuted, fontSize: 10 },
   attachment: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  attachmentIcon: { fontSize: 16 },
-  attachmentText: { color: colors.text, fontSize: 13, maxWidth: 160 },
+  attachmentIcon: { ...typography.bodyLarge },
+  attachmentText: { ...typography.body, color: colors.text, fontSize: 13, maxWidth: 160 },
 });

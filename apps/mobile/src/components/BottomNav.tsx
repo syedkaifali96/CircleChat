@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeInsets } from '../lib/safeInsets';
-import { colors, radii, shadows, spacing } from '../design/tokens';
+import { colors, radii, shadows, spacing, typography } from '../design/tokens';
 import { Icon } from './Icon';
 
 export type BottomNavTab = 'home' | 'chats' | 'profile';
@@ -52,7 +52,7 @@ export function BottomNav({ activeTab }: BottomNavProps): React.JSX.Element {
               <Icon
                 name={tab.icon}
                 size={18}
-                color={isActive ? colors.accent : colors.textMuted}
+                color={isActive ? colors.primary : colors.textMuted}
               />
               <Text
                 style={[
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.surfaceGlass,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.xxl,
@@ -100,18 +100,18 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   activeTab: {
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.primaryGlowSoft,
   },
   pressed: {
     opacity: 0.75,
   },
   label: {
+    ...typography.captionStrong,
     fontSize: 11,
-    fontWeight: '600',
     includeFontPadding: false,
   },
   activeLabel: {
-    color: colors.text,
+    color: colors.primary,
   },
   inactiveLabel: {
     color: colors.textMuted,

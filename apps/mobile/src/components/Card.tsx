@@ -41,7 +41,7 @@ export function Card({
   const baseStyle: StyleProp<ViewStyle> = [
     styles.card,
     { backgroundColor: getBgColor() },
-    shadows.card,
+    variant === 'elevated' ? shadows.glow : shadows.card,
     style,
   ];
 

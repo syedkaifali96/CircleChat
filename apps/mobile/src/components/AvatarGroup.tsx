@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Avatar, type AvatarSize } from './Avatar';
-import { colors } from '../design/tokens';
+import { colors, typography } from '../design/tokens';
 
 interface AvatarGroupItem {
   id: string;
@@ -98,7 +98,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   remainingText: {
-    color: colors.accent,
-    fontWeight: '700',
+    ...typography.captionStrong,
+    lineHeight: undefined,
+    color: colors.primary,
   },
 });

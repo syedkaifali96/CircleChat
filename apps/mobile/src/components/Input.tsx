@@ -53,7 +53,7 @@ export function Input({
         <TextInput
           style={[styles.input, inputStyle]}
           placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accent}
+          selectionColor={colors.primary}
           testID={testID}
           onFocus={(e) => {
             setIsFocused(true);
@@ -117,19 +117,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   input: {
+    ...typography.body,
     flex: 1,
     color: colors.text,
-    fontSize: 15,
     paddingVertical: 12,
   },
   errorText: {
+    ...typography.caption,
     color: colors.error,
-    fontSize: 12,
     marginTop: spacing.xs,
   },
   helperText: {
+    ...typography.caption,
     color: colors.textMuted,
-    fontSize: 12,
     marginTop: spacing.xs,
   },
 });
