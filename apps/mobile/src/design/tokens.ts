@@ -73,7 +73,7 @@ export const colors = {
   // Group Stacking"). Replaces the old blue/green/coral mix.
   memberCoral: '#E06D53',
   memberGold: '#E5A93C',
-  memberTerracotta: '#C85A32',
+  memberTerracotta: '#E87A4F',
   memberAmber: '#F59E0B',
 } as const;
 

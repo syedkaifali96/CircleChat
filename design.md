@@ -71,6 +71,11 @@ Amber Deep (pressed): `#D97706`
 
 Warm Coral accent: `#E06D53`
 
+Terracotta member/accent token: `#E87A4F` (formerly `#C85A32`). Normal-text
+contrast is 6.45:1 on the canvas, 5.97:1 on the surface and 5.69:1 on the
+elevated surface. The shared token also supplies the Velvet Dusk accent and
+avatar fallbacks; persisted custom accent values are not rewritten.
+
 Background (warm charcoal): `#161311`
 
 Surface (elevated): `#1F1B18`
