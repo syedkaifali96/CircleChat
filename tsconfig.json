@@ -8,6 +8,5 @@
     "resolveJsonModule": true,
     "useUnknownInCatchVariables": true,
     "sourceMap": true
-  },
-  "extends": "expo/tsconfig.base"
+  }
 }
