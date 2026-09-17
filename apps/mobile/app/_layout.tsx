@@ -1,3 +1,12 @@
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import {
+  useFonts as useJakarta,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+} from '@expo-google-fonts/plus-jakarta-sans';
+import { useFonts as useInter, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -15,6 +24,20 @@ import { colors } from '../src/design/tokens';
 // device's real insets (status bar, cutout, nav bar) to every screen — without
 // it useSafeInsets() falls back to zeros and headers sit under the status bar.
 export default function RootLayout() {
+  const [jakartaLoaded, jakartaError] = useJakarta({
+    'PlusJakartaSans-Regular': PlusJakartaSans_400Regular,
+    'PlusJakartaSans-Medium': PlusJakartaSans_500Medium,
+    'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
+    'PlusJakartaSans-Bold': PlusJakartaSans_700Bold,
+  });
+  const [interLoaded, interError] = useInter({
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
+  // Native text falls back to the system font for unavailable families on error.
+  const fontsSettled = (jakartaLoaded || jakartaError) && (interLoaded || interError);
+
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <AuthProvider>
@@ -23,9 +46,24 @@ export default function RootLayout() {
         <PushManager />
         <AppLockProvider>
           <StatusBar style="light" backgroundColor={colors.background} />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+          {fontsSettled ? (
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }} />
+          ) : (
+            <View testID="font-loading" style={styles.loading}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          )}
         </AppLockProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+  },
+});

@@ -12,6 +12,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",
     "expo": "~53.0.9",
@@ -19,6 +21,7 @@
     "expo-constants": "~17.1.6",
     "expo-crypto": "~14.1.5",
     "expo-device": "~7.1.4",
+    "expo-font": "~13.3.2",
     "expo-image-picker": "^16.1.4",
     "expo-linking": "~7.1.5",
     "expo-local-authentication": "~15.0.2",

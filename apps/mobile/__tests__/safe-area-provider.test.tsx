@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootLayout from '../app/_layout';
 
@@ -20,9 +20,11 @@ jest.mock('../src/auth/AppLockManager', () => ({
 jest.mock('../src/lib/PushManager', () => ({ PushManager: () => null }));
 
 describe('App root safe-area provider', () => {
-  it('mounts SafeAreaProvider so real device insets reach every screen', () => {
+  it('mounts SafeAreaProvider so real device insets reach every screen', async () => {
     const tree = render(<RootLayout />);
 
+    expect(tree.UNSAFE_getByType(SafeAreaProvider)).toBeTruthy();
+    await act(async () => {});
     expect(tree.UNSAFE_getByType(SafeAreaProvider)).toBeTruthy();
   });
 });
