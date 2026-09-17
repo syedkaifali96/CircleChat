@@ -30,7 +30,7 @@ import {
 import { loadSessionToken } from '../../../src/auth/session';
 import { CircleThemeGate } from '../../../src/design/useCircleSettings';
 import { useCircleTheme, themedBackdrop } from '../../../src/design/CircleTheme';
-import { colors } from '../../../src/design/tokens';
+import { colors, typography } from '../../../src/design/tokens';
 
 /**
  * Circle Home (M9): the Circle's private home — identity, members preview and
@@ -457,7 +457,7 @@ function CircleHomeThemed({ circleId: id }: { circleId: string }) {
                 testID="invite-generate"
               >
                 {inviteBusy ? (
-                  <ActivityIndicator color={colors.text} />
+                  <ActivityIndicator color={colors.primaryContent} />
                 ) : (
                   <Text style={styles.primaryButtonText}>Generate invite code</Text>
                 )}
@@ -521,13 +521,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: colors.text, fontSize: 34, fontWeight: '700' },
-  name: { color: colors.text, fontSize: 24, fontWeight: '700', marginTop: 14 },
-  memberCount: { color: colors.textSecondary, fontSize: 13, marginTop: 4 },
-  description: { color: colors.textMuted, fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
+  avatarText: { ...typography.display, color: colors.primaryContent, fontSize: 34 },
+  name: { ...typography.h1, color: colors.text, fontSize: 24, marginTop: 14 },
+  memberCount: { ...typography.caption, color: colors.textSecondary, fontSize: 13, marginTop: 4 },
+  description: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28 },
-  viewAllLink: { color: colors.accent, fontSize: 13, fontWeight: '600' },
-  pinboardEmpty: { color: colors.textMuted, fontSize: 13, marginTop: 8 },
+  viewAllLink: { ...typography.captionStrong, color: colors.accent, fontSize: 13 },
+  pinboardEmpty: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 8 },
   pinRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -538,12 +538,12 @@ const styles = StyleSheet.create({
     padding: 12,
     marginTop: 10,
   },
-  pinIcon: { fontSize: 16 },
+  pinIcon: { ...typography.bodyLarge, fontSize: 16 },
   pinInfo: { flex: 1, marginLeft: 10 },
-  pinBody: { color: colors.text, fontSize: 14 },
-  pinMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
-  settingsLink: { color: colors.accent, fontSize: 14, fontWeight: '600', marginTop: 14 },
-  sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginTop: 28 },
+  pinBody: { ...typography.body, color: colors.text, fontSize: 14 },
+  pinMeta: { ...typography.caption, color: colors.textMuted, fontSize: 11, marginTop: 3 },
+  settingsLink: { ...typography.bodyStrong, color: colors.accent, fontSize: 14, marginTop: 14 },
+  sectionTitle: { ...typography.h3, color: colors.text, fontSize: 17, marginTop: 28 },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -562,14 +562,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  memberAvatarText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  memberAvatarText: { ...typography.bodyStrong, color: colors.primaryContent, fontSize: 16 },
   memberInfo: { flex: 1, marginLeft: 12 },
-  memberName: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  memberUsername: { color: colors.textMuted, fontSize: 12, marginTop: 1 },
+  memberName: { ...typography.bodyStrong, color: colors.text, fontSize: 15 },
+  memberUsername: { ...typography.caption, color: colors.textMuted, fontSize: 12, marginTop: 1 },
   roleBadge: {
+    ...typography.captionStrong,
     color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: '700',
     textTransform: 'uppercase',
     borderColor: colors.border,
     borderWidth: 1,
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
   },
-  primaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  primaryButtonText: { ...typography.button, color: colors.primaryContent, fontSize: 14 },
   secondaryButton: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     marginTop: 16,
   },
-  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  secondaryButtonText: { ...typography.button, color: colors.text, fontSize: 14 },
   leaveButton: {
     backgroundColor: colors.surface,
     borderColor: colors.error,
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
-  leaveText: { color: colors.error, fontSize: 14, fontWeight: '600' },
+  leaveText: { ...typography.button, color: colors.error, fontSize: 14 },
   openChatButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     marginTop: 22,
   },
-  openChatText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  openChatText: { ...typography.button, color: colors.primaryContent, fontSize: 15 },
   unreadBadge: {
     minWidth: 22,
     borderRadius: 11,
@@ -625,11 +625,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 8,
   },
-  unreadBadgeText: { color: colors.text, fontSize: 12, fontWeight: '700' },
-  error: { color: colors.error, fontSize: 13, marginTop: 12, textAlign: 'center' },
-  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(11,7,20,0.8)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  unreadBadgeText: { ...typography.captionStrong, color: colors.text, fontSize: 12 },
+  error: { ...typography.caption, color: colors.error, fontSize: 13, marginTop: 12, textAlign: 'center' },
+  stateTitle: { ...typography.h3, color: colors.text, fontSize: 16, textAlign: 'center' },
+  stateText: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  modalBackdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: 24 },
   modalCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -638,13 +638,13 @@ const styles = StyleSheet.create({
     padding: 24,
     alignSelf: 'stretch',
   },
-  modalTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  modalSubtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
-  modalNote: { color: colors.warning, fontSize: 12, fontWeight: '600', marginTop: 14 },
+  modalTitle: { ...typography.h3, color: colors.text, fontSize: 18 },
+  modalSubtitle: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  modalNote: { ...typography.captionStrong, color: colors.warning, fontSize: 12, marginTop: 14 },
   inviteCode: {
+    ...typography.h2,
     color: colors.text,
     fontSize: 22,
-    fontWeight: '700',
     letterSpacing: 3,
     textAlign: 'center',
     marginTop: 10,
@@ -654,10 +654,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   textButton: { alignItems: 'center', marginTop: 14, padding: 6 },
-  textButtonText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  textButtonText: { ...typography.button, color: colors.textMuted, fontSize: 13 },
   menuOption: { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
-  menuOptionText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  menuOptionText: { ...typography.bodyStrong, color: colors.text, fontSize: 15 },
   menuOptionDanger: { paddingVertical: 13 },
-  menuOptionDangerText: { color: colors.error, fontSize: 15, fontWeight: '600' },
+  menuOptionDangerText: { ...typography.bodyStrong, color: colors.error, fontSize: 15 },
   buttonPressed: { opacity: 0.85 },
 });

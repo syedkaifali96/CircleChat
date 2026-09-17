@@ -5,7 +5,7 @@ import { clearAppLockPin, isValidAppLockPin, verifyAppLockPin } from './appLockP
 import { saveAppLockMode } from './appLock';
 import { useAuth } from './AuthContext';
 import { clearSessionToken } from './session';
-import { colors } from '../design/tokens';
+import { colors, typography } from '../design/tokens';
 
 /**
  * Locked screen (M13, design.md §22): rendered INSTEAD of the whole app while
@@ -132,7 +132,7 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             disabled={verifying || pinDraft.length < 4}
             testID="app-lock-verify"
           >
-            {verifying ? <ActivityIndicator color={colors.text} /> : <Text style={styles.primaryText}>Unlock</Text>}
+            {verifying ? <ActivityIndicator color={colors.primaryContent} /> : <Text style={styles.primaryText}>Unlock</Text>}
           </Pressable>
         </>
       ) : (
@@ -172,10 +172,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  logo: { color: colors.text, fontSize: 22, fontWeight: '700' },
+  logo: { ...typography.h2, color: colors.text, fontSize: 22 },
   logoMark: { color: colors.primary },
-  title: { color: colors.textSecondary, fontSize: 16, marginTop: 12 },
+  title: { ...typography.h3, color: colors.textSecondary, fontSize: 16, marginTop: 12 },
   pinInput: {
+    ...typography.bodyLarge, lineHeight: undefined,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     alignSelf: 'stretch',
   },
-  primaryText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  primaryText: { ...typography.button, color: colors.primaryContent, fontSize: 15 },
   secondaryButton: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -208,8 +209,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     alignSelf: 'stretch',
   },
-  secondaryText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  error: { color: colors.error, fontSize: 13, marginTop: 14 },
-  forgotText: { color: colors.textMuted, fontSize: 13, marginTop: 32 },
+  secondaryText: { ...typography.button, color: colors.primary, fontSize: 14 },
+  error: { ...typography.caption, color: colors.error, fontSize: 13, marginTop: 14 },
+  forgotText: { ...typography.caption, color: colors.accent, fontSize: 13, marginTop: 32 },
   pressed: { opacity: 0.85 },
 });

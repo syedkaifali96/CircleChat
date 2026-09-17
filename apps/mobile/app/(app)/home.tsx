@@ -131,7 +131,7 @@ export default function HomeScreen() {
             style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
             testID="home-create-circle"
           >
-            <Icon name="plus" size={16} color={colors.background} />
+            <Icon name="plus" size={16} color={colors.primaryContent} />
             <Text style={styles.primaryActionText}>Create Circle</Text>
           </Pressable>
           <Pressable
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   featuredMeta: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
   actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   primaryAction: { flex: 1, minHeight: 48, borderRadius: radii.lg, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  primaryActionText: { ...typography.button, color: colors.background },
+  primaryActionText: { ...typography.button, color: colors.primaryContent },
   secondaryAction: { flex: 1, minHeight: 48, borderRadius: radii.lg, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   secondaryActionText: { ...typography.button, color: colors.text },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xxxl, marginBottom: spacing.sm },
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   circleName: { ...typography.bodyStrong, color: colors.text },
   circleMeta: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
   unread: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  unreadText: { ...typography.captionStrong, color: colors.background },
+  unreadText: { ...typography.captionStrong, color: colors.primaryContent },
   state: { padding: spacing.xxl, borderRadius: radii.xxl, backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm },
   stateIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.errorMuted, alignItems: 'center', justifyContent: 'center' },
   emptyIcon: { width: 56, height: 56, borderRadius: radii.xxl, backgroundColor: colors.primaryGlow, alignItems: 'center', justifyContent: 'center' },

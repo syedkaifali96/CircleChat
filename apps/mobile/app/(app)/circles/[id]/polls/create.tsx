@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ApiError, createPoll } from '../../../../../src/lib/api';
 import { loadSessionToken } from '../../../../../src/auth/session';
-import { colors } from '../../../../../src/design/tokens';
+import { colors, typography } from '../../../../../src/design/tokens';
 
 /**
  * Create Poll (M11): question + 2–6 options (matching the server schema —
@@ -113,7 +113,7 @@ export default function CreatePollScreen() {
         testID="create-poll-submit"
       >
         {submitting ? (
-          <ActivityIndicator color={colors.text} />
+          <ActivityIndicator color={colors.primaryContent} />
         ) : (
           <Text style={styles.primaryButtonText}>Create poll</Text>
         )}
@@ -128,10 +128,11 @@ export default function CreatePollScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, paddingTop: 64 },
-  title: { color: colors.text, fontSize: 26, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 24 },
+  title: { ...typography.h1, color: colors.text, fontSize: 26 },
+  subtitle: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  label: { ...typography.bodyStrong, color: colors.text, fontSize: 14, marginTop: 24 },
   input: {
+    ...typography.body,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -144,10 +145,10 @@ const styles = StyleSheet.create({
   },
   optionRow: { flexDirection: 'row', alignItems: 'center' },
   optionInput: { flex: 1 },
-  removeText: { color: colors.error, fontSize: 16, paddingHorizontal: 10 },
+  removeText: { ...typography.button, color: colors.error, fontSize: 16, paddingHorizontal: 10 },
   addOption: { marginTop: 12, padding: 6 },
-  addOptionText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
-  error: { color: colors.error, fontSize: 13, marginTop: 12 },
+  addOptionText: { ...typography.button, color: colors.accent, fontSize: 14 },
+  error: { ...typography.captionStrong, color: colors.error, fontSize: 13, marginTop: 12 },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -155,8 +156,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
-  primaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  primaryButtonText: { ...typography.button, color: colors.primaryContent, fontSize: 14 },
   cancel: { alignItems: 'center', marginTop: 14, padding: 6 },
-  cancelText: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
+  cancelText: { ...typography.button, color: colors.textMuted, fontSize: 14 },
   buttonPressed: { opacity: 0.85 },
 });

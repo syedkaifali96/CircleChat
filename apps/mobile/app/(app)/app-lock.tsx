@@ -9,7 +9,7 @@ import {
 } from '../../src/auth/appLock';
 import { clearAppLockPin, setupAppLockPin } from '../../src/auth/appLockPin';
 import { useAppLock } from '../../src/auth/AppLockManager';
-import { colors } from '../../src/design/tokens';
+import { colors, typography } from '../../src/design/tokens';
 
 /**
  * App Lock settings (M13, design.md §22 "Off / Immediately / After 1 / 5 /
@@ -192,7 +192,7 @@ export default function AppLockSettingsScreen() {
               disabled={saving || pinDraft.length < 4 || pinConfirmDraft.length < 4}
               testID="app-lock-pin-save"
             >
-              {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.primaryText}>Save PIN</Text>}
+              {saving ? <ActivityIndicator color={colors.primaryContent} /> : <Text style={styles.primaryText}>Save PIN</Text>}
             </Pressable>
             <Pressable
               style={styles.textButton}
@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, padding: 24, paddingTop: 64 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 8, lineHeight: 19 },
+  title: { ...typography.h1, color: colors.text, fontSize: 24 },
+  subtitle: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 8, lineHeight: 19 },
   modeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,14 +233,15 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 10,
   },
-  modeRowActive: { borderColor: colors.accent },
-  modeLabel: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  modeCheck: { color: colors.accent, fontSize: 15, fontWeight: '700' },
-  pinState: { color: colors.textMuted, fontSize: 12, marginTop: 16 },
-  error: { color: colors.error, fontSize: 13, marginTop: 10 },
+  modeRowActive: { borderColor: colors.primary },
+  modeLabel: { ...typography.bodyStrong, color: colors.text, fontSize: 15 },
+  modeCheck: { ...typography.bodyStrong, color: colors.primary, fontSize: 15 },
+  pinState: { ...typography.caption, color: colors.textMuted, fontSize: 12, marginTop: 16 },
+  error: { ...typography.caption, color: colors.error, fontSize: 13, marginTop: 10 },
   setupCard: { marginTop: 20, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16 },
-  setupTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  setupTitle: { ...typography.h3, color: colors.text, fontSize: 15 },
   input: {
+    ...typography.bodyLarge, lineHeight: undefined,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -260,10 +261,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 14,
   },
-  primaryText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  primaryText: { ...typography.button, color: colors.primaryContent, fontSize: 15 },
   textButton: { alignItems: 'center', marginTop: 12, padding: 6 },
-  textButtonText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  textButtonText: { ...typography.button, color: colors.textMuted, fontSize: 13 },
   backLink: { alignItems: 'center', marginTop: 28 },
-  backText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  backText: { ...typography.button, color: colors.textMuted, fontSize: 13 },
   pressed: { opacity: 0.85 },
 });

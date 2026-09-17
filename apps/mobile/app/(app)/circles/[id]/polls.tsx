@@ -12,7 +12,7 @@ import {
 import { loadSessionToken } from '../../../../src/auth/session';
 import { CircleThemeGate } from '../../../../src/design/useCircleSettings';
 import { useCircleTheme } from '../../../../src/design/CircleTheme';
-import { colors } from '../../../../src/design/tokens';
+import { colors, typography } from '../../../../src/design/tokens';
 
 /**
  * Polls (M11): the Circle's poll list — active polls are votable (single
@@ -248,9 +248,9 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 64, paddingBottom: 40 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { color: colors.text, fontSize: 26, fontWeight: '700' },
-  createLink: { fontSize: 14, fontWeight: '700' },
-  sectionLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginTop: 22 },
+  title: { ...typography.h1, color: colors.text, fontSize: 26 },
+  createLink: { ...typography.button, fontSize: 14 },
+  sectionLabel: { ...typography.captionStrong, color: colors.textSecondary, fontSize: 12, textTransform: 'uppercase', marginTop: 22 },
   pollCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -259,8 +259,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 12,
   },
-  pollQuestion: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  pollMeta: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+  pollQuestion: { ...typography.h3, color: colors.text, fontSize: 16 },
+  pollMeta: { ...typography.caption, color: colors.textMuted, fontSize: 12, marginTop: 3 },
   optionRow: {
     marginTop: 10,
     borderRadius: 10,
@@ -268,8 +268,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 10,
   },
-  optionLabel: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  optionVotes: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  optionLabel: { ...typography.bodyStrong, color: colors.text, fontSize: 14 },
+  optionVotes: { ...typography.caption, color: colors.textMuted, fontSize: 11, marginTop: 2 },
   barTrack: {
     height: 6,
     borderRadius: 3,
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   barFill: { height: 6, backgroundColor: colors.primary },
   pollActions: { flexDirection: 'row', marginTop: 10 },
   textAction: { paddingVertical: 6, paddingHorizontal: 8 },
-  textActionText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
+  textActionText: { ...typography.button, color: colors.accent, fontSize: 12 },
   emptyCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -289,8 +289,8 @@ const styles = StyleSheet.create({
     padding: 20,
     marginTop: 16,
   },
-  emptyTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  emptyText: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  emptyTitle: { ...typography.h3, color: colors.text, fontSize: 15 },
+  emptyText: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
   secondaryButton: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -300,9 +300,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     marginTop: 16,
   },
-  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
-  error: { color: colors.error, fontSize: 13, marginTop: 12 },
+  secondaryButtonText: { ...typography.button, color: colors.text, fontSize: 14 },
+  stateTitle: { ...typography.h3, color: colors.text, fontSize: 16, textAlign: 'center' },
+  stateText: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  error: { ...typography.captionStrong, color: colors.error, fontSize: 13, marginTop: 12 },
   buttonPressed: { opacity: 0.85 },
 });

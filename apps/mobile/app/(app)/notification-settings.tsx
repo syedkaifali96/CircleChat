@@ -10,7 +10,7 @@ import {
   type PushPermissionStatus,
 } from '../../src/lib/notifications';
 import { loadSessionToken } from '../../src/auth/session';
-import { colors } from '../../src/design/tokens';
+import { colors, typography } from '../../src/design/tokens';
 
 /**
  * Notification settings (M8): the user's global push preferences — global
@@ -106,6 +106,7 @@ export default function NotificationSettingsScreen() {
           onValueChange={(value) => void onToggle('notificationsEnabled', value)}
           disabled={saving}
           trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={colors.text}
           testID="switch-global"
         />
       </View>
@@ -120,6 +121,7 @@ export default function NotificationSettingsScreen() {
           onValueChange={(value) => void onToggle('notificationPreview', value)}
           disabled={saving}
           trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={colors.text}
           testID="switch-preview"
         />
       </View>
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, paddingTop: 64 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700' },
+  title: { ...typography.h1, color: colors.text, fontSize: 24 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -148,8 +150,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   rowText: { flex: 1, marginRight: 12 },
-  rowTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  rowSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+  rowTitle: { ...typography.bodyStrong, color: colors.text, fontSize: 15 },
+  rowSubtitle: { ...typography.caption, color: colors.textMuted, fontSize: 12, marginTop: 3 },
   permissionBox: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -158,8 +160,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 20,
   },
-  permissionTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  permissionText: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
-  stateTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  permissionTitle: { ...typography.h3, color: colors.text, fontSize: 13 },
+  permissionText: { ...typography.caption, color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  stateTitle: { ...typography.h3, color: colors.text, fontSize: 15 },
+  stateText: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
 });

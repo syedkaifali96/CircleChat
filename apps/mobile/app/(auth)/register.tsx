@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { ApiError } from '../../src/lib/api';
-import { colors, radii, shadows, spacing } from '../../src/design/tokens';
+import { colors, radii, shadows, spacing, typography } from '../../src/design/tokens';
 import { Icon } from '../../src/components/Icon';
 
 /** Registration screen (M2). Shows the recovery code screen on success. */
@@ -90,7 +90,7 @@ export default function RegisterScreen() {
           testID="register-submit"
         >
           {submitting ? (
-            <ActivityIndicator color={colors.text} size="small" />
+            <ActivityIndicator color={colors.primaryContent} size="small" />
           ) : (
             <Text style={styles.buttonText}>Create account</Text>
           )}
@@ -127,21 +127,22 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    backgroundColor: colors.primaryGlowSoft,
     borderWidth: 1.5,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderColor: colors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.glow,
   },
   title: {
+    ...typography.h1,
     color: colors.text,
     fontSize: 26,
-    fontWeight: '700',
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   tagline: {
+    ...typography.caption,
     color: colors.textMuted,
     fontSize: 13,
     textAlign: 'center',
@@ -152,6 +153,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   input: {
+    ...typography.body,
     backgroundColor: colors.surfaceElevated,
     borderColor: colors.border,
     borderWidth: 1.5,
@@ -162,16 +164,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: colors.errorMuted,
     borderRadius: radii.md,
     padding: spacing.sm,
     marginTop: spacing.sm,
   },
   error: {
+    ...typography.captionStrong,
     color: colors.error,
     fontSize: 12,
     textAlign: 'center',
-    fontWeight: '600',
   },
   button: {
     backgroundColor: colors.primary,
@@ -186,14 +188,14 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.985 }],
   },
   buttonText: {
-    color: colors.text,
+    ...typography.button,
+    color: colors.primaryContent,
     fontSize: 15,
-    fontWeight: '700',
   },
   link: {
+    ...typography.bodyStrong,
     color: colors.accent,
     fontSize: 14,
-    fontWeight: '600',
     textAlign: 'center',
     marginTop: spacing.lg,
     paddingVertical: spacing.xs,

@@ -103,7 +103,7 @@ export default function ChatsScreen() {
             accessibilityLabel="Start private chat"
             testID="new-chat-button"
           >
-            <Icon name="plus" size={18} color={colors.background} />
+            <Icon name="plus" size={18} color={colors.primaryContent} />
           </Pressable>
         </View>
 
@@ -202,7 +202,7 @@ export default function ChatsScreen() {
               style={({ pressed }) => [styles.startButton, pressed && styles.pressed, starting && styles.disabled]}
               testID="new-chat-start"
             >
-              {starting ? <ActivityIndicator color={colors.background} /> : <Text style={styles.startButtonText}>Start chat</Text>}
+              {starting ? <ActivityIndicator color={colors.primaryContent} /> : <Text style={styles.startButtonText}>Start chat</Text>}
             </Pressable>
             <Pressable onPress={closeModal} style={styles.cancelButton} testID="new-chat-cancel">
               <Text style={styles.cancelText}>Cancel</Text>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   separator: { ...typography.caption, color: colors.textMuted },
   preview: { ...typography.caption, color: colors.textMuted, flex: 1 },
   unread: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  unreadText: { ...typography.captionStrong, color: colors.background },
+  unreadText: { ...typography.captionStrong, color: colors.primaryContent },
   state: { marginHorizontal: spacing.lg, padding: spacing.xxl, borderRadius: radii.xxl, backgroundColor: colors.surface, alignItems: 'center', gap: spacing.sm },
   stateTitle: { ...typography.bodyStrong, color: colors.text, textAlign: 'center' },
   stateText: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 52, borderRadius: radii.lg, paddingHorizontal: spacing.md, backgroundColor: colors.backgroundElevated, color: colors.text, ...typography.body },
   error: { ...typography.caption, color: colors.error, marginTop: spacing.sm },
   startButton: { minHeight: 52, marginTop: spacing.xl, borderRadius: radii.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  startButtonText: { ...typography.button, color: colors.background },
+  startButtonText: { ...typography.button, color: colors.primaryContent },
   cancelButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   cancelText: { ...typography.button, color: colors.textMuted },
   disabled: { opacity: 0.55 },

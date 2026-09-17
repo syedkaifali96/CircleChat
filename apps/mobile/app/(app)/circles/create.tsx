@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { useRouter } from 'expo-router';
 import { createCircle } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
-import { colors } from '../../../src/design/tokens';
+import { colors, typography } from '../../../src/design/tokens';
 import { useSafeInsets } from '../../../src/lib/safeInsets';
 
 /**
@@ -95,7 +95,7 @@ export default function CreateCircleScreen() {
           disabled={creating}
           testID="create-circle-submit"
         >
-          {creating ? <ActivityIndicator color={colors.text} /> : <Text style={styles.primaryButtonText}>Create Circle</Text>}
+          {creating ? <ActivityIndicator color={colors.primaryContent} /> : <Text style={styles.primaryButtonText}>Create Circle</Text>}
         </Pressable>
         <Pressable onPress={() => router.back()} style={styles.cancel} disabled={creating} testID="create-circle-cancel">
           <Text style={styles.cancelText}>Cancel</Text>
@@ -116,11 +116,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  backText: { color: colors.accent, fontSize: 28, fontWeight: '700', paddingHorizontal: 6 },
-  title: { color: colors.text, fontSize: 26, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 24 },
+  backText: { ...typography.h1, color: colors.accent, paddingHorizontal: 6 },
+  title: { ...typography.h1, color: colors.text, fontSize: 26 },
+  subtitle: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  label: { ...typography.bodyStrong, color: colors.text, fontSize: 14, marginTop: 24 },
   input: {
+    ...typography.body,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
-  error: { color: colors.error, fontSize: 13, marginTop: 14 },
+  error: { ...typography.captionStrong, color: colors.error, fontSize: 13, marginTop: 14 },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -140,8 +141,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 28,
   },
-  primaryButtonText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  primaryButtonText: { ...typography.button, color: colors.primaryContent },
   cancel: { alignSelf: 'center', marginTop: 18, padding: 8 },
-  cancelText: { color: colors.textMuted, fontSize: 14 },
+  cancelText: { ...typography.body, color: colors.textMuted },
   buttonPressed: { opacity: 0.85 },
 });

@@ -13,7 +13,7 @@ import { useAuth } from '../../../../src/auth/AuthContext';
 import { loadSessionToken } from '../../../../src/auth/session';
 import { CircleThemeGate } from '../../../../src/design/useCircleSettings';
 import { useCircleTheme } from '../../../../src/design/CircleTheme';
-import { colors } from '../../../../src/design/tokens';
+import { colors, typography } from '../../../../src/design/tokens';
 
 /**
  * Pinboard (M10): the Circle's full pinned list. Items reference existing
@@ -196,9 +196,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, paddingTop: 64 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { color: colors.text, fontSize: 26, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
-  error: { color: colors.error, fontSize: 13, marginTop: 12 },
+  title: { ...typography.h1, color: colors.text, fontSize: 26 },
+  subtitle: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 4 },
+  error: { ...typography.captionStrong, color: colors.error, fontSize: 13, marginTop: 12 },
   emptyCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
     padding: 20,
     marginTop: 16,
   },
-  emptyTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  emptyText: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  emptyTitle: { ...typography.h3, color: colors.text, fontSize: 15 },
+  emptyText: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
   pinCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -218,11 +218,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   pinMain: { flexDirection: 'row', alignItems: 'center' },
-  pinIcon: { fontSize: 16 },
+  pinIcon: { ...typography.body, fontSize: 16 },
   pinInfo: { flex: 1, marginLeft: 10 },
-  pinBody: { color: colors.text, fontSize: 14 },
-  pinMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
-  unpinText: { color: colors.error, fontSize: 13, fontWeight: '600', paddingHorizontal: 6 },
+  pinBody: { ...typography.body, color: colors.text, fontSize: 14 },
+  pinMeta: { ...typography.caption, color: colors.textMuted, fontSize: 11, marginTop: 3 },
+  unpinText: { ...typography.button, color: colors.error, fontSize: 13, paddingHorizontal: 6 },
   secondaryButton: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -232,8 +232,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     marginTop: 16,
   },
-  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  stateText: { color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  secondaryButtonText: { ...typography.button, color: colors.text, fontSize: 14 },
+  stateTitle: { ...typography.h3, color: colors.text, fontSize: 16, textAlign: 'center' },
+  stateText: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: 'center' },
   buttonPressed: { opacity: 0.85 },
 });

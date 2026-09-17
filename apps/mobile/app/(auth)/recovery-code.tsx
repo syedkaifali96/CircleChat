@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
-import { colors } from '../../src/design/tokens';
+import { colors, typography } from '../../src/design/tokens';
 
 /**
  * Recovery code display (M2) — shown EXACTLY once after signup or rotation.
@@ -45,9 +45,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  title: { color: colors.text, fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  body: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
+  title: { ...typography.h2, color: colors.text, textAlign: 'center' },
+  body: { ...typography.body, color: colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 12 },
   code: {
+    ...typography.h2,
     color: colors.accent,
     fontSize: 24,
     fontWeight: '700',
@@ -67,5 +68,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonPressed: { opacity: 0.85 },
-  buttonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  buttonText: { ...typography.button, color: colors.primaryContent },
 });

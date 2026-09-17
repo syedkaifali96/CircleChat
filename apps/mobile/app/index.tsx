@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../src/auth/AuthContext';
-import { colors } from '../src/design/tokens';
+import { colors, typography } from '../src/design/tokens';
 
 /**
  * Auth gate (M2): restores the session, then routes to the authenticated app
@@ -32,6 +32,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  title: { color: colors.text, fontSize: 32, fontWeight: '700' },
-  tagline: { color: colors.accent, fontSize: 16, marginTop: 8 },
+  title: { ...typography.display, color: colors.text },
+  tagline: { ...typography.bodyLarge, color: colors.accent, marginTop: 8 },
 });

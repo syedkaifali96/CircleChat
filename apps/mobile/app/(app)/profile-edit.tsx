@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { loadSessionToken } from '../../src/auth/session';
 import { ApiError, updateProfile } from '../../src/lib/api';
-import { colors } from '../../src/design/tokens';
+import { colors, typography } from '../../src/design/tokens';
 
 /**
  * Edit profile (M3): display name + bio only. Username is shown read-only
@@ -106,7 +106,7 @@ export default function ProfileEditScreen() {
         disabled={saving}
         testID="edit-save"
       >
-        {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.buttonText}>Save</Text>}
+        {saving ? <ActivityIndicator color={colors.primaryContent} /> : <Text style={styles.buttonText}>Save</Text>}
       </Pressable>
       <Pressable style={styles.cancel} onPress={() => router.back()} testID="edit-cancel">
         <Text style={styles.cancelText}>Cancel</Text>
@@ -117,9 +117,10 @@ export default function ProfileEditScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 24 },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700', marginTop: 48 },
-  label: { color: colors.textMuted, fontSize: 12, marginTop: 20, marginBottom: 6 },
+  title: { ...typography.h1, color: colors.text, fontSize: 24, marginTop: 48 },
+  label: { ...typography.captionStrong, color: colors.textMuted, fontSize: 12, marginTop: 20, marginBottom: 6 },
   readonly: {
+    ...typography.body,
     color: colors.textSecondary,
     fontSize: 15,
     backgroundColor: colors.surface,
@@ -131,6 +132,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   input: {
+    ...typography.body, lineHeight: undefined,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -140,8 +142,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   bioInput: { minHeight: 90, textAlignVertical: 'top' },
-  error: { color: colors.error, fontSize: 13, marginTop: 12 },
-  success: { color: colors.success, fontSize: 13, marginTop: 12 },
+  error: { ...typography.caption, color: colors.error, fontSize: 13, marginTop: 12 },
+  success: { ...typography.caption, color: colors.success, fontSize: 13, marginTop: 12 },
   button: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -150,7 +152,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   pressed: { opacity: 0.85 },
-  buttonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  buttonText: { ...typography.button, color: colors.primaryContent, fontSize: 15 },
   cancel: { alignItems: 'center', marginTop: 16 },
-  cancelText: { color: colors.accent },
+  cancelText: { ...typography.button, color: colors.accent },
 });

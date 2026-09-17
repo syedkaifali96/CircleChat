@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Phase 4–6 — Warm Hearth design system migration
+
+- `feat(mobile): migrate all 19 screens to warm hearth palette`
+- Group A (4): landing, login, register and recovery code; amber glows and typography.
+- Group B (2): Create/Join Circle; typography with safe-area headers preserved.
+- Group C (6): Home, Circle Home/settings/pinboard/polls/create poll; token-based
+  overlays, typography and Amber/Coral/Gold/Terracotta accent swatches with legacy testIDs retained.
+- Group D (2): chat list and conversation; typography and primary-content contrast,
+  preserving the 42×42 composer controls, safe-area padding and keyboard handling.
+- Group E (5): profile, profile edit, App Lock settings, LockScreen and notification
+  settings; typography and warm switch colors, with PIN/biometric/privacy logic unchanged.
+- Phase 5 removes the remaining 11 hardcoded screen/LockScreen hex/rgba occurrences
+  (11 → 0). Final app/src sweep finds color literals only in `tokens.ts`.
+- Five new auth/onboarding regression tests bring mobile coverage to 160 tests
+  (17 more than the pre-migration baseline across all phases). Server: 239; shared: 2.
+- Phase 6 synchronizes README and design.md with Warm Hearth and documents the
+  API-compatible preset-name debt (`dark_purple`, `midnight`, `orchid`, `ember`).
+  No API, database, auth-flow or Socket.IO changes.
+
 ### Documentation synchronization
 
 - Updated README and every project document to the implemented M13 baseline,

@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View 
 import { useRouter } from 'expo-router';
 import { ApiError, fetchInvitePreview, joinCircle, type InvitePreview } from '../../../src/lib/api';
 import { loadSessionToken } from '../../../src/auth/session';
-import { colors } from '../../../src/design/tokens';
+import { colors, typography } from '../../../src/design/tokens';
 import { useSafeInsets } from '../../../src/lib/safeInsets';
 
 /**
@@ -154,7 +154,7 @@ export default function JoinCircleScreen() {
               testID="join-confirm"
             >
               {joining ? (
-                <ActivityIndicator color={colors.text} />
+                <ActivityIndicator color={colors.primaryContent} />
               ) : (
                 <Text style={styles.primaryButtonText}>Join this Circle</Text>
               )}
@@ -181,11 +181,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  backText: { color: colors.accent, fontSize: 28, fontWeight: '700', paddingHorizontal: 6 },
-  title: { color: colors.text, fontSize: 26, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6 },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 24 },
+  backText: { ...typography.h1, color: colors.accent, paddingHorizontal: 6 },
+  title: { ...typography.h1, color: colors.text, fontSize: 26 },
+  subtitle: { ...typography.caption, color: colors.textMuted, fontSize: 13, marginTop: 6 },
+  label: { ...typography.bodyStrong, color: colors.text, fontSize: 14, marginTop: 24 },
   input: {
+    ...typography.body,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -207,8 +208,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
   },
-  lookupButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  error: { color: colors.error, fontSize: 13, marginTop: 14 },
+  lookupButtonText: { ...typography.button, color: colors.text, fontSize: 14 },
+  error: { ...typography.captionStrong, color: colors.error, fontSize: 13, marginTop: 14 },
   previewCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -228,11 +229,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   previewAvatarImage: { width: 72, height: 72 },
-  previewAvatarText: { color: colors.text, fontSize: 30, fontWeight: '700' },
-  previewName: { color: colors.text, fontSize: 18, fontWeight: '700', marginTop: 14 },
-  previewMeta: { color: colors.textSecondary, fontSize: 13, marginTop: 4 },
-  previewCapacity: { color: colors.success, fontSize: 12, marginTop: 8 },
-  previewCapacityFull: { color: colors.warning, fontSize: 12, marginTop: 8 },
+  previewAvatarText: { ...typography.display, color: colors.primaryContent, fontSize: 30 },
+  previewName: { ...typography.h3, color: colors.text, marginTop: 14 },
+  previewMeta: { ...typography.caption, color: colors.textSecondary, fontSize: 13, marginTop: 4 },
+  previewCapacity: { ...typography.caption, color: colors.success, marginTop: 8 },
+  previewCapacityFull: { ...typography.caption, color: colors.warning, marginTop: 8 },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -242,8 +243,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignSelf: 'stretch',
   },
-  primaryButtonText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  primaryButtonText: { ...typography.button, color: colors.primaryContent },
   cancel: { alignSelf: 'center', marginTop: 18, padding: 8 },
-  cancelText: { color: colors.textMuted, fontSize: 14 },
+  cancelText: { ...typography.body, color: colors.textMuted, fontSize: 14 },
   buttonPressed: { opacity: 0.85 },
 });

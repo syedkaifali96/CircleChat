@@ -22,7 +22,7 @@ import {
   updateCircleSettings,
 } from '../../../../src/lib/api';
 import { loadSessionToken } from '../../../../src/auth/session';
-import { colors } from '../../../../src/design/tokens';
+import { colors, typography } from '../../../../src/design/tokens';
 import {
   BACKGROUND_LABELS,
   CIRCLE_THEMES,
@@ -47,14 +47,13 @@ import {
  * palettes (no free-form color input).
  */
 
-/** Approved accent swatches — a finite, contrast-checked palette drawn from
- * the documented brand colors and preset accents. */
-const ACCENT_SWATCHES: { label: string; value: string | null }[] = [
-  { label: 'Default', value: null },
-  { label: 'Lavender', value: '#A78BFA' },
-  { label: 'Light Violet', value: '#C4B5FD' },
-  { label: 'Amber', value: '#FBBF24' },
-  { label: 'Emerald', value: '#34D399' },
+/** Legacy test IDs stay stable independently of the visible accent labels. */
+const ACCENT_SWATCHES: { label: string; value: string | null; testID: string }[] = [
+  { label: 'Default', value: null, testID: 'accent-option-default' },
+  { label: 'Amber', value: colors.memberAmber, testID: 'accent-option-amber' },
+  { label: 'Coral', value: colors.memberCoral, testID: 'accent-option-lavender' },
+  { label: 'Gold', value: colors.memberGold, testID: 'accent-option-light violet' },
+  { label: 'Terracotta', value: colors.memberTerracotta, testID: 'accent-option-emerald' },
 ];
 
 export default function CircleSettingsScreen() {
@@ -238,7 +237,7 @@ export default function CircleSettingsScreen() {
           disabled={saving || !dirty}
           testID="circle-settings-save"
         >
-          {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.primaryButtonText}>Save changes</Text>}
+          {saving ? <ActivityIndicator color={colors.primaryContent} /> : <Text style={styles.primaryButtonText}>Save changes</Text>}
         </Pressable>
 
         {isAdmin && settings ? (
@@ -281,7 +280,7 @@ export default function CircleSettingsScreen() {
                   onPress={() => void onPatchSettings('accent', { accentColor: swatch.value })}
                   disabled={savingTheme !== null}
                   accessibilityLabel={`Accent ${swatch.label}`}
-                  testID={`accent-option-${swatch.label.toLowerCase()}`}
+                  testID={swatch.testID}
                 />
               ))}
             </View>
@@ -327,9 +326,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, paddingTop: 64 },
   centered: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700' },
-  label: { color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 24 },
+  title: { ...typography.h1, color: colors.text, fontSize: 24 },
+  label: { ...typography.bodyStrong, color: colors.text, fontSize: 14, marginTop: 24 },
   input: {
+    ...typography.body,
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
@@ -341,8 +341,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   multiline: { minHeight: 90, textAlignVertical: 'top' },
-  error: { color: colors.error, fontSize: 13, marginTop: 14 },
-  saved: { color: colors.success, fontSize: 13, marginTop: 14 },
+  error: { ...typography.captionStrong, color: colors.error, fontSize: 13, marginTop: 14 },
+  saved: { ...typography.caption, color: colors.success, fontSize: 13, marginTop: 14 },
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 28,
   },
-  primaryButtonText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  primaryButtonText: { ...typography.button, color: colors.primaryContent, fontSize: 15 },
   secondaryButton: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -360,10 +360,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     marginTop: 16,
   },
-  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  stateTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  secondaryButtonText: { ...typography.button, color: colors.text, fontSize: 14 },
+  stateTitle: { ...typography.h3, color: colors.text, fontSize: 16 },
   personalization: { marginTop: 36, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16 },
-  personalizationTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
+  personalizationTitle: { ...typography.h3, color: colors.text, fontSize: 17 },
   presetRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -376,8 +376,8 @@ const styles = StyleSheet.create({
   },
   presetRowActive: { borderColor: colors.accent },
   presetSwatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 2 },
-  presetLabel: { color: colors.text, fontSize: 14, fontWeight: '600', flex: 1 },
-  presetCheck: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+  presetLabel: { ...typography.bodyStrong, color: colors.text, fontSize: 14, flex: 1 },
+  presetCheck: { ...typography.bodyStrong, color: colors.accent, fontSize: 15 },
   swatchRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   accentSwatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: colors.border },
   accentSwatchDefault: {
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   },
   accentSwatchActive: { borderColor: colors.text },
   dangerZone: { marginTop: 40, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16 },
-  dangerTitle: { color: colors.warning, fontSize: 13, fontWeight: '700', textTransform: 'uppercase' },
+  dangerTitle: { ...typography.captionStrong, color: colors.warning, fontSize: 13, textTransform: 'uppercase' },
   deleteButton: {
     borderColor: colors.error,
     borderWidth: 1,
@@ -396,6 +396,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: colors.background,
   },
-  deleteText: { color: colors.error, fontSize: 14, fontWeight: '600' },
+  deleteText: { ...typography.button, color: colors.error, fontSize: 14 },
   buttonPressed: { opacity: 0.85 },
 });

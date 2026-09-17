@@ -61,6 +61,16 @@ What actually ships today, verified by the test suites referenced below:
 
 CircleChat currently has **no generative-AI feature, AI SDK, AI provider API or AI API key**. “AI” in the development-plan filename describes the coding workflow only; product AI ideas remain experimental and unimplemented.
 
+## Design System — Warm Hearth
+
+The mobile app uses firelight amber (`#F59E0B`), warm charcoal (`#161311`),
+coral accents (`#E06D53`) and warm pearl text (`#F5F0EB`), with Plus Jakarta Sans
+headings and Inter body text. The migration covers 19 screens and 11 components;
+colors and typography come from `apps/mobile/src/design/tokens.ts`.
+This replaces the original Dark Purple identity. Theme preset identifiers
+(`dark_purple`, `midnight`, `orchid`, `ember`) remain stable for API compatibility;
+renaming them is V2 debt, not part of this visual migration.
+
 ## Documentation
 
 Product & design sources of truth:
@@ -137,7 +147,7 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 **M0–M13 complete; M14 hardening is in progress (all automated suites green).**
 
-Latest verification (local QA pass, 2026-09-16): shared 2/2, server 239/239 (Vitest + real PostgreSQL) and mobile 143/143 (Jest + RNTL), with lint and typecheck green. Real Android device smoke (physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
+Latest automated verification (Warm Hearth migration, 2026-09-18): shared 2/2, server 239/239 (Vitest + real PostgreSQL) and mobile 160/160 (Jest + RNTL), with lint and typecheck green. Earlier real Android device smoke (2026-09-16, before this migration, physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|

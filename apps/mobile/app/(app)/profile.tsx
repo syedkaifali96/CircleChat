@@ -32,7 +32,7 @@ interface SettingsRowProps {
 function SettingsRow({ icon, title, detail, onPress, testID }: SettingsRowProps) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]} testID={testID}>
-      <View style={styles.settingsIcon}><Icon name={icon} size={19} color={colors.accent} /></View>
+      <View style={styles.settingsIcon}><Icon name={icon} size={19} color={colors.primary} /></View>
       <View style={styles.settingsCopy}>
         <Text style={styles.settingsTitle}>{title}</Text>
         <Text style={styles.settingsDetail}>{detail}</Text>
@@ -186,7 +186,7 @@ export default function ProfileScreen() {
         </View>
 
         <Pressable onPress={() => void signOut()} style={({ pressed }) => [styles.logout, pressed && styles.pressed]} testID="profile-logout">
-          <Icon name="logout" size={17} color={colors.primary} />
+          <Icon name="logout" size={17} color={colors.accent} />
           <Text style={styles.logoutText}>Log out</Text>
         </Pressable>
       </ScrollView>
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   avatarButton: { width: 104, height: 104 },
   avatar: { width: 104, height: 104, borderRadius: 35, backgroundColor: colors.surface },
   avatarPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-  avatarInitial: { color: colors.background, fontSize: 40, fontWeight: '700' },
+  avatarInitial: { ...typography.display, lineHeight: undefined, color: colors.primaryContent, fontSize: 40 },
   cameraBadge: { position: 'absolute', right: -4, bottom: -4, width: 36, height: 36, borderRadius: 13, borderWidth: 3, borderColor: colors.background, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
   uploadIndicator: { position: 'absolute', left: 40, top: 40 },
   displayName: { ...typography.h2, color: colors.text, marginTop: spacing.lg },
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   settingsCopy: { flex: 1 },
   settingsTitle: { ...typography.bodyStrong, color: colors.text },
   settingsDetail: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  logout: { minHeight: 50, marginTop: spacing.xl, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.primaryBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  logoutText: { ...typography.button, color: colors.primary },
+  logout: { minHeight: 50, marginTop: spacing.xl, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  logoutText: { ...typography.button, color: colors.accent },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

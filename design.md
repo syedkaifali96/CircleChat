@@ -8,9 +8,11 @@ This document defines the visual language, UX principles, screen structure, inte
 
 The goal is to give designers and AI coding agents a single design source of truth before implementation.
 
-> Implementation status: the warm-midnight foundation and conversation UI are
-> active on `feat/chat-ui-redesign`; future screens must extend these tokens and
-> interaction rules instead of reintroducing the earlier purple/glow-heavy look.
+> Design System: **Warm Hearth**. The shared tokens, 11 migrated components,
+> and all 19 migration screens now use warm charcoal, amber and coral with
+> Plus Jakarta Sans headings and Inter body text. This replaces the original
+> Dark Purple (`#7C3AED`) identity and the intermediate warm-midnight palette.
+> Future screens must reuse these tokens and preserve existing interaction rules.
 
 CircleChat is a **private messenger for small Circles of 2–5 people**. It includes both private 1-to-1 chats and private Circle group chats.
 
@@ -52,37 +54,48 @@ The interface should communicate **"this is our little space"** rather than **"t
 
 ## 3. Visual Identity
 
-### 3.1 Color Palette
+### 3.1 Color Palette — Warm Hearth
 
-Primary Coral: `#F58A7A`
+> Migration note (2026-09): the implemented palette moved from the earlier
+> warm-midnight blues (`#0B1020`/`#151E30`) to Warm Hearth. Screens, shared
+> components, and auth components now consume only tokens from
+> `apps/mobile/src/design/tokens.ts`; the hex values below are the token
+> definitions. Circle theme preset enum names (`dark_purple`, `midnight`,
+> `orchid`, `ember`) are unchanged for API compatibility — server-validated
+> names stay stable even though the preset visuals are warm now (V2 debt:
+> revisit names when the API can version them).
 
-Midnight Background: `#0B1020`
+Primary Amber (firelight): `#F59E0B`
 
-Surface: `#151E30`
+Amber Deep (pressed): `#D97706`
 
-Accent Lavender: `#D4B5FF`
+Warm Coral accent: `#E06D53`
 
-Primary Text: `#F7F7FA`
+Background (warm charcoal): `#161311`
+
+Surface (elevated): `#1F1B18`
+
+Primary Text (warm pearl): `#F5F0EB`
 
 Recommended supporting colors:
 
-- Secondary text: `#C8D1E0`
-- Muted text: `#8D9AB0`
-- Border: `#263044`
+- Secondary text: `#A89F91`
+- Muted text: `#78716C`
+- Border: `#332B25`
 - Success: `#4CD69A`
 - Warning: `#F59E0B`
 - Error: `#EF4444`
-- Info: `#60A5FA`
+- Info: `#F59E0B`
 
-Supporting colors should be used sparingly. Coral carries primary actions while
-lavender adds warmth to secondary highlights. Neither color should become a
+Supporting colors should be used sparingly. Amber carries primary actions while
+coral adds warmth to secondary highlights. Neither color should become a
 full-screen wash or decorative glow.
 
 ### 3.2 Color Usage
 
-- Primary coral: primary actions, unread indicators, and high-priority interactive elements.
-- Lavender: secondary highlights, identity accents, and subtle focus states.
-- Midnight background: application shell and dark-mode page background.
+- Primary amber: primary actions, unread indicators, and high-priority interactive elements.
+- Warm coral: identity accents (member colors, avatars) and subtle focus states.
+- Warm charcoal background: application shell and dark-mode page background.
 - Surface: cards, panels, dialogs, chat composer, navigation surfaces.
 - Text: high-priority content.
 - Muted text: metadata, timestamps, secondary descriptions.
@@ -92,7 +105,7 @@ spacing, typography, restrained surface contrast, and one clear primary action.
 
 ### 3.3 Typography
 
-Primary font: **Inter**.
+Headings: **Plus Jakarta Sans** (600/700). Body, captions and buttons: **Inter** (400/500/600/700). Fonts are bundled through Expo Google Fonts and loaded before the navigation tree renders; use the `typography` tokens rather than raw font-family names.
 
 Suggested scale:
 
@@ -157,7 +170,7 @@ Do not mix unrelated icon styles. Every icon-only button must have an accessible
 The application uses an in-house, zero-external-dependency shared component suite defined in `apps/mobile/src/components/`:
 
 ### 1. Button (`Button.tsx`)
-- **Variants:** `primary` (coral solid with restrained depth), `secondary` (midnight elevated surface), `outline` (transparent with lavender border), `danger` (error red), `ghost` (transparent).
+- **Variants:** `primary` (amber solid with dark primary-content text), `secondary` (warm elevated surface), `outline` (transparent with amber border), `danger` (error red), `ghost` (transparent).
 - **Sizes:** `sm` (compact, for list items), `md` (standard actions), `lg` (hero buttons).
 - **Micro-interactions:** Interactive press scale (`0.98`) and opacity transition (`0.88`), integrated loading spinner with disabled state.
 - **Icons:** Supports leading (`icon`) and trailing (`iconTrailing`) icon slots.
@@ -169,16 +182,16 @@ The application uses an in-house, zero-external-dependency shared component suit
 - **AvatarGroup:** Overlapping stacked member avatars with custom overlap scale and `+N` remaining counter bubble.
 
 ### 3. Card (`Card.tsx`)
-- **Surface:** Midnight `#151E30` surface with `#263044` subtle border and 16px radius (`radii.xl`).
-- **Variants:** `default` (standard surface), `elevated` (higher layer `#1B263A`), `glass` (translucent midnight glass).
+- **Surface:** Warm `colors.surface` with `colors.border` and radius from `radii.xl`.
+- **Variants:** `default` (standard surface), `elevated` (`colors.surfaceElevated`), `glass` (`colors.surfaceGlass`).
 - **Interactive:** Optional `onPress` activates tactile press micro-animation (`scale: 0.985`, active border highlight).
 
 ### 4. Badge & Pill (`Badge.tsx`)
-- **Variants:** `primary` / `unread` (coral for message badges), `role` (accent lavender for Owner/Admin/Member), `success`, `warning`, `error`.
+- **Variants:** `primary` / `unread` (amber for message badges), `role` (warm coral for Owner/Admin/Member), `success`, `warning`, `error`.
 - **Shape:** Full pill radius (`radii.full`), bold legible typography.
 
 ### 5. Input (`Input.tsx`)
-- **Focus State:** Active focus ring transitioning border to `colors.primary` with restrained coral emphasis.
+- **Focus State:** Active focus ring transitioning border to `colors.primary` with restrained amber emphasis.
 - **Slots:** Leading icon (e.g. search, lock), trailing icon, error message, helper text.
 
 ### 6. EmptyState (`EmptyState.tsx`)
@@ -186,7 +199,7 @@ The application uses an in-house, zero-external-dependency shared component suit
 
 ### 7. BottomNav (`BottomNav.tsx`)
 - **Structure:** Docked bottom navigation surface housing `Circles`, `Chats`, and `Profile`.
-- **Indicator:** Quiet midnight surface with a coral active label; no glowing pill.
+- **Indicator:** Quiet warm-charcoal surface with an amber active label; no glowing pill.
 
 
 ---
