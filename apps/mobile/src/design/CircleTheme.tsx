@@ -6,12 +6,15 @@ import type { BackgroundKey, ThemePreset } from '@circlechat/shared';
 /**
  * Circle themes (M12, docs/DATABASE.md §1.4): the four app-defined presets
  * the server accepts as `circle_settings.theme_preset`. Each preset maps the
- * design-system roles onto the approved dark palette — personalization never
- * invents new roles, it only recolors existing tokens (docs/design.md §3).
- * The persisted `dark_purple` key remains for API compatibility; its visual
- * roles now resolve to the approved warm-midnight brand foundation.
+ * design-system roles onto the approved Warm Hearth palette — personalization
+ * only recolors existing roles, never invents new ones (design.md §24).
+ *
+ * ⚠️ TECHNICAL DEBT (V2): the preset enum NAMES (`dark_purple`, `orchid`) still
+ * reference the old purple palette, but their VISUAL appearance is now Warm
+ * Hearth amber/timber. Renaming requires a server-side schema + API change
+ * (packages/shared/src/circles.ts Zod enum + DB migration), which is out of
+ * scope for this visual migration. The names are API-stable identifiers only.
  */
-
 export interface ThemeColors {
   primary: string;
   background: string;
@@ -27,6 +30,7 @@ export interface ThemeColors {
   bubbleOwnText: string;
 }
 
+/** Warm Hearth default — Firelight Amber on deep charcoal canvas. */
 const darkPurple: ThemeColors = {
   primary: baseColors.primary,
   background: baseColors.background,
@@ -42,42 +46,47 @@ const darkPurple: ThemeColors = {
 };
 
 export const CIRCLE_THEMES: Record<ThemePreset, ThemeColors> = {
+  /** Warm Hearth — amber firelight on deep charcoal. */
   dark_purple: darkPurple,
+  /** Cabin Night — deepest charcoal base, same amber identity. */
   midnight: {
     ...darkPurple,
-    background: '#05050C',
-    surface: '#101020',
-    border: '#1F1F38',
-    textMuted: '#7A7A92',
-    bubbleOther: '#101020',
+    background: baseColors.surfaceContainerLowest,
+    surface: baseColors.surfaceContainerLow,
+    border: baseColors.borderActive,
+    textMuted: baseColors.textMuted,
+    bubbleOther: baseColors.surfaceContainerLow,
   },
+  /** Velvet Dusk — warm coral primary, terracotta accent. */
   orchid: {
     ...darkPurple,
-    background: '#12081C',
-    surface: '#221233',
-    accent: '#C4B5FD',
-    border: '#3A2352',
-    bubbleOther: '#221233',
+    primary: baseColors.memberCoral,
+    accent: baseColors.memberTerracotta,
+    border: baseColors.borderActive,
+    textMuted: baseColors.textMuted,
+    bubbleOwn: baseColors.memberCoral,
+    bubbleOwnText: baseColors.primaryContent,
   },
+  /** Amber Timber — deep ochre amber on elevated timber. */
   ember: {
     ...darkPurple,
-    primary: '#B45309',
-    background: '#150A08',
-    surface: '#2A1712',
-    accent: '#FBBF24',
-    border: '#47291C',
-    textMuted: '#9C8878',
-    bubbleOwn: '#B45309',
-    bubbleOther: '#2A1712',
-    bubbleOwnText: baseColors.text,
+    primary: baseColors.primaryDark,
+    accent: baseColors.primary,
+    background: baseColors.background,
+    surface: baseColors.surfaceElevated,
+    border: baseColors.borderActive,
+    textMuted: baseColors.textMuted,
+    bubbleOwn: baseColors.primaryDark,
+    bubbleOther: baseColors.surfaceElevated,
+    bubbleOwnText: baseColors.primaryContent,
   },
 };
 
 export const THEME_LABELS: Record<ThemePreset, string> = {
-  dark_purple: 'Warm Midnight (default)',
-  midnight: 'Midnight',
-  orchid: 'Orchid',
-  ember: 'Ember',
+  dark_purple: 'Warm Hearth (default)',
+  midnight: 'Cabin Night',
+  orchid: 'Velvet Dusk',
+  ember: 'Amber Timber',
 };
 
 /**
