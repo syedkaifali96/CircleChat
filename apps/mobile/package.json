@@ -33,7 +33,8 @@
     "react-native": "^0.79.6",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "^4.11.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "@circlechat/shared": "*"
   },
   "devDependencies": {
     "@testing-library/react-native": "^13.2.0",
