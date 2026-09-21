@@ -143,6 +143,12 @@ function ThemedComposer({
         multiline
         editable={!sending}
         testID="composer-input"
+        onSubmitEditing={() => {
+          if (draft.trim().length > 0) {
+            onSend();
+          }
+        }}
+        blurOnSubmit={false}
       />
       <Pressable
         style={[styles.composerSend, { backgroundColor: themed.primary }, (sending || draft.trim().length === 0) && styles.composerSendDisabled]}
@@ -714,7 +720,8 @@ export default function ConversationScreen() {
     <CircleThemeGate circleId={header.circleId ?? ''}>
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: 'transparent' }]}
-      behavior={Platform.OS === 'android' ? undefined : 'padding'}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       {/* M12: themed Circle backdrop sits behind the whole conversation. */}
       <ThemedSurface />
