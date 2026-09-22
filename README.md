@@ -244,7 +244,5 @@ There is no OpenAI or other generative-AI environment variable in the current ap
 - Typing/presence state is single-process in-memory; a multi-node deployment would need a shared store (Redis).
 - Presence is only shown for the direct-chat partner; no group-wide online indicator.
 - Video thumbnails are not generated (frame extraction needs ffmpeg-scale native tooling).
-- Reply messages render correctly and the API accepts `replyToId`, but the
-  mobile composer still needs its user-facing Reply action during M14 polish.
 - The basic Android smoke pass is complete, but the full device matrix (media retry, realtime reconnect, deep links, biometrics and remote push in a development build) is still part of M14 hardening.
 - iOS, tablet/desktop layouts, multi-node realtime and E2EE are post-MVP work.

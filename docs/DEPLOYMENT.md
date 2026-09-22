@@ -83,6 +83,13 @@ mobile       → EAS Build on demand / on tag: Android staging APK; manual EAS S
 - **Basic alerts**: error-rate spike, deploy failure, DB storage > 80% of tier.
 - Weekly operator checklist (manual, in this repo): backup restore spot-check, dependency audit summary, storage/bandwidth review vs. R2 free tier.
 
+**Known limitation (M14.3):** video thumbnails are not generated —
+frame extraction needs ffmpeg-scale native tooling that is not part of the
+MVP deployment. Video messages render a themed placeholder (play icon +
+filename) in the app and open the original file on tap. If ffmpeg becomes
+available on the host, `getVideoThumbnail` (apps/mobile/src/chat/videoThumbnail.tsx)
+is the single seam to resolve a frame derivative; no other change is needed.
+
 ## 6. Backups & Recovery
 
 - Neon PITR enabled; weekly manual logical backup downloaded off-platform during MVP.
