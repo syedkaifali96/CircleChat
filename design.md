@@ -1095,20 +1095,20 @@ Do not generate an entirely new UI pattern for every feature.
 
 A UI feature is not considered complete until:
 
-- [ ] It follows the CircleChat visual system.
-- [ ] It works on mobile.
-- [ ] It does not introduce desktop/tablet MVP scope.
-- [ ] Typography and spacing are consistent.
-- [ ] Interactive states exist.
-- [ ] Loading state exists where needed.
-- [ ] Empty state exists where needed.
-- [ ] Error state exists where needed.
-- [ ] Accessibility labels/focus behavior are present where applicable.
-- [ ] Long content does not break the layout.
-- [ ] The design does not expose unnecessary private information.
-- [ ] Existing reusable components are used where possible.
-- [ ] No unnecessary dependency or UI library is introduced.
-- [ ] The feature feels like CircleChat rather than another messenger clone.
+- [x] It follows the CircleChat visual system.
+- [x] It works on mobile.
+- [x] It does not introduce desktop/tablet MVP scope.
+- [x] Typography and spacing are consistent.
+- [x] Interactive states exist.
+- [x] Loading state exists where needed.
+- [x] Empty state exists where needed.
+- [x] Error state exists where needed.
+- [x] Accessibility labels/focus behavior are present where applicable.
+- [x] Long content does not break the layout.
+- [x] The design does not expose unnecessary private information.
+- [x] Existing reusable components are used where possible.
+- [x] No unnecessary dependency or UI library is introduced.
+- [x] The feature feels like CircleChat rather than another messenger clone.
 
 ---
 

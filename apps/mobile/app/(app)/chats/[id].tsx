@@ -182,6 +182,10 @@ export default function ConversationScreen() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<Message | null>(null);
+  // M14.3: pending reply target, set from the long-press menu and cleared on
+  // send or cancel. The server validates replyToId against the conversation,
+  // so both Circle and direct chats offer the same Reply action.
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [reacting, setReacting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState('');
@@ -423,9 +427,14 @@ export default function ConversationScreen() {
     setSending(true);
     try {
       const token = (await loadSessionToken()) ?? '';
-      const { message } = await sendMessage(token, id, { body, clientMessageId: makeClientMessageId() });
+      const { message } = await sendMessage(token, id, {
+        body,
+        clientMessageId: makeClientMessageId(),
+        ...(replyingTo ? { replyToId: replyingTo.id } : {}),
+      });
       setMessages((current) => [...current, message]);
       setDraft('');
+      setReplyingTo(null);
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
     } catch {
       setSendError("Message couldn't be sent. Check your connection and try again.");
@@ -694,6 +703,15 @@ export default function ConversationScreen() {
     setEditDraft(editTarget?.body ?? '');
   };
 
+  const onReply = (message: Message) => {
+    setActionMessage(null);
+    setReplyingTo(message);
+  };
+
+  const onCancelReply = () => {
+    setReplyingTo(null);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered} testID="conversation-loading">
@@ -835,6 +853,22 @@ export default function ConversationScreen() {
         <Text style={styles.sendError} testID="conversation-send-error">{sendError}</Text>
       ) : null}
 
+      {replyingTo ? (
+        <View style={styles.quoteBar} testID="composer-quote">
+          <View style={styles.quoteLeft} />
+          <View style={styles.quoteBody}>
+            <Text style={styles.quoteSender} numberOfLines={1}>
+              {replyingTo.deleted ? 'Deleted message' : replyingTo.senderDisplayName}
+            </Text>
+            <Text style={styles.quoteText} numberOfLines={1}>
+              {replyingTo.deleted ? 'Message deleted' : replyingTo.body ?? (replyingTo.type !== 'text' ? 'Media' : '')}
+            </Text>
+          </View>
+          <Pressable onPress={onCancelReply} hitSlop={8} testID="quote-cancel">
+            <Text style={styles.quoteCancel}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <ThemedComposer
         draft={draft}
         onDraftChange={onDraftChange}
@@ -878,6 +912,11 @@ export default function ConversationScreen() {
               {header.type === 'circle' && header.circleId && !actionMessage.deleted ? (
                 <Pressable style={styles.menuOption} onPress={() => onPin(actionMessage)} testID="action-pin">
                   <Text style={styles.menuOptionText}>Pin to Pinboard</Text>
+                </Pressable>
+              ) : null}
+              {!actionMessage.deleted ? (
+                <Pressable style={styles.menuOption} onPress={() => onReply(actionMessage)} testID="action-reply">
+                  <Text style={styles.menuOptionText}>Reply</Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -1033,6 +1072,20 @@ const styles = StyleSheet.create({
   muteIconActive: { color: colors.textMuted },
   listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm },
   sendError: { ...typography.caption, color: colors.error, fontSize: 12, paddingHorizontal: 16, paddingVertical: 4 },
+  quoteBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: 8,
+  },
+  quoteLeft: { width: 3, height: '100%', backgroundColor: colors.accent, borderRadius: 2 },
+  quoteBody: { flex: 1 },
+  quoteSender: { ...typography.captionStrong, color: colors.accent, fontSize: 11 },
+  quoteText: { ...typography.caption, color: colors.textSecondary, fontSize: 12 },
+  quoteCancel: { ...typography.button, color: colors.textMuted, fontSize: 12 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

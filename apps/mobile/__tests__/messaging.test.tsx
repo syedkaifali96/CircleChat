@@ -245,7 +245,7 @@ describe('MediaContent', () => {
     expect(mockApi.fetchMediaDownloadUrl).not.toHaveBeenCalled();
   });
 
-  it('opens the authorized URL when a video attachment is tapped', async () => {
+  it('renders the video placeholder and opens the authorized URL when tapped', async () => {
     mockApi.fetchMediaDownloadUrl.mockResolvedValue('https://download.example.test/video');
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
 
@@ -262,7 +262,9 @@ describe('MediaContent', () => {
       />,
     );
 
-    fireEvent.press(screen.getByTestId('media-attachment-video-1'));
+    // M14.3: videos render the placeholder (no ffmpeg thumbnails in the MVP
+    // toolchain); tapping it still opens the signed, authorized URL.
+    fireEvent.press(screen.getByTestId('video-placeholder-video-1'));
     await waitFor(() => expect(open).toHaveBeenCalledWith('https://download.example.test/video'));
     open.mockRestore();
   });

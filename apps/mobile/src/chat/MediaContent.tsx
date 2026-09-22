@@ -4,6 +4,7 @@ import { Audio } from 'expo-av';
 import type { Message } from '../lib/api';
 import { fetchMediaDownloadUrl } from '../lib/api';
 import { colors, typography } from '../design/tokens';
+import { getVideoThumbnail, VideoPlaceholder } from './videoThumbnail';
 
 /**
  * Media content for chat bubbles (M7): images render inline, voice shows a
@@ -182,7 +183,44 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
     );
   }
 
-  // Video/file attachments render as tappable chips (opens the signed URL).
+  // M14.3: videos have no frame-extracted thumbnail in the MVP toolchain
+  // (ffmpeg-scale native tooling is not part of the build). The seam reports
+  // null and the placeholder renders — crash-safe, no network round-trip,
+  // and it opens the signed URL on press exactly like the attachment chip. If
+  // a future milestone adds frame extraction, getVideoThumbnail resolves a real
+  // URI and this branch renders it instead of the placeholder — no other change.
+  if (message.type === 'video') {
+    const thumb = getVideoThumbnail(message);
+    if (thumb) {
+      return (
+        <Pressable
+          style={styles.image}
+          onPress={() => setFullRes(true)}
+          testID={'media-video-thumb-' + message.id}
+        >
+          <Image source={{ uri: thumb }} style={styles.image} resizeMode="cover" testID={'media-image-' + message.id} />
+        </Pressable>
+      );
+    }
+    return (
+      <VideoPlaceholder
+        message={message}
+        onPress={() =>
+          void (async () => {
+            try {
+              const uri = await fetchMediaDownloadUrl(message.mediaId!);
+              await Linking.openURL(uri);
+            } catch {
+              setLoadFailed(true);
+            }
+          })()}
+      />
+    );
+  }
+
+  // File attachments render as tappable chips (opens the signed URL). Video is
+  // fully handled above (thumbnail seam, else VideoPlaceholder), so it never
+  // reaches this branch and TS narrows 'video' out of the message type here.
   return (
     <Pressable
       style={styles.attachment}
@@ -196,9 +234,9 @@ export function MediaContent({ message, localUri, uploadStage, onRetry }: MediaC
       })()}
       testID={`media-attachment-${message.id}`}
     >
-      <Text style={styles.attachmentIcon}>{message.type === 'video' ? '🎬' : '📎'}</Text>
+      <Text style={styles.attachmentIcon}>📎</Text>
       <Text style={styles.attachmentText} numberOfLines={1}>
-        {message.body || (message.type === 'video' ? 'Video' : 'Attachment')}
+        {message.body || 'Attachment'}
       </Text>
     </Pressable>
   );
