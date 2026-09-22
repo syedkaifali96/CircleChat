@@ -122,6 +122,10 @@ export function wireRealtime(
 ): RealtimeHandle {
   const presence = options.presence ?? createPresenceRegistry();
   const typingLimiter = new SocketRateLimiter(30, 10_000);
+  // Join/leave each authorize against the DB per attempt; a misbehaving
+  // client must not be able to burn DB cycles or spam room names
+  // (docs/SECURITY.md §6: per-user/session socket event limits).
+  const joinLimiter = new SocketRateLimiter(60, 60_000);
 
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
@@ -161,30 +165,33 @@ export function wireRealtime(
       const conversationId =
         typeof payload === 'object' && payload !== null
           ? (payload as { conversationId?: unknown }).conversationId
-          : undefined;
-      if (typeof conversationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(conversationId)) {
-        ack?.({ ok: false });
-        return;
-      }
-      try {
-        const allowed = await canAccessConversation(db, conversationId, userId);
-        if (!allowed) {
+          : undefined;        if (typeof conversationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(conversationId)) {
           ack?.({ ok: false });
           return;
         }
-        socket.join(`${CONVERSATION_ROOM_PREFIX}${conversationId}`);
-        ack?.({ ok: true });
-      } catch {
-        ack?.({ ok: false });
-      }
-    });
+        if (!joinLimiter.allow(userId)) {
+          ack?.({ ok: false });
+          return;
+        }
+        try {
+          const allowed = await canAccessConversation(db, conversationId, userId);
+          if (!allowed) {
+            ack?.({ ok: false });
+            return;
+          }
+          socket.join(`${CONVERSATION_ROOM_PREFIX}${conversationId}`);
+          ack?.({ ok: true });
+        } catch {
+          ack?.({ ok: false });
+        }
+      });
 
     socket.on('leave', (payload: unknown) => {
       const conversationId =
         typeof payload === 'object' && payload !== null
           ? (payload as { conversationId?: unknown }).conversationId
           : undefined;
-      if (typeof conversationId === 'string' && conversationId.length > 0) {
+      if (typeof conversationId === 'string' && conversationId.length > 0 && joinLimiter.allow(userId)) {
         socket.leave(`${CONVERSATION_ROOM_PREFIX}${conversationId}`);
       }
     });

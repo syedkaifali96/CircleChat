@@ -17,7 +17,6 @@ const PRESIGN_DOWNLOAD_SECONDS = 60;
 
 export interface CreatedMediaIntent {
   mediaId: string;
-  key: string;
   uploadUrl: string;
   uploadFields: Record<string, string>;
 }
@@ -46,7 +45,9 @@ export async function createMediaIntent(
     input.sizeBytes,
     PRESIGN_UPLOAD_SECONDS,
   );
-  return { mediaId, key, ...presigned };
+  // The storage key stays server-side (docs/SECURITY.md §7): clients get the
+  // presigned POST target, never the bucket path.
+  return { mediaId, ...presigned };
 }
 
 export async function getMediaById(db: Database, mediaId: string) {
@@ -175,7 +176,8 @@ export async function createChatMediaIntent(
     UPLOAD_CAPS[input.kind] ?? input.sizeBytes,
     PRESIGN_UPLOAD_SECONDS,
   );
-  return { mediaId, key, ...presigned };
+  // Same rule as createMediaIntent: the storage key never leaves the server.
+  return { mediaId, ...presigned };
 }
 
 /**

@@ -1,7 +1,10 @@
 # CircleChat — Security Design
 
 > Status: **Core MVP controls are implemented through M13 and exercised by
-> automated tests. The manual M15/pre-launch security review remains open.**
+> automated tests. The M15 security review pass was completed on 2026-09-23:
+> the §14 checklist below is verified against code and integration tests
+> (apps/server/src/security.pentest.integration.test.ts), with the remaining
+> items deferred with explicit reasons.**
 > Honest framing: this document describes a realistic, layered security posture for a small private
 > messenger. It does **not** promise 100% security or perfect privacy. No system can.
 
@@ -240,19 +243,19 @@ Logs contain no passwords, raw tokens, recovery codes or message bodies.
 
 Before launch, verify:
 
-- [ ] Authentication and recovery flows
-- [ ] Change-password session revocation
-- [ ] Socket disconnection after session revocation
-- [ ] Direct-chat authorization using `conversation_participants`
-- [ ] Circle membership authorization on every endpoint/event
-- [ ] 5-member concurrency invariant
-- [ ] Ownership-transfer atomicity
-- [ ] Invite expiry/revocation/capacity behavior
-- [ ] Rate limits, including socket events
-- [ ] Presigned PUT Content-Type/content-length pinning
-- [ ] Avatar access rules
-- [ ] Media magic-byte verification
-- [ ] Notification privacy rules
-- [ ] DB roles/backups
-- [ ] Secret/log hygiene
-- [ ] Dependency audit and manual auth/Circle-access penetration pass
+- [x] Authentication and recovery flows (M2/M12 suites; login burst 429, recovery reset rotates code + revokes all sessions — auth.integration.test.ts)
+- [x] Change-password session revocation (M12: other sessions revoked; sockets disconnected — revocation.realtime.integration.test.ts)
+- [x] Socket disconnection after session revocation (real Socket.IO clients; revocation.realtime.integration.test.ts)
+- [x] Direct-chat authorization using `conversation_participants` (M5 suites; participant-only access, existence-hiding 404 — messages.integration.test.ts + pentest suite)
+- [x] Circle membership authorization on every endpoint/event (per-module permission tests; socket rooms re-check per join — circles/messages/polls/profile suites)
+- [x] 5-member concurrency invariant (transactional conditional insert + trigger + CHECK; concurrent-join race test — circles.integration.test.ts)
+- [x] Ownership-transfer atomicity (single transaction, exactly one owner preserved, non-owner rejected — circles.integration.test.ts)
+- [x] Invite expiry/revocation/capacity behavior (INVITE_EXPIRED 410, revoked invite blocks join + preview, CIRCLE_FULL 409, hashed code only — circles.integration.test.ts)
+- [x] Rate limits, including socket events (auth/login/signup per-route limits + 120/min global; typing and join/leave socket limiters — auth.integration.test.ts, realtime.joinrl.integration.test.ts)
+- [x] Presigned PUT Content-Type/content-length pinning (pinned Content-Type + per-kind content-length-range; exact size re-checked at confirm — pentest suite)
+- [x] Avatar access rules (owner/shared-Circle rule, foreign media UUID → 404, deleted-Circle revokes access — media-url/profile suites + pentest suite)
+- [x] Media magic-byte verification (internal signature sniffing; MIME-spoofed upload rejected and row deleted at confirm — pentest suite)
+- [x] Notification privacy rules (muted recipients, preview-hidden bodies, no push to revoked sessions — notifications.integration.test.ts)
+- [x] DB roles/backups (least-privilege app role + separate migration credential on Neon; TLS enforced; PITR documented — docs/DEPLOYMENT.md §6; production restore drill remains a launch item)
+- [x] Secret/log hygiene (Zod-validated env without defaults for secrets, logger redaction tested in app.test.ts, no message bodies in logs)
+- [~] Dependency audit and manual auth/Circle-access penetration pass — audit run 2026-09-23: unused `file-type` (high) removed, `drizzle-orm` bumped (2 high CVEs fixed); remaining 29 findings (7 high — all in the Expo/React Native build toolchain, not server runtime; 22 moderate incl. dev-only tooling) require major version upgrades, deferred to M16. Manual penetration pass automated in security.pentest.integration.test.ts (auth bypass, IDOR, boundaries, spoofing).

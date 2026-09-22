@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### M15 — Security hardening
+
+- `feat(security): complete M15 hardening checklist`
+- SECURITY.md §14 review checklist verified item-by-item against code and
+  integration tests and ticked; dependency-audit item carries an explicit
+  deferral note (Expo/RN build-toolchain advisories → M16).
+- New penetration suite `security.pentest.integration.test.ts` (real
+  PostgreSQL + HTTP): auth bypass (missing/malformed/revoked bearers,
+  generic login errors), IDOR (foreign conversations/media/circles,
+  direct-chat participant isolation), message-boundary enforcement
+  (4000-char cap exactly), and upload constraints (presigned
+  Content-Type/content-length pinning, MIME-spoof rejection with
+  existence-hiding 404 and pending-row deletion).
+- Socket event abuse: per-user rate limit on `join`/`leave` alongside the
+  existing typing limiter (`realtime.joinrl.integration.test.ts`).
+- Media intent responses no longer expose a redundant top-level storage
+  `key`; the bucket path lives only inside the presigned POST form where
+  the S3 protocol requires it.
+- Dependency audit: removed unused `file-type` (high CVE) and bumped
+  `drizzle-orm` — 2 high CVEs eliminated; remaining advisories are
+  Expo/React Native build-toolchain majors deferred to M16.
+
 ### Phase 4–6 — Warm Hearth design system migration
 
 - `feat(mobile): migrate all 19 screens to warm hearth palette`

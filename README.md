@@ -169,6 +169,7 @@ Latest automated verification (Warm Hearth migration, 2026-09-18): shared 2/2, s
 | M12 — Personalization (Circle theme presets, accent palette, bundled chat backgrounds, settings pickers) | ✅ Done |
 | M13 — App Lock (local PIN + platform biometrics, six lock modes, full-content lock screen) | ✅ Done |
 | M14 — Testing / hardening | 🟡 In progress — unit/integration coverage strong; device/E2E matrix pending |
+| M15 — Security hardening (§14 review checklist, pentest suite, dependency audit) | ✅ Done — one item partially deferred (RN/Expo build-toolchain advisories → M16) |
 
 ## Getting Started
 
