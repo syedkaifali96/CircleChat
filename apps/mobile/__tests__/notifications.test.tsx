@@ -1,4 +1,5 @@
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react-native';
+import Constants from 'expo-constants';
 import NotificationSettingsScreen from '../app/(app)/notification-settings';
 import { PushManager } from '../src/lib/PushManager';
 import {
@@ -51,6 +52,12 @@ jest.mock('expo-router', () => {
 jest.mock('../src/auth/AuthContext', () => ({
   useAuth: () => ({ status: mockAuthStatus }),
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+// Controlled expoConfig for the EAS projectId assertions (read via mock holder).
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: null as unknown },
 }));
 
 jest.mock('expo-notifications', () => {
@@ -154,6 +161,20 @@ describe('push permission states (M8)', () => {
 
     await expect(registerForPushNotifications('session-token')).resolves.toBe('granted');
     expect(mockApi.registerPushTokenForSession).toHaveBeenCalledWith('session-token', 'ExpoPushToken[register-me]');
+  });
+
+  it('passes the EAS projectId to token acquisition when app.json configures one (M16)', async () => {
+    (Constants as unknown as { expoConfig: unknown }).expoConfig = {
+      extra: { eas: { projectId: 'pw-eas-123' } },
+    };
+    expoNotifications.getPermissionsAsync.mockResolvedValue({ granted: true });
+    expoNotifications.getExpoPushTokenAsync.mockResolvedValue({ data: 'ExpoPushToken[pwid]' });
+    mockApi.registerPushTokenForSession.mockResolvedValue({ ok: true });
+
+    await expect(registerForPushNotifications('session-token')).resolves.toBe('granted');
+    expect(expoNotifications.getExpoPushTokenAsync).toHaveBeenCalledWith({ projectId: 'pw-eas-123' });
+
+    (Constants as unknown as { expoConfig: unknown }).expoConfig = null;
   });
 
   it('returns denied when permission is refused and never calls the API', async () => {

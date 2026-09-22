@@ -145,9 +145,9 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M13 complete; M14 hardening is in progress (all automated suites green).**
+**M0–M15 complete; M16 deployment/release wiring is in place (owner actions listed in docs/DEPLOYMENT.md §4.1).**
 
-Latest automated verification (Warm Hearth migration, 2026-09-18): shared 2/2, server 239/239 (Vitest + real PostgreSQL) and mobile 160/160 (Jest + RNTL), with lint and typecheck green. Earlier real Android device smoke (2026-09-16, before this migration, physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require a development build with EAS/FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
+Latest automated verification (M16, 2026-09-23): shared 2/2, server 250/250 (Vitest + real PostgreSQL) and mobile 171/171 (Jest + RNTL), with lint and typecheck green. Earlier real Android device smoke (2026-09-16, before this migration, physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require the EAS development/preview build with FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 
 | Milestone | Status |
 |---|---|
@@ -170,6 +170,7 @@ Latest automated verification (Warm Hearth migration, 2026-09-18): shared 2/2, s
 | M13 — App Lock (local PIN + platform biometrics, six lock modes, full-content lock screen) | ✅ Done |
 | M14 — Testing / hardening | 🟡 In progress — unit/integration coverage strong; device/E2E matrix pending |
 | M15 — Security hardening (§14 review checklist, pentest suite, dependency audit) | ✅ Done — one item partially deferred (RN/Expo build-toolchain advisories → M16) |
+| M16 — Production deployment & Android release (EAS profiles, backend config, FCM wiring) | 🟡 Repo wiring done — build/deploy/FCM activation and device E2E are owner actions (docs/DEPLOYMENT.md §4.1, §8) |
 
 ## Getting Started
 

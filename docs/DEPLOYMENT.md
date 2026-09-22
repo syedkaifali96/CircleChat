@@ -72,6 +72,45 @@ tag v*       → deploy to production → migrations → smoke test → Sentry r
 mobile       → EAS Build on demand / on tag: Android staging APK; manual EAS Submit for store later
 ```
 
+### 4.1 M16 status: what is wired vs. what needs the owner
+
+The repository now ships every file the release automation needs; the
+remaining steps require owner-held accounts and secrets, so they are listed
+as explicit owner actions rather than being faked:
+
+Wired in-repo (M16):
+- `apps/mobile/app.json` — `android.package` (`com.circlechat.app`),
+  `POST_NOTIFICATIONS` + `RECORD_AUDIO` permissions, `expo-notifications`
+  plugin, and the `extra.eas.projectId` slot.
+- `apps/mobile/eas.json` — `development` (dev client), `preview`
+  (internal APK) and `production` (AAB) profiles with per-profile
+  `EXPO_PUBLIC_API_URL`; `appVersionSource: remote`.
+- `.env.example` — full production variable set (Neon `DATABASE_URL`, R2
+  credentials, `EXPO_ACCESS_TOKEN`, optional `SENTRY_DSN`) with the
+  owner-action sequence documented inline.
+- `.gitignore` — `google-services.json` and `*.keystore` are ignored.
+
+Owner actions (cannot be done by an agent — real accounts/secrets):
+1. Create the Expo account → `npx eas init` in `apps/mobile` → paste the
+   printed project ID into `app.json` `extra.eas.projectId` and the two
+   `REPLACE_WITH_*_API_URL` slots in `eas.json`.
+2. Neon → create the production project → put the pooled connection string
+   into Railway as `DATABASE_URL`.
+3. Railway → create the service from this repo → set `NODE_ENV=production`
+   plus the R2/Expo secrets → first deploy runs `npm ci`, `npm run build`,
+   `npm run db:migrate` then `npm start` (health check `/health`).
+4. Cloudflare R2 → create the private bucket + API token → fill the four
+   `R2_*` secrets in Railway.
+5. Android push (FCM): Firebase console → create the project for package
+   `com.circlechat.app` → download `google-services.json` → place it in
+   `apps/mobile/` (gitignored) → upload the same file (or the service-account
+   key) in Expo → `npx eas credentials`. `EXPO_ACCESS_TOKEN` goes into
+   Railway's secrets.
+6. Build: `npx eas build -p android --profile preview` (internal APK for
+   device E2E), then `--profile production` (AAB) for the store.
+7. Real-device E2E pass (signup → circles → direct + circle messaging →
+   realtime → media over real R2 → real FCM push → App Lock → theming).
+
 - Migrations run **before** the new server version accepts traffic (additive-first strategy: expand → migrate data → contract, so rollbacks stay possible).
 - Rollback = redeploy previous image; DB migrations are written to be backward-compatible for one release.
 
@@ -109,14 +148,18 @@ is the single seam to resolve a frame derivative; no other change is needed.
 
 Media is the cost driver to watch (spec risk #4) — upload caps and the cleanup job exist for this reason.
 
-## 8. Production Launch Checklist (summary)
+## 8. Production Launch Checklist
 
-- [ ] Production secrets rotated and stored in provider secret stores
-- [ ] Migrations applied from a clean staging database
-- [ ] Restore drill completed and recorded
-- [ ] Rate limits and WebSocket behavior verified on the chosen host
-- [ ] Sentry receiving scrubbed events and alerts configured
-- [ ] Database backups/PITR enabled
-- [ ] `.env` and real credentials absent from the repository
-- [ ] Dependency audit reviewed
-- [ ] `SECURITY.md` launch checklist signed off
+Items are marked: ✅ verified in-repo · ⏳ **Owner Action Required**
+(the step needs a real account/secret/store submission and cannot be
+completed from the repository).
+
+- [ ] ⏳ Production secrets rotated and stored in provider secret stores — Railway/Neon/R2/EAS stores; owner fills `.env.example`-listed names
+- [ ] ⏳ Migrations applied from a clean staging database — `npm run db:migrate` is the documented command; run it on the Neon staging branch first
+- [ ] ⏳ Restore drill completed and recorded — Neon PITR restore drill before launch
+- [ ] ⏳ Rate limits and WebSocket behavior verified on the chosen host — smoke test after the first Railway deploy (rate-limit suite runs in CI; host-level verification needs the live URL)
+- [ ] ⏳ Sentry receiving scrubbed events and alerts configured — optional; owner creates the Sentry project and sets `SENTRY_DSN`
+- [ ] ⏳ Database backups/PITR enabled — Neon dashboard toggle, owner action
+- [x] ✅ `.env` and real credentials absent from the repository — verified: no `.env`/`google-services.json`/`*.keystore` tracked; `.gitignore` covers all three
+- [x] ✅ Dependency audit reviewed — M15 audit (29 findings; 2 high CVEs fixed; remaining Expo/RN toolchain majors deferred with reason in `SECURITY.md` §14)
+- [x] ✅ `SECURITY.md` launch checklist signed off — M15 (2026-09-23): 15/16 items ticked with evidence, dependency-audit item carries the explicit deferral note

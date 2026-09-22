@@ -68,7 +68,7 @@ M16 Deployment / Android build
 | M0–M13 | Complete and covered by CI |
 | M14 Testing / hardening | In progress — automated coverage is strong; the full device/E2E matrix remains |
 | M15 Security hardening | Complete — §14 checklist verified/ticked (2026-09-23), pentest suite added, dependency audit run; RN/Expo build-toolchain advisories deferred to M16 |
-| M16 Deployment / Android release | Planned; local Android export works, production release is not claimed |
+| M16 Deployment / Android release | Repo wiring complete (EAS profiles, android.package, backend config docs, FCM process); actual deploy/build/FCM activation and device E2E are owner actions — docs/DEPLOYMENT.md §4.1, §8 |
 
 For each milestone:
 

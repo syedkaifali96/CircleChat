@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { registerPushTokenForSession, unregisterPushTokenForSession } from './api';
 
 /**
@@ -71,7 +72,13 @@ export async function registerForPushNotifications(token: string): Promise<PushP
       const after = (await Notifications.getPermissionsAsync()) as unknown as PermissionResult;
       return after.status === 'denied' ? 'denied' : 'unavailable';
     }
-    const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
+    // EAS builds (M16) need the EAS project id here — without it
+    // getExpoPushTokenAsync throws in preview/production builds (Expo Go
+    // never reached this path; it has no remote push on Android SDK 53+).
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const pushToken = (
+      await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)
+    ).data;
     await registerPushTokenForSession(token, pushToken);
     return 'granted';
   } catch {

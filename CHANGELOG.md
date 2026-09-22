@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### M16 — Production deployment & Android release wiring
+
+- `chore(deploy): complete M16 production deployment and android release`
+- `apps/mobile/app.json`: `android.package` (`com.circlechat.app`),
+  `POST_NOTIFICATIONS`/`RECORD_AUDIO` permissions, `expo-notifications`
+  plugin and the `extra.eas.projectId` slot.
+- New `apps/mobile/eas.json`: `development` (dev client), `preview`
+  (internal APK) and `production` (AAB) profiles with per-profile
+  `EXPO_PUBLIC_API_URL`; versioning tracked remotely (`appVersionSource`).
+- Push token acquisition now passes the EAS project id from app config —
+  required in EAS builds (Expo Go never reached this path on Android).
+  Regression test added (mobile 171).
+- `.env.example` documents the full production variable set (Neon, R2,
+  `EXPO_ACCESS_TOKEN`, optional Sentry) with the owner-action sequence;
+  `.gitignore` covers `google-services.json` and `*.keystore`.
+- `DEPLOYMENT.md` §4.1 lists exactly what is wired vs. what requires owner
+  accounts/secrets; §8 launch checklist items are marked verified vs.
+  Owner Action Required (nothing faked).
+- Deferred Expo/RN build-toolchain advisories reviewed in M16: no
+  non-breaking fix path exists (`npm audit fix` cannot resolve; fixes
+  require Expo SDK 57 + RN 0.87 major migration) — documented in
+  `SECURITY.md` §14.
+
 ### M15 — Security hardening
 
 - `feat(security): complete M15 hardening checklist`

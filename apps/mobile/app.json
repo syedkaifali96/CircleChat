@@ -6,6 +6,21 @@
     "scheme": "circlechat",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#161311",
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      "expo-notifications"
+    ],
+    "android": {
+      "package": "com.circlechat.app",
+      "permissions": [
+        "RECORD_AUDIO",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
   }
 }

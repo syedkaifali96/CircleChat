@@ -15,6 +15,11 @@ web-build/
 .env.*
 !.env.example
 
+# Android release credentials (M16) — Google account keys & FCM config are per-owner secrets
+google-services.json
+*.keystore
+!debug.keystore
+
 # Misc
 npm-debug.log*
 .DS_Store
