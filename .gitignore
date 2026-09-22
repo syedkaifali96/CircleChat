@@ -32,3 +32,6 @@ Thumbs.db
 # Ephemeral embedded-PostgreSQL data dirs from integration test runs
 circlechat-pg-*/
 
+# Freebuff coding-tool workspace metadata (not project code)
+.freebuff/
+
