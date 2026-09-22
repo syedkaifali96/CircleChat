@@ -1,7 +1,8 @@
 # CircleChat — AI-Assisted Development Plan
 
-> Status snapshot: **M0–M13 are implemented. M14 testing/hardening is active;
-> M15 security hardening and M16 production deployment remain planned.**
+> Status snapshot: **M0–M15 are implemented (M14's physical-device/E2E matrix
+> remains open). M16 deployment/release wiring is in place; the actual deploy,
+> EAS build, FCM activation and device E2E are documented owner actions.**
 
 ## Purpose
 Use AI as a virtual development team while keeping human control over product, architecture, security and production decisions.

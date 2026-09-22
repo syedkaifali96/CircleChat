@@ -1,6 +1,6 @@
 # CircleChat — API Design
 
-> Status: **Implemented MVP contract through M13.** All endpoints below are JSON over HTTPS under
+> Status: **Implemented MVP contract through M16** (endpoint surface unchanged since M13; M15 removed the redundant top-level `key` from upload-intent responses — the storage path now appears only inside the presigned POST form). All endpoints below are JSON over HTTPS under
 > `/v1`. Auth: `Authorization: Bearer <session token>` unless marked **public**.
 > Errors: stable machine codes + generic human messages (see SECURITY.md §12).
 >

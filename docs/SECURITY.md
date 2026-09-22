@@ -1,10 +1,11 @@
 # CircleChat — Security Design
 
-> Status: **Core MVP controls are implemented through M13 and exercised by
+> Status: **Core MVP controls are implemented through M16 and exercised by
 > automated tests. The M15 security review pass was completed on 2026-09-23:
 > the §14 checklist below is verified against code and integration tests
 > (apps/server/src/security.pentest.integration.test.ts), with the remaining
-> items deferred with explicit reasons.**
+> dependency-toolchain items deferred with explicit reasons and an M16
+> re-review note.**
 > Honest framing: this document describes a realistic, layered security posture for a small private
 > messenger. It does **not** promise 100% security or perfect privacy. No system can.
 

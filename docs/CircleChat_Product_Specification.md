@@ -1,6 +1,6 @@
 # CircleChat — Product Specification
 
-> Status: **MVP product baseline implemented through M13; M14 testing and hardening is in progress.**
+> Status: **MVP product baseline implemented through M16 (M14's physical-device/E2E matrix remains open; production deploy/EAS build/FCM activation are documented owner actions).**
 
 ## Product
 CircleChat is a private messenger designed for small circles of 2–5 close friends or family members.

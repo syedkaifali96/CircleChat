@@ -40,16 +40,16 @@ CircleChat is intentionally **not a WhatsApp clone**. The Circle itself is the c
 - Session/device management
 - Notification controls
 
-## Current Capabilities (implemented through M13)
+## Current Capabilities (implemented through M16)
 
 What actually ships today, verified by the test suites referenced below:
 
 - **Authentication:** username/password accounts, recovery codes, session/device management with revocation (revoked sessions also disconnect live sockets)
 - **Profiles:** display name, bio, avatars via private R2 storage with authorized presigned access
 - **Circles:** create/join via multi-use expiring revocable invites, roles (owner/admin/member), ownership transfer, server-enforced 5-member limit (transaction + trigger + CHECK)
-- **Messaging:** Direct (requires a shared active Circle) and Circle text chats with idempotent sends, keyset-paginated history, reactions, reply metadata/rendering, 24-hour sender-only edits, sender/admin tombstone deletes, read state and unread counts
+- **Messaging:** Direct (requires a shared active Circle) and Circle text chats with idempotent sends, keyset-paginated history, reactions, reply UI (long-press → Reply, composer quote preview, reply previews in bubbles), 24-hour sender-only edits, sender/admin tombstone deletes, read state and unread counts
 - **Realtime:** typing indicators (server-side TTL expiry) and online/offline presence with last-seen timestamps
-- **Media messaging:** images, video, voice messages (2-minute server-enforced limit) via presigned uploads to private R2 with magic-byte verification; image thumbnails (400px) served alongside originals
+- **Media messaging:** images, video, voice messages (2-minute server-enforced limit) via presigned uploads to private R2 with magic-byte verification; image thumbnails (400px) served alongside originals; videos without a generated frame render a themed crash-safe placeholder (frame extraction stays a post-MVP seam)
 - **GIF search:** via **GIPHY**, called directly from the client per GIPHY's API terms (proxying prohibited), with the "Powered By GIPHY" attribution in the picker
 - **Push notifications:** server-authoritative Expo Push fan-out after every persisted message — per-user global toggle, per-conversation mute, message-preview privacy, multi-device support (devices = sessions), invalid-token cleanup, and notification-tap deep links; provider failures never affect messaging
 - **Circle Home:** a private dashboard per Circle — identity header (avatar, name, description, member count), members preview with roles, the primary Open Chat action carrying the server-computed unread count, and management actions (invites, role changes, settings) — served by GET /v1/circles/:id/home, active members only
@@ -79,7 +79,7 @@ Product & design sources of truth:
 - [Design System & UX Specification](design.md)
 - [AI-Assisted Development Plan](docs/CircleChat_AI_Build_Plan.md)
 
-Technical foundation (approved and implemented through M13):
+Technical foundation (approved and implemented through M16):
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Database Design](docs/DATABASE.md)
@@ -145,7 +145,7 @@ CircleChat should collect the minimum information necessary to provide the servi
 
 ## Status
 
-**M0–M15 complete; M16 deployment/release wiring is in place (owner actions listed in docs/DEPLOYMENT.md §4.1).**
+**M0–M16 complete.** Production deployment, the Android EAS build and FCM activation are owner actions with a ready runbook — see [docs/DEPLOYMENT.md §4.1](docs/DEPLOYMENT.md) (Expo/EAS init, Neon, Cloudflare R2, Railway, Firebase `google-services.json`) and the §8 launch checklist (3 items verified in-repo, 6 owner actions).
 
 Latest automated verification (M16, 2026-09-23): shared 2/2, server 250/250 (Vitest + real PostgreSQL) and mobile 171/171 (Jest + RNTL), with lint and typecheck green. Earlier real Android device smoke (2026-09-16, before this migration, physical device via Expo Go + local server): launch, signup/auth, API connection, notification settings UI and global-toggle persistence PASS. Actual remote push delivery and push-tap navigation are **not yet device-verified** — they require the EAS development/preview build with FCM configuration plus `EXPO_ACCESS_TOKEN` (Expo Go on Android since SDK 53 provides no remote push capability).
 

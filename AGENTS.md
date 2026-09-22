@@ -57,7 +57,7 @@ docs/            All documentation — update docs when behavior changes
 
 ## 6. UI Rules (Expo app)
 
-- Design tokens only (full token/component definitions in `design.md`): colors `#7C3AED / #0B0714 / #171225 / #A78BFA / #F5F3FF`, Inter font, radii per `design.md` §4 (tokens in `apps/mobile/src/design/tokens.ts`). No hardcoded hex values in screens.
+- Design tokens only (full token/component definitions in `design.md`): warm-hearth palette per `design.md` §4 and `apps/mobile/src/design/tokens.ts` (primary `#F59E0B` amber, `#161311` canvas, warm surfaces, coral accent) with Inter font and the documented radii. No hardcoded hex values in screens.
 - Every UI feature must pass the `design.md` §43 acceptance checklist (states, accessibility, responsive, no new UI libraries).
 - Reuse the shared component library (Button, Input, Card, MessageBubble, Avatar, Modal). Building a screen with raw primitives instead of the library is a bug.
 - Subtle animations only (fade/scale ≤ 200ms); no over-animation.

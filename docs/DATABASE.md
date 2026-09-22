@@ -1,6 +1,6 @@
 # CircleChat — Database Design
 
-> Status: **Implemented MVP schema through M13.** PostgreSQL 16 is accessed via
+> Status: **Implemented MVP schema through M16** (no schema changes since M13 — M15/M16 touched only rate limiting, upload responses and release wiring). PostgreSQL 16 is accessed via
 > Drizzle ORM; committed migrations and real-PostgreSQL integration tests are
 > the executable source of truth when this document and code differ.
 

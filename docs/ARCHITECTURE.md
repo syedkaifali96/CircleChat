@@ -1,6 +1,6 @@
 # CircleChat — Architecture
 
-> Status: **Implemented MVP baseline through M13; M14 hardening is in progress.** This document is the
+> Status: **Implemented MVP baseline through M16.** This document is the
 > technical source of truth for how CircleChat is built. Product behavior comes from
 > `docs/CircleChat_Product_Specification.md` and UX/design behavior from `design.md`.
 >
@@ -59,7 +59,7 @@
 - Server-side participant/member authorization is required before room joins and on every relevant event.
 - Events are notifications, not the source of truth; clients recover state through REST.
 - **Session revocation must disconnect live sockets associated with that session.** A revoked session cannot continue receiving or emitting authorized events.
-- Socket event rate limits are required for message send, typing, joins and other abuse-sensitive events; limits are documented/tuned with the API security policy.
+- Socket event rate limits are required for message send, typing, joins and other abuse-sensitive events; limits are documented/tuned with the API security policy. Implemented (M15): a shared per-user sliding-window limiter gates typing and join/leave attempts before their per-event DB authorization queries, so a runaway client cannot burn authorization cycles.
 
 ### 2.6 Media storage — **Cloudflare R2 + presigned URLs**
 
@@ -93,9 +93,9 @@
 - Integration tests use a real PostgreSQL database.
 - App tests use React Native Testing Library.
 - Maestro device flows are deferred to hardening.
-- Latest local baseline: shared 2/2, server 239/239 and mobile 143/143 tests,
-  plus lint and typecheck. Counts are a snapshot, not a substitute for the M14
-  physical-device matrix.
+- Latest local baseline (M16): shared 2/2, server 250/250 and mobile 171/171
+  tests, plus lint and typecheck. Counts are a snapshot, not a substitute for
+  the physical-device matrix (owner-run EAS build + E2E pass).
 
 ### 2.10 Deployment — **Railway (server) + Neon (Postgres) + R2 + EAS Build**
 
